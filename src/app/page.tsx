@@ -200,8 +200,8 @@ export default function HomePage() {
               description="AI đọc data, phát hiện bất thường, gợi ý: 'Campaign này CPC cao bất thường, nên tắt'. Như có chuyên gia ngồi cạnh."
             />
             <FeatureCard
-              title="Đồng bộ Google Sheets"
-              description="Data tự lưu mỗi ngày. Tuần sau mở ra là có báo cáo sẵn. Không cần copy paste, không cần Excel."
+              title="Theo dõi diễn biến"
+              description="Biểu đồ xu hướng theo ngày, so sánh hiệu suất qua thời gian. Phát hiện sớm campaign đang tuột dốc để xử lý kịp."
             />
           </div>
         </div>

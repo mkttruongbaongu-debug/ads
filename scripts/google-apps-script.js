@@ -104,6 +104,8 @@ function doPost(e) {
                 return saveUser(data);
             case 'getUser':
                 return getUser(data);
+            case 'fixHeaders':
+                return fixHeaders(data);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -187,15 +189,39 @@ function syncData(data) {
 
 /**
  * Append data - thêm dữ liệu mới
+ * Tự động thêm headers nếu sheet trống
  */
 function appendData(data) {
     const { sheetName, rows } = data;
     const sheet = getOrCreateSheet(sheetName);
 
     if (rows && rows.length > 0) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length)
-            .setValues(rows);
-        return createResponse({ success: true, rowsAdded: rows.length });
+        // Check if headers exist (row 1 has data)
+        const lastRow = sheet.getLastRow();
+
+        if (lastRow === 0) {
+            // Sheet is empty - add headers first
+            const headers = HEADERS[sheetName];
+            if (headers && headers.length > 0) {
+                sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+                // Format header row - bold, freeze, blue background
+                const headerRange = sheet.getRange(1, 1, 1, headers.length);
+                headerRange.setFontWeight('bold');
+                headerRange.setBackground('#1a73e8');
+                headerRange.setFontColor('#ffffff');
+                sheet.setFrozenRows(1);
+            }
+        }
+
+        // Append data rows
+        const startRow = sheet.getLastRow() + 1;
+        sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+
+        return createResponse({
+            success: true,
+            rowsAdded: rows.length,
+            headersAdded: lastRow === 0
+        });
     }
 
     return createResponse({ success: false, error: 'No rows provided' });
@@ -749,6 +775,48 @@ function getUser(data) {
             success: false,
             error: 'User not found',
             fb_user_id: fbUserId
+        });
+
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Fix headers cho sheet đã có data nhưng thiếu headers
+ * @param {Object} data - { sheetName }
+ */
+function fixHeaders(data) {
+    try {
+        const sheetName = data.sheetName || 'Campaigns';
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+
+        if (!sheet) {
+            return createResponse({ success: false, error: 'Sheet not found: ' + sheetName });
+        }
+
+        const headers = HEADERS[sheetName];
+        if (!headers || headers.length === 0) {
+            return createResponse({ success: false, error: 'No headers defined for: ' + sheetName });
+        }
+
+        // Insert a new row at the top for headers
+        sheet.insertRowBefore(1);
+
+        // Set header values
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+        // Format header row
+        const headerRange = sheet.getRange(1, 1, 1, headers.length);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#1a73e8');
+        headerRange.setFontColor('#ffffff');
+        sheet.setFrozenRows(1);
+
+        return createResponse({
+            success: true,
+            message: 'Headers added for ' + sheetName,
+            columnCount: headers.length
         });
 
     } catch (error) {

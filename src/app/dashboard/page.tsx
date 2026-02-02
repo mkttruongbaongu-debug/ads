@@ -136,10 +136,14 @@ export default function DashboardPage() {
                     const errorMsg = json.error || 'Không thể tải danh sách tài khoản';
                     setError(errorMsg);
 
-                    if (errorMsg.toLowerCase().includes('token') ||
+                    // If token error or needsLogin flag from API
+                    if (json.needsLogin ||
+                        errorMsg.toLowerCase().includes('token') ||
                         errorMsg.toLowerCase().includes('expired') ||
-                        errorMsg.toLowerCase().includes('session')) {
+                        errorMsg.toLowerCase().includes('login')) {
                         setAuthStatus({ authenticated: false, needsLogin: true, reason: errorMsg });
+                        // Auto signOut để xóa session cũ invalid, user sẽ phải đăng nhập lại
+                        // signOut({ callbackUrl: '/' }); // Uncomment nếu muốn tự động logout
                     }
                 }
             } catch (err) {

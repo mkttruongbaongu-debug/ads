@@ -29,7 +29,7 @@ export default function HomePage() {
           <img src="/logo.png" alt="QUÂN SƯ ADS" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
           <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>QUÂN SƯ ADS</span>
         </div>
-        {isAuthenticated ? (
+        {isAuthenticated && (
           <Link
             href="/dashboard"
             style={{
@@ -46,22 +46,6 @@ export default function HomePage() {
           >
             Vào Dashboard →
           </Link>
-        ) : (
-          <button
-            onClick={handleLogin}
-            style={{
-              background: 'white',
-              color: 'var(--color-bg-header)',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              padding: '8px 20px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-            }}
-          >
-            Đăng nhập
-          </button>
         )}
       </header>
 

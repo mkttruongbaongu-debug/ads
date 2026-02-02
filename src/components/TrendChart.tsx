@@ -20,6 +20,19 @@ interface TrendData {
     ctr: number;
     cpc: number;
     cpm: number;
+    // Extended metrics
+    messages?: number;
+    comments?: number;
+    purchases?: number;
+    purchase_value?: number;
+    cost_per_message?: number;
+    cost_per_purchase?: number;
+    aov?: number;
+    // Computed metrics (sẽ tính trong component)
+    totalData?: number;
+    costPerData?: number;
+    conversionRate?: number;
+    adsPercent?: number;
 }
 
 interface TrendChartProps {
@@ -30,12 +43,18 @@ interface TrendChartProps {
 }
 
 const METRICS = [
-    { key: 'spend', name: 'Chi tiêu', color: '#8884d8', format: (v: number) => `${v.toLocaleString('vi-VN')}đ` },
-    { key: 'impressions', name: 'Hiển thị', color: '#82ca9d', format: (v: number) => v.toLocaleString('vi-VN') },
-    { key: 'clicks', name: 'Clicks', color: '#ffc658', format: (v: number) => v.toLocaleString('vi-VN') },
-    { key: 'ctr', name: 'CTR (%)', color: '#ff7300', format: (v: number) => `${v.toFixed(2)}%` },
-    { key: 'cpc', name: 'CPC', color: '#0088fe', format: (v: number) => `${v.toLocaleString('vi-VN')}đ` },
-    { key: 'cpm', name: 'CPM', color: '#00C49F', format: (v: number) => `${v.toLocaleString('vi-VN')}đ` },
+    // QUAN TRỌNG - Các metrics cốt lõi để phân tích hiệu quả quảng cáo
+    { key: 'spend', name: 'Spend', color: '#8884d8', format: (v: number) => `${v.toLocaleString('vi-VN')}đ`, desc: 'Chi tiêu quảng cáo (Advertising Spend)' },
+    { key: 'costPerData', name: 'CPL', color: '#e74c3c', format: (v: number) => `${v.toLocaleString('vi-VN')}đ`, desc: 'Cost Per Lead - Chi phí mỗi data (tin nhắn + bình luận)' },
+    { key: 'conversionRate', name: 'CVR', color: '#2ecc71', format: (v: number) => `${v.toFixed(2)}%`, desc: 'Conversion Rate - Tỷ lệ chốt đơn (Lượt mua / Tổng Data)' },
+    { key: 'cost_per_purchase', name: 'CAC', color: '#9b59b6', format: (v: number) => `${v.toLocaleString('vi-VN')}đ`, desc: 'Customer Acquisition Cost - Chi phí để có 1 khách hàng' },
+    { key: 'adsPercent', name: 'ACoS', color: '#f39c12', format: (v: number) => `${v.toFixed(1)}%`, desc: 'Advertising Cost of Sales - % Chi phí QC trên doanh thu' },
+    { key: 'aov', name: 'AOV', color: '#1abc9c', format: (v: number) => `${v.toLocaleString('vi-VN')}đ`, desc: 'Average Order Value - Giá trị trung bình đơn hàng' },
+    // Metrics bổ sung
+    { key: 'totalData', name: 'Leads', color: '#3498db', format: (v: number) => v.toLocaleString('vi-VN'), desc: 'Tổng số data (tin nhắn + bình luận)' },
+    { key: 'purchases', name: 'Sales', color: '#27ae60', format: (v: number) => v.toLocaleString('vi-VN'), desc: 'Số lượt mua hàng (Purchases)' },
+    { key: 'clicks', name: 'Clicks', color: '#ffc658', format: (v: number) => v.toLocaleString('vi-VN'), desc: 'Số lượt click vào quảng cáo' },
+    { key: 'ctr', name: 'CTR', color: '#ff7300', format: (v: number) => `${v.toFixed(2)}%`, desc: 'Click-Through Rate - Tỷ lệ click / hiển thị' },
 ];
 
 export default function TrendChart({
@@ -44,11 +63,27 @@ export default function TrendChart({
     campaignData,
     onClose,
 }: TrendChartProps) {
-    // Dùng trực tiếp data từ props - không cần fetch!
-    const data = campaignData;
+    // Compute derived metrics from raw data
+    const data = campaignData.map(row => {
+        const messages = row.messages || 0;
+        const comments = row.comments || 0;
+        const totalData = messages + comments;
+        const purchases = row.purchases || 0;
+        const purchaseValue = row.purchase_value || 0;
+        const spend = row.spend || 0;
+
+        return {
+            ...row,
+            totalData,
+            costPerData: totalData > 0 ? spend / totalData : 0,
+            conversionRate: totalData > 0 ? (purchases / totalData) * 100 : 0,
+            adsPercent: purchaseValue > 0 ? (spend / purchaseValue) * 100 : 0,
+        };
+    });
+
     const loading = false;  // Data đã có sẵn
     const error: string | null = campaignData.length === 0 ? 'Không có dữ liệu cho campaign này' : null;
-    const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['spend', 'clicks']);
+    const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['spend', 'costPerData']);
 
     const toggleMetric = (key: string) => {
         setSelectedMetrics(prev =>
@@ -104,6 +139,7 @@ export default function TrendChart({
                                 backgroundColor: selectedMetrics.includes(metric.key) ? `${metric.color}20` : 'transparent',
                             }}
                             onClick={() => toggleMetric(metric.key)}
+                            title={metric.desc}
                         >
                             <span className="metric-dot" style={{ backgroundColor: metric.color }} />
                             {metric.name}

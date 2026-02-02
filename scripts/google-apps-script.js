@@ -18,6 +18,7 @@ const CONFIG = {
     ACCOUNTS_SHEET: 'Accounts',
     LOGS_SHEET: 'Logs',
     TOKENS_SHEET: 'Tokens',  // Lưu Facebook OAuth tokens
+    USERS_SHEET: 'Users',    // Lưu thông tin người dùng đăng ký
 
     // API Secret (để bảo vệ endpoint)
     API_SECRET: 'tho-ads-ai-2026' // Thay đổi secret này
@@ -62,6 +63,9 @@ const HEADERS = {
     ],
     Tokens: [
         'user_id', 'access_token', 'token_type', 'expires_at', 'created_at', 'updated_at'
+    ],
+    Users: [
+        'fb_user_id', 'name', 'email', 'avatar', 'plan', 'created_at', 'last_login'
     ]
 };
 
@@ -96,6 +100,8 @@ function doPost(e) {
                 return initializeSheets();
             case 'saveToken':
                 return saveToken(data);
+            case 'saveUser':
+                return saveUser(data);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -573,4 +579,94 @@ function getToken(params) {
         hasToken: false,
         message: 'No token found for userId: ' + userId
     });
+}
+
+// ==================== USER MANAGEMENT ====================
+
+/**
+ * Lưu hoặc cập nhật thông tin user
+ * Nếu user đã tồn tại (theo fb_user_id), chỉ update last_login
+ * Nếu chưa, tạo mới với plan = 'free'
+ */
+function saveUser(data) {
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        let sheet = ss.getSheetByName(CONFIG.USERS_SHEET);
+
+        // Tạo sheet nếu chưa có
+        if (!sheet) {
+            sheet = ss.insertSheet(CONFIG.USERS_SHEET);
+            sheet.getRange(1, 1, 1, HEADERS.Users.length).setValues([HEADERS.Users]);
+            sheet.getRange(1, 1, 1, HEADERS.Users.length)
+                .setBackground('#1a73e8')
+                .setFontColor('white')
+                .setFontWeight('bold');
+            sheet.setFrozenRows(1);
+        }
+
+        const user = data.user;
+        if (!user || !user.fb_user_id) {
+            return createResponse({ success: false, error: 'Missing user data or fb_user_id' });
+        }
+
+        const now = new Date().toISOString();
+        const allData = sheet.getDataRange().getValues();
+        const headers = allData[0];
+
+        // Tìm xem user đã tồn tại chưa
+        let existingRowIndex = -1;
+        for (let i = 1; i < allData.length; i++) {
+            const row = allData[i];
+            const obj = {};
+            headers.forEach((h, idx) => obj[h] = row[idx]);
+
+            if (obj.fb_user_id === user.fb_user_id) {
+                existingRowIndex = i + 1; // Sheet row index (1-based)
+                break;
+            }
+        }
+
+        if (existingRowIndex > 0) {
+            // User đã tồn tại, chỉ update last_login
+            const lastLoginColIndex = headers.indexOf('last_login') + 1;
+            sheet.getRange(existingRowIndex, lastLoginColIndex).setValue(now);
+
+            return createResponse({
+                success: true,
+                action: 'updated',
+                message: 'Updated last_login for existing user',
+                fb_user_id: user.fb_user_id
+            });
+        } else {
+            // User mới, tạo record mới với plan = 'free'
+            const newRow = HEADERS.Users.map(h => {
+                switch (h) {
+                    case 'fb_user_id': return user.fb_user_id;
+                    case 'name': return user.name || '';
+                    case 'email': return user.email || '';
+                    case 'avatar': return user.avatar || '';
+                    case 'plan': return 'free';
+                    case 'created_at': return now;
+                    case 'last_login': return now;
+                    default: return '';
+                }
+            });
+
+            sheet.appendRow(newRow);
+
+            // Log
+            logAction('saveUser', 'new_user', user.fb_user_id, 1, 'success', 'New user registered: ' + user.name);
+
+            return createResponse({
+                success: true,
+                action: 'created',
+                message: 'New user registered with plan: free',
+                fb_user_id: user.fb_user_id,
+                plan: 'free'
+            });
+        }
+
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
 }

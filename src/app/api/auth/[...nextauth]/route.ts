@@ -9,8 +9,8 @@ async function saveUserToSheet(user: {
     avatar?: string;
 }) {
     try {
-        const scriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || process.env.GOOGLE_APPS_SCRIPT_URL;
-        const secret = process.env.NEXT_PUBLIC_APPS_SCRIPT_SECRET || process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+        const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
 
         if (!scriptUrl) {
             console.error('[saveUser] Missing APPS_SCRIPT_URL');
@@ -42,8 +42,8 @@ async function saveTokenToSheet(tokenData: {
     expires_at?: string;
 }) {
     try {
-        const scriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || process.env.GOOGLE_APPS_SCRIPT_URL;
-        const secret = process.env.NEXT_PUBLIC_APPS_SCRIPT_SECRET || process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+        const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
 
         if (!scriptUrl) {
             console.error('[saveToken] Missing APPS_SCRIPT_URL');

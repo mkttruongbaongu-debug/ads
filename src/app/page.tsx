@@ -3,6 +3,20 @@
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  Flame,
+  Facebook,
+  Frown,
+  Wallet,
+  BarChart3,
+  Rocket,
+  LayoutDashboard,
+  Brain,
+  TrendingUp,
+  Clock,
+  Shield,
+  Zap
+} from "lucide-react";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -57,14 +71,19 @@ export default function HomePage() {
       }}>
         {/* Pain Point Hook */}
         <p style={{
-          fontSize: '1rem',
-          color: '#c5221f',
-          fontWeight: 500,
+          fontSize: '0.875rem',
+          color: '#dc2626',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
           marginBottom: '16px',
           textTransform: 'uppercase',
           letterSpacing: '1px',
         }}>
-          🔥 Dành cho người chạy Ads chán đau đầu
+          <Flame size={18} strokeWidth={2.5} />
+          Dành cho người chạy Ads chán đau đầu
         </p>
 
         {/* Main Headline - Alex Hormozi Style */}
@@ -110,7 +129,8 @@ export default function HomePage() {
             marginBottom: '12px',
           }}
         >
-          🔐 Đăng nhập bằng Facebook
+          <Facebook size={20} style={{ marginRight: '8px' }} />
+          Đăng nhập bằng Facebook
         </button>
         <p style={{ fontSize: '0.8125rem', color: '#80868b' }}>
           Miễn phí. Không cần thẻ. Vào là dùng luôn.
@@ -140,17 +160,17 @@ export default function HomePage() {
             gap: '24px',
           }}>
             <PainCard
-              emoji="😤"
+              icon={Frown}
               title="Check ads như tra tấn"
               description="Mở Facebook Ads Manager, loading 10 phút. Nhìn đống số liệu mà không biết campaign nào đang chết, campaign nào đang ngon."
             />
             <PainCard
-              emoji="💸"
+              icon={Wallet}
               title="Đốt tiền mà không biết"
               description="Để CPC 50k chạy cả tuần vì 'quên check'. Tới lúc phát hiện thì mất 5 triệu rồi. Lại đổ xăng cho ông Zuck."
             />
             <PainCard
-              emoji="📊"
+              icon={BarChart3}
               title="Báo cáo thủ công muốn phát điên"
               description="Cuối tuần ngồi copy paste số liệu vào Excel. Tính tay ROAS, CAC. Làm xong thì hết ngày chủ nhật."
             />
@@ -191,14 +211,17 @@ export default function HomePage() {
             gap: '24px',
           }}>
             <FeatureCard
+              icon={LayoutDashboard}
               title="Dashboard 1 cái nhìn"
               description="Tất cả campaigns, chi tiêu, ROAS, CPA, CTR... hiện một màn hình. Xanh là tốt, đỏ là chết. Đơn giản vậy thôi."
             />
             <FeatureCard
+              icon={Brain}
               title="AI phân tích tự động"
               description="AI đọc data, phát hiện bất thường, gợi ý: 'Campaign này CPC cao bất thường, nên tắt'. Như có chuyên gia ngồi cạnh."
             />
             <FeatureCard
+              icon={TrendingUp}
               title="Theo dõi diễn biến"
               description="Biểu đồ xu hướng theo ngày, so sánh hiệu suất qua thời gian. Phát hiện sớm campaign đang tuột dốc để xử lý kịp."
             />
@@ -264,7 +287,8 @@ export default function HomePage() {
             boxShadow: '0 4px 14px rgba(13, 71, 161, 0.3)',
           }}
         >
-          🚀 Dùng thử miễn phí
+          <Rocket size={20} style={{ marginRight: '8px' }} />
+          Dùng thử miễn phí
         </button>
       </div>
 
@@ -292,40 +316,76 @@ export default function HomePage() {
   );
 }
 
-function PainCard({ emoji, title, description }: { emoji: string; title: string; description: string }) {
+function PainCard({ icon: Icon, title, description }: { icon: React.ComponentType<{ size?: number; className?: string }>; title: string; description: string }) {
   return (
     <div style={{
-      background: '#fff5f5',
+      background: 'linear-gradient(135deg, #fef2f2 0%, #fff5f5 100%)',
       border: '1px solid #fecaca',
-      borderRadius: '8px',
-      padding: '24px',
-    }}>
-      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>{emoji}</div>
-      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#991b1b', marginBottom: '8px' }}>{title}</h4>
-      <p style={{ fontSize: '0.875rem', color: '#7f1d1d', lineHeight: 1.6 }}>{description}</p>
+      borderRadius: '12px',
+      padding: '28px',
+      transition: 'all 0.3s ease',
+      cursor: 'default',
+    }}
+      className="pain-card"
+    >
+      <div style={{
+        width: '48px',
+        height: '48px',
+        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        borderRadius: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '16px',
+        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+      }}>
+        <Icon size={24} className="text-white" />
+      </div>
+      <h4 style={{ fontSize: '1.0625rem', fontWeight: 600, color: '#991b1b', marginBottom: '10px' }}>{title}</h4>
+      <p style={{ fontSize: '0.9rem', color: '#7f1d1d', lineHeight: 1.7 }}>{description}</p>
     </div>
   );
 }
 
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ icon: Icon, title, description }: { icon?: React.ComponentType<{ size?: number; className?: string }>; title: string; description: string }) {
   return (
     <div style={{
-      background: '#ffffff',
-      border: '1px solid #dadce0',
-      borderRadius: '8px',
-      padding: '24px',
-    }}>
-      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#202124', marginBottom: '8px' }}>{title}</h4>
-      <p style={{ fontSize: '0.875rem', color: '#5f6368', lineHeight: 1.6 }}>{description}</p>
+      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      padding: '28px',
+      transition: 'all 0.3s ease',
+      cursor: 'default',
+    }}
+      className="feature-card"
+    >
+      {Icon && (
+        <div style={{
+          width: '48px',
+          height: '48px',
+          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '16px',
+          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+        }}>
+          <Icon size={24} className="text-white" />
+        </div>
+      )}
+      <h4 style={{ fontSize: '1.0625rem', fontWeight: 600, color: '#1e293b', marginBottom: '10px' }}>{title}</h4>
+      <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.7 }}>{description}</p>
     </div>
   );
 }
 
-function StatItem({ value, label }: { value: string; label: string }) {
+function StatItem({ value, label, icon: Icon }: { value: string; label: string; icon?: React.ComponentType<{ size?: number; className?: string }> }) {
   return (
-    <div>
-      <div style={{ fontSize: '2rem', fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>{label}</div>
+    <div style={{ transition: 'transform 0.3s ease' }} className="stat-item">
+      {Icon && <Icon size={28} className="stat-icon" />}
+      <div style={{ fontSize: '2.25rem', fontWeight: 700, marginTop: '8px' }}>{value}</div>
+      <div style={{ fontSize: '0.9rem', opacity: 0.85, marginTop: '4px' }}>{label}</div>
     </div>
   );
 }

@@ -12,12 +12,14 @@ export default function HomePage() {
         alignItems: 'center',
       }}>
         <div style={{
-          color: 'white',
-          fontWeight: 700,
-          fontSize: '1rem',
-          letterSpacing: '0.5px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
         }}>
-          QUÂN SƯ ADS
+          <img src="/logo.png" alt="QUÂN SƯ ADS" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
+          <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.5px' }}>
+            QUÂN SƯ ADS
+          </span>
         </div>
         <Link
           href="/dashboard"

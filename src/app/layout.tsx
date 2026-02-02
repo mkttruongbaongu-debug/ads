@@ -14,10 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "QUÂN SƯ ADS - Quản lý quảng cáo thông minh",
-  description: "Hệ thống quản lý và tối ưu hóa quảng cáo Facebook bằng AI",
+  description: "Hệ thống quản lý và tối ưu hóa quảng cáo Facebook chuyên nghiệp",
   icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/logo.png",
   },
 };
 

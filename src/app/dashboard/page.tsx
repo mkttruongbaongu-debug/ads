@@ -476,7 +476,7 @@ export default function DashboardPage() {
             <header className="header">
                 <div className="header-content">
                     <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <img src="/icon.png" alt="Logo" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
+                        <img src="/logo.png" alt="Logo" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
                         <span>QUÂN SƯ ADS</span>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

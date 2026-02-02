@@ -102,6 +102,8 @@ function doPost(e) {
                 return saveToken(data);
             case 'saveUser':
                 return saveUser(data);
+            case 'getUser':
+                return getUser(data);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -693,6 +695,61 @@ function saveUser(data) {
                 plan: 'free'
             });
         }
+
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Lấy thông tin user từ sheet Users
+ * @param {Object} data - { fb_user_id }
+ */
+function getUser(data) {
+    try {
+        const fbUserId = data.fb_user_id || data.fbUserId;
+
+        if (!fbUserId) {
+            return createResponse({ success: false, error: 'Missing fb_user_id' });
+        }
+
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName(CONFIG.USERS_SHEET);
+
+        if (!sheet) {
+            return createResponse({ success: false, error: 'Users sheet not found' });
+        }
+
+        const allData = sheet.getDataRange().getValues();
+        const headers = allData[0];
+
+        // Tìm user
+        for (let i = 1; i < allData.length; i++) {
+            const row = allData[i];
+            const obj = {};
+            headers.forEach((h, idx) => obj[h] = row[idx]);
+
+            if (obj.fb_user_id === fbUserId) {
+                return createResponse({
+                    success: true,
+                    user: {
+                        fb_user_id: obj.fb_user_id,
+                        name: obj.name,
+                        email: obj.email,
+                        avatar: obj.avatar,
+                        plan: obj.plan || 'free',
+                        created_at: obj.created_at,
+                        last_login: obj.last_login
+                    }
+                });
+            }
+        }
+
+        return createResponse({
+            success: false,
+            error: 'User not found',
+            fb_user_id: fbUserId
+        });
 
     } catch (error) {
         return createResponse({ success: false, error: error.message });

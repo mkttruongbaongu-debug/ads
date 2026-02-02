@@ -95,6 +95,14 @@ export default function DashboardPage() {
         cta: string;
     }[]>([]);
     const [loadingCreatives, setLoadingCreatives] = useState(false);
+
+    // User profile state
+    const [userProfile, setUserProfile] = useState<{
+        name: string;
+        avatar: string;
+        plan: string;
+    } | null>(null);
+
     // Auth check - redirect nếu chưa đăng nhập
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -144,6 +152,45 @@ export default function DashboardPage() {
 
         fetchAccounts();
     }, []);
+
+    // Fetch user profile on mount
+    useEffect(() => {
+        async function fetchUserProfile() {
+            try {
+                const res = await fetch('/api/user');
+                const json = await res.json();
+
+                if (json.success && json.user) {
+                    setUserProfile({
+                        name: json.user.name || 'User',
+                        avatar: json.user.avatar || '',
+                        plan: json.user.plan || 'free',
+                    });
+                } else if (session?.user) {
+                    // Fallback to session
+                    setUserProfile({
+                        name: session.user.name || 'User',
+                        avatar: session.user.image || '',
+                        plan: 'free',
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching user profile:', err);
+                // Fallback to session on error
+                if (session?.user) {
+                    setUserProfile({
+                        name: session.user.name || 'User',
+                        avatar: session.user.image || '',
+                        plan: 'free',
+                    });
+                }
+            }
+        }
+
+        if (status === 'authenticated') {
+            fetchUserProfile();
+        }
+    }, [status, session]);
 
     // Fetch campaign data
     const fetchData = useCallback(async () => {
@@ -553,6 +600,68 @@ export default function DashboardPage() {
                         )}
                         {syncStatus === 'error' && (
                             <span className="badge" style={{ background: '#e74c3c' }}>❌ Sync Failed</span>
+                        )}
+
+                        {/* User Profile */}
+                        {userProfile && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.25rem 0.75rem',
+                                background: 'rgba(255,255,255,0.1)',
+                                borderRadius: '20px',
+                            }}>
+                                {userProfile.avatar ? (
+                                    <img
+                                        src={userProfile.avatar}
+                                        alt={userProfile.name}
+                                        style={{
+                                            width: '28px',
+                                            height: '28px',
+                                            borderRadius: '50%',
+                                            border: '2px solid rgba(255,255,255,0.3)'
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '50%',
+                                        background: '#1877f2',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        color: 'white'
+                                    }}>
+                                        {userProfile.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                                    <span style={{
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        color: 'white'
+                                    }}>
+                                        {userProfile.name}
+                                    </span>
+                                    <span style={{
+                                        fontSize: '0.65rem',
+                                        padding: '1px 6px',
+                                        borderRadius: '8px',
+                                        background: userProfile.plan === 'pro' ? '#f39c12' :
+                                            userProfile.plan === 'premium' ? '#9b59b6' : '#27ae60',
+                                        color: 'white',
+                                        fontWeight: 500,
+                                        textTransform: 'uppercase',
+                                        width: 'fit-content'
+                                    }}>
+                                        {userProfile.plan}
+                                    </span>
+                                </div>
+                            </div>
                         )}
 
                         {/* Nút Đăng xuất */}

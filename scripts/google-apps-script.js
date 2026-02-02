@@ -407,8 +407,15 @@ function getOrCreateSheet(sheetName) {
 
         // Add headers if defined
         if (HEADERS[sheetName]) {
-            sheet.getRange(1, 1, 1, HEADERS[sheetName].length)
-                .setValues([HEADERS[sheetName]]);
+            const headers = HEADERS[sheetName];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+            // Auto-format header: màu xanh, chữ trắng bold, freeze row
+            sheet.getRange(1, 1, 1, headers.length)
+                .setBackground('#1a73e8')
+                .setFontColor('white')
+                .setFontWeight('bold');
+            sheet.setFrozenRows(1);
         }
     }
 

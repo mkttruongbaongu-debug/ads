@@ -59,8 +59,26 @@ export default function TrendChart({
     };
 
     const formatDate = (dateStr: string) => {
+        if (!dateStr) return '-';
+
+        // Try parsing as ISO date (YYYY-MM-DD)
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const day = parseInt(parts[2], 10);
+            const month = parseInt(parts[1], 10);
+            if (!isNaN(day) && !isNaN(month)) {
+                return `${day}/${month}`;
+            }
+        }
+
+        // Fallback to Date parser
         const date = new Date(dateStr);
-        return `${date.getDate()}/${date.getMonth() + 1}`;
+        if (!isNaN(date.getTime())) {
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+        }
+
+        // Last fallback - return original
+        return dateStr.substring(0, 10);
     };
 
     return (

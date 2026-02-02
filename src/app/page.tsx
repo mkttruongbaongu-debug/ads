@@ -2,18 +2,14 @@
 
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import Link from "next/link";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Nếu đã đăng nhập, redirect về dashboard
-  useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/dashboard");
-    }
-  }, [status, router]);
+  // Không auto-redirect nữa - để user tự navigate
+  const isAuthenticated = status === "authenticated";
 
   const handleLogin = () => {
     signIn("facebook", { callbackUrl: "/dashboard" });
@@ -33,21 +29,40 @@ export default function HomePage() {
           <img src="/logo.png" alt="QUÂN SƯ ADS" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
           <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>QUÂN SƯ ADS</span>
         </div>
-        <button
-          onClick={handleLogin}
-          style={{
-            background: 'white',
-            color: 'var(--color-bg-header)',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            padding: '8px 20px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-          }}
-        >
-          Đăng nhập
-        </button>
+        {isAuthenticated ? (
+          <Link
+            href="/dashboard"
+            style={{
+              background: 'white',
+              color: 'var(--color-bg-header)',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              padding: '8px 20px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              textDecoration: 'none',
+            }}
+          >
+            Vào Dashboard →
+          </Link>
+        ) : (
+          <button
+            onClick={handleLogin}
+            style={{
+              background: 'white',
+              color: 'var(--color-bg-header)',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              padding: '8px 20px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            Đăng nhập
+          </button>
+        )}
       </header>
 
       {/* Hero Section */}

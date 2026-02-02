@@ -84,13 +84,13 @@ export default function HomePage() {
           🚀 Bắt đầu ngay
         </Link>
 
-        {/* Tech Stack */}
+        {/* Footer */}
         <div style={{
           marginTop: 'var(--space-2xl)',
           color: 'var(--color-text-muted)',
           fontSize: '0.875rem',
         }}>
-          Powered by Next.js • Facebook Marketing API • GPT-4o
+          Powered by <strong style={{ color: 'var(--color-primary)' }}>Nguyen Xuan Truong</strong> | Call & Zalo: <a href="tel:0768536874" style={{ color: 'var(--color-accent)' }}>076 85 36874</a>
         </div>
       </div>
     </div>

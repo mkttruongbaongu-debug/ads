@@ -855,13 +855,13 @@ export default function DashboardPage() {
                                     <th style={{ textAlign: 'right' }}>CPM</th>
                                     <th style={{ textAlign: 'right' }}>CPC</th>
                                     <th style={{ textAlign: 'right' }}>CTR</th>
-                                    <th style={{ textAlign: 'right' }}>Tổng Data</th>
-                                    <th style={{ textAlign: 'right' }}>CP/Data</th>
-                                    <th style={{ textAlign: 'right' }}>Lượt mua</th>
-                                    <th style={{ textAlign: 'right' }}>Tỷ lệ chốt</th>
-                                    <th style={{ textAlign: 'right' }}>CP/Mua</th>
-                                    <th style={{ textAlign: 'right' }}>Doanh thu</th>
-                                    <th style={{ textAlign: 'right' }}>%ADS</th>
+                                    <th style={{ textAlign: 'right' }} title="Tổng số Data (tin nhắn + bình luận)">Leads</th>
+                                    <th style={{ textAlign: 'right' }} title="Cost Per Lead - Chi phí mỗi data">CPL</th>
+                                    <th style={{ textAlign: 'right' }} title="Số lượt mua hàng">Sales</th>
+                                    <th style={{ textAlign: 'right' }} title="Conversion Rate - Tỷ lệ chốt (Sales/Leads)">CVR</th>
+                                    <th style={{ textAlign: 'right' }} title="Customer Acquisition Cost - Chi phí có 1 khách">CAC</th>
+                                    <th style={{ textAlign: 'right' }} title="Doanh thu từ mua hàng">Revenue</th>
+                                    <th style={{ textAlign: 'right' }} title="Advertising Cost of Sales - % Chi phí QC/Doanh thu">ACoS</th>
                                 </tr>
                             </thead>
                             <tbody>

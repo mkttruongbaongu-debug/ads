@@ -32,7 +32,7 @@ export default function HomePage() {
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
         }}>
-          Thợ ADS AI
+          QUÂN SƯ ADS
         </h1>
 
         {/* Subtitle */}

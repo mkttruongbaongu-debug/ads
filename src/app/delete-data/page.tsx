@@ -50,7 +50,7 @@ export default function DeleteDataPage() {
                 <li>Truy cập <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank" style={{ color: '#1a73e8' }}>
                     Cài đặt Facebook → Business Integrations
                 </a></li>
-                <li>Tìm ứng dụng "Thợ ADS AI"</li>
+                <li>Tìm ứng dụng "QUÂN SƯ ADS"</li>
                 <li>Click "Xóa" hoặc "Remove"</li>
             </ol>
 

@@ -477,7 +477,7 @@ export default function DashboardPage() {
                 <div className="header-content">
                     <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <img src="/icon.png" alt="Logo" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
-                        <span>Thợ ADS AI</span>
+                        <span>QUÂN SƯ ADS</span>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                         {isLoadingAccounts ? (

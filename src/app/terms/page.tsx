@@ -15,13 +15,13 @@ export default function TermsPage() {
 
             <h2>1. Chấp nhận điều khoản</h2>
             <p>
-                Bằng việc sử dụng Thợ ADS AI, bạn đồng ý tuân thủ các điều khoản này.
+                Bằng việc sử dụng QUÂN SƯ ADS, bạn đồng ý tuân thủ các điều khoản này.
                 Nếu không đồng ý, vui lòng không sử dụng dịch vụ.
             </p>
 
             <h2>2. Mô tả dịch vụ</h2>
             <p>
-                Thợ ADS AI là công cụ quản lý và phân tích quảng cáo Facebook, cung cấp:
+                QUÂN SƯ ADS là công cụ quản lý và phân tích quảng cáo Facebook, cung cấp:
             </p>
             <ul>
                 <li>Dashboard theo dõi hiệu suất quảng cáo</li>

@@ -15,7 +15,7 @@ export default function PrivacyPage() {
 
             <h2>1. Giới thiệu</h2>
             <p>
-                Thợ ADS AI ("chúng tôi", "của chúng tôi") cam kết bảo vệ quyền riêng tư của bạn.
+                QUÂN SƯ ADS ("chúng tôi", "của chúng tôi") cam kết bảo vệ quyền riêng tư của bạn.
                 Chính sách này giải thích cách chúng tôi thu thập, sử dụng và bảo vệ thông tin của bạn
                 khi sử dụng ứng dụng quản lý quảng cáo Facebook của chúng tôi.
             </p>

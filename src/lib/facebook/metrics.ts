@@ -1,5 +1,5 @@
 // Facebook Ads Metrics Constants - COMPREHENSIVE COLLECTION
-// Author: Thợ ADS AI - Performance Ads Expert Edition
+// Author: QUÂN SƯ ADS - Performance Ads Expert Edition
 
 // ============================================================================
 // RAW METRICS FROM FACEBOOK API

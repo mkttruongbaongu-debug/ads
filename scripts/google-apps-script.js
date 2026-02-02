@@ -189,27 +189,51 @@ function syncData(data) {
 
 /**
  * Append data - thêm dữ liệu mới
- * Tự động thêm headers nếu sheet trống
+ * Tự động thêm headers nếu sheet trống HOẶC nếu row 1 không phải headers
  */
 function appendData(data) {
     const { sheetName, rows } = data;
     const sheet = getOrCreateSheet(sheetName);
+    let headersAdded = false;
 
     if (rows && rows.length > 0) {
-        // Check if headers exist (row 1 has data)
+        const headers = HEADERS[sheetName];
         const lastRow = sheet.getLastRow();
 
-        if (lastRow === 0) {
-            // Sheet is empty - add headers first
-            const headers = HEADERS[sheetName];
-            if (headers && headers.length > 0) {
+        // Check if headers are missing or incorrect
+        if (headers && headers.length > 0) {
+            let needHeaders = false;
+
+            if (lastRow === 0) {
+                // Sheet is completely empty
+                needHeaders = true;
+            } else {
+                // Sheet has data - check if row 1 is actually headers
+                const firstCell = sheet.getRange(1, 1).getValue();
+                const expectedFirstHeader = headers[0];
+
+                // If first cell doesn't match expected header, we need to insert headers
+                if (firstCell !== expectedFirstHeader) {
+                    needHeaders = true;
+                }
+            }
+
+            if (needHeaders) {
+                // Insert a new row at top for headers
+                if (lastRow > 0) {
+                    sheet.insertRowBefore(1);
+                }
+
+                // Add headers
                 sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
                 // Format header row - bold, freeze, blue background
                 const headerRange = sheet.getRange(1, 1, 1, headers.length);
                 headerRange.setFontWeight('bold');
                 headerRange.setBackground('#1a73e8');
                 headerRange.setFontColor('#ffffff');
                 sheet.setFrozenRows(1);
+                headersAdded = true;
             }
         }
 
@@ -220,7 +244,7 @@ function appendData(data) {
         return createResponse({
             success: true,
             rowsAdded: rows.length,
-            headersAdded: lastRow === 0
+            headersAdded: headersAdded
         });
     }
 

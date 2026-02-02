@@ -1,9 +1,27 @@
-import Link from 'next/link';
+"use client";
+
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Nếu đã đăng nhập, redirect về dashboard
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard");
+    }
+  }, [status, router]);
+
+  const handleLogin = () => {
+    signIn("facebook", { callbackUrl: "/dashboard" });
+  };
+
   return (
     <div className="app-container">
-      {/* Header Bar */}
+      {/* Header */}
       <header style={{
         background: 'var(--color-bg-header)',
         padding: '12px 24px',
@@ -11,108 +29,144 @@ export default function HomePage() {
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/logo.png" alt="QUÂN SƯ ADS" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
-          <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.5px' }}>
-            QUÂN SƯ ADS
-          </span>
+          <span style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>QUÂN SƯ ADS</span>
         </div>
-        <Link
-          href="/dashboard"
+        <button
+          onClick={handleLogin}
           style={{
-            color: 'white',
+            background: 'white',
+            color: 'var(--color-bg-header)',
             fontSize: '0.875rem',
-            textDecoration: 'none',
-            padding: '6px 16px',
-            border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: '4px',
+            fontWeight: 600,
+            padding: '8px 20px',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
           }}
         >
           Đăng nhập
-        </Link>
+        </button>
       </header>
 
-      {/* Hero Section - Light Background */}
+      {/* Hero Section */}
       <div style={{
-        background: 'linear-gradient(180deg, #f8f9fa 0%, #e8eaed 100%)',
-        padding: '80px 24px',
+        background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)',
+        padding: '60px 24px 80px',
         textAlign: 'center',
       }}>
-        {/* Title */}
-        <h1 style={{
-          fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
-          fontWeight: 700,
-          color: '#202124',
-          marginBottom: '16px',
-          letterSpacing: '-0.5px',
-        }}>
-          Phần mềm Quản lý Quảng cáo Chuyên nghiệp
-        </h1>
-
-        {/* Subtitle */}
+        {/* Pain Point Hook */}
         <p style={{
           fontSize: '1rem',
-          color: '#5f6368',
-          maxWidth: '540px',
-          margin: '0 auto 32px',
-          lineHeight: 1.6,
+          color: '#c5221f',
+          fontWeight: 500,
+          marginBottom: '16px',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
         }}>
-          Theo dõi chi tiêu, phân tích hiệu suất và tối ưu chiến dịch Facebook Ads
-          với dữ liệu real-time và báo cáo chuyên sâu.
+          🔥 Dành cho người chạy Ads chán đau đầu
         </p>
 
-        {/* CTA Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '48px' }}>
-          <Link
-            href="/dashboard"
-            className="btn btn-primary"
-            style={{
-              padding: '12px 32px',
-              fontSize: '0.9375rem',
-              fontWeight: 600,
-            }}
-          >
-            Vào Dashboard
-          </Link>
-          <Link
-            href="/privacy"
-            className="btn btn-secondary"
-            style={{
-              padding: '12px 24px',
-              fontSize: '0.9375rem',
-            }}
-          >
-            Tìm hiểu thêm
-          </Link>
-        </div>
-
-        {/* Stats Preview */}
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-          marginBottom: '48px',
+        {/* Main Headline - Alex Hormozi Style */}
+        <h1 style={{
+          fontSize: 'clamp(1.75rem, 4vw, 2.75rem)',
+          fontWeight: 700,
+          color: '#202124',
+          marginBottom: '24px',
+          lineHeight: 1.3,
+          maxWidth: '800px',
+          margin: '0 auto 24px',
         }}>
-          <StatCard label="Tổng Chi tiêu" value="₫ 15,420,000" change="+12.5%" positive />
-          <StatCard label="ROAS" value="3.24x" change="+0.42" positive />
-          <StatCard label="CPA" value="₫ 45,200" change="-8.3%" positive />
-          <StatCard label="CTR" value="2.85%" change="-0.15%" positive={false} />
+          Thôi đi học khoá 10 triệu.<br />
+          Thôi tuyển nhân viên media.<br />
+          <span style={{ color: 'var(--color-primary)' }}>Để AI làm hết.</span>
+        </h1>
+
+        {/* Subheadline */}
+        <p style={{
+          fontSize: '1.125rem',
+          color: '#5f6368',
+          maxWidth: '600px',
+          margin: '0 auto 40px',
+          lineHeight: 1.7,
+        }}>
+          Bạn bỏ 20 triệu/tháng thuê 1 đứa ngồi check ads, nó check 30 phút rồi lướt Facebook.
+          <strong style={{ color: '#202124' }}> QUÂN SƯ ADS check 24/7, không nghỉ trưa, không xin tăng lương.</strong>
+        </p>
+
+        {/* CTA Button */}
+        <button
+          onClick={handleLogin}
+          style={{
+            background: 'var(--color-primary)',
+            color: 'white',
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            padding: '16px 48px',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(13, 71, 161, 0.3)',
+            marginBottom: '12px',
+          }}
+        >
+          🔐 Đăng nhập bằng Facebook
+        </button>
+        <p style={{ fontSize: '0.8125rem', color: '#80868b' }}>
+          Miễn phí. Không cần thẻ. Vào là dùng luôn.
+        </p>
+      </div>
+
+      {/* Pain Points Section */}
+      <div style={{
+        background: '#ffffff',
+        padding: '64px 24px',
+        borderTop: '1px solid #e8eaed',
+      }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: 700,
+            color: '#202124',
+            textAlign: 'center',
+            marginBottom: '40px',
+          }}>
+            Bạn có đang gặp mấy vấn đề này không?
+          </h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '24px',
+          }}>
+            <PainCard
+              emoji="😤"
+              title="Check ads như tra tấn"
+              description="Mở Facebook Ads Manager, loading 10 phút. Nhìn đống số liệu mà không biết campaign nào đang chết, campaign nào đang ngon."
+            />
+            <PainCard
+              emoji="💸"
+              title="Đốt tiền mà không biết"
+              description="Để CPC 50k chạy cả tuần vì 'quên check'. Tới lúc phát hiện thì mất 5 triệu rồi. Lại đổ xăng cho ông Zuck."
+            />
+            <PainCard
+              emoji="📊"
+              title="Báo cáo thủ công muốn phát điên"
+              description="Cuối tuần ngồi copy paste số liệu vào Excel. Tính tay ROAS, CAC. Làm xong thì hết ngày chủ nhật."
+            />
+          </div>
         </div>
       </div>
 
-      {/* Features Section */}
+      {/* Solution Section */}
       <div style={{
+        background: '#f8f9fa',
         padding: '64px 24px',
-        background: '#ffffff',
       }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{
-            fontSize: '0.75rem',
+            fontSize: '0.875rem',
             fontWeight: 600,
             color: 'var(--color-primary)',
             textTransform: 'uppercase',
@@ -120,7 +174,7 @@ export default function HomePage() {
             textAlign: 'center',
             marginBottom: '8px',
           }}>
-            Tính năng
+            GIẢI PHÁP
           </h2>
           <h3 style={{
             fontSize: '1.5rem',
@@ -129,7 +183,7 @@ export default function HomePage() {
             textAlign: 'center',
             marginBottom: '40px',
           }}>
-            Công cụ dành cho Performance Marketer
+            QUÂN SƯ ADS làm được gì?
           </h3>
 
           <div style={{
@@ -138,27 +192,86 @@ export default function HomePage() {
             gap: '24px',
           }}>
             <FeatureCard
-              title="Báo cáo Chi tiết"
-              description="Xem đầy đủ metrics: Spend, CTR, CPC, CPM, ROAS, CAC, Purchases, Messages..."
-              icon="📊"
+              title="Dashboard 1 cái nhìn"
+              description="Tất cả campaigns, chi tiêu, ROAS, CPA, CTR... hiện một màn hình. Xanh là tốt, đỏ là chết. Đơn giản vậy thôi."
             />
             <FeatureCard
-              title="Phân tích Xu hướng"
-              description="Biểu đồ diễn biến theo ngày, so sánh các giai đoạn, phát hiện anomaly."
-              icon="📈"
+              title="AI phân tích tự động"
+              description="AI đọc data, phát hiện bất thường, gợi ý: 'Campaign này CPC cao bất thường, nên tắt'. Như có chuyên gia ngồi cạnh."
             />
             <FeatureCard
               title="Đồng bộ Google Sheets"
-              description="Tự động lưu lịch sử dữ liệu, theo dõi performance qua thời gian."
-              icon="📋"
+              description="Data tự lưu mỗi ngày. Tuần sau mở ra là có báo cáo sẵn. Không cần copy paste, không cần Excel."
             />
           </div>
         </div>
       </div>
 
+      {/* Social Proof / Numbers */}
+      <div style={{
+        background: 'var(--color-bg-header)',
+        padding: '48px 24px',
+        color: 'white',
+      }}>
+        <div style={{
+          maxWidth: '800px',
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-around',
+          flexWrap: 'wrap',
+          gap: '32px',
+          textAlign: 'center',
+        }}>
+          <StatItem value="5 phút" label="Setup xong" />
+          <StatItem value="24/7" label="Giám sát tự động" />
+          <StatItem value="0đ" label="Chi phí nhân sự" />
+        </div>
+      </div>
+
+      {/* Final CTA */}
+      <div style={{
+        background: '#ffffff',
+        padding: '64px 24px',
+        textAlign: 'center',
+      }}>
+        <h2 style={{
+          fontSize: '1.75rem',
+          fontWeight: 700,
+          color: '#202124',
+          marginBottom: '16px',
+        }}>
+          Sẵn sàng để bớt đau đầu chưa?
+        </h2>
+        <p style={{
+          fontSize: '1rem',
+          color: '#5f6368',
+          marginBottom: '32px',
+          maxWidth: '500px',
+          margin: '0 auto 32px',
+        }}>
+          Đăng nhập bằng Facebook là dùng được ngay. Không cần setup phức tạp, không cần IT.
+        </p>
+        <button
+          onClick={handleLogin}
+          style={{
+            background: 'var(--color-primary)',
+            color: 'white',
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            padding: '16px 48px',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(13, 71, 161, 0.3)',
+          }}
+        >
+          🚀 Dùng thử miễn phí
+        </button>
+      </div>
+
       {/* Footer */}
       <footer style={{
-        background: 'var(--color-bg-header)',
+        background: '#1a1a2e',
         padding: '24px',
         textAlign: 'center',
         color: '#9aa0a6',
@@ -168,6 +281,10 @@ export default function HomePage() {
           Powered by <span style={{ color: '#8ab4f8' }}>Nguyen Xuan Truong</span> |
           Call & Zalo: <a href="tel:0768536874" style={{ color: '#8ab4f8', textDecoration: 'none' }}>076 85 36874</a>
         </div>
+        <div style={{ marginTop: '8px', display: 'flex', gap: '16px', justifyContent: 'center' }}>
+          <a href="/privacy" style={{ color: '#9aa0a6', textDecoration: 'none' }}>Privacy Policy</a>
+          <a href="/terms" style={{ color: '#9aa0a6', textDecoration: 'none' }}>Terms of Service</a>
+        </div>
         <div style={{ marginTop: '8px', fontSize: '0.75rem' }}>
           © 2026 QUÂN SƯ ADS. All rights reserved.
         </div>
@@ -176,85 +293,40 @@ export default function HomePage() {
   );
 }
 
-function StatCard({ label, value, change, positive }: {
-  label: string;
-  value: string;
-  change: string;
-  positive: boolean;
-}) {
+function PainCard({ emoji, title, description }: { emoji: string; title: string; description: string }) {
+  return (
+    <div style={{
+      background: '#fff5f5',
+      border: '1px solid #fecaca',
+      borderRadius: '8px',
+      padding: '24px',
+    }}>
+      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>{emoji}</div>
+      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#991b1b', marginBottom: '8px' }}>{title}</h4>
+      <p style={{ fontSize: '0.875rem', color: '#7f1d1d', lineHeight: 1.6 }}>{description}</p>
+    </div>
+  );
+}
+
+function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div style={{
       background: '#ffffff',
       border: '1px solid #dadce0',
       borderRadius: '8px',
-      padding: '16px 24px',
-      minWidth: '160px',
-      textAlign: 'left',
-      boxShadow: '0 1px 3px rgba(60,64,67,0.12)',
+      padding: '24px',
     }}>
-      <div style={{
-        fontSize: '0.6875rem',
-        fontWeight: 500,
-        color: '#80868b',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        marginBottom: '4px',
-      }}>
-        {label}
-      </div>
-      <div style={{
-        fontSize: '1.25rem',
-        fontWeight: 700,
-        fontFamily: "'IBM Plex Mono', monospace",
-        color: '#202124',
-        marginBottom: '2px',
-      }}>
-        {value}
-      </div>
-      <div style={{
-        fontSize: '0.75rem',
-        fontWeight: 500,
-        color: positive ? '#137333' : '#c5221f',
-      }}>
-        {change}
-      </div>
+      <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#202124', marginBottom: '8px' }}>{title}</h4>
+      <p style={{ fontSize: '0.875rem', color: '#5f6368', lineHeight: 1.6 }}>{description}</p>
     </div>
   );
 }
 
-function FeatureCard({ title, description, icon }: {
-  title: string;
-  description: string;
-  icon: string;
-}) {
+function StatItem({ value, label }: { value: string; label: string }) {
   return (
-    <div style={{
-      background: '#f8f9fa',
-      border: '1px solid #dadce0',
-      borderRadius: '8px',
-      padding: '24px',
-    }}>
-      <div style={{
-        fontSize: '1.5rem',
-        marginBottom: '12px',
-      }}>
-        {icon}
-      </div>
-      <h4 style={{
-        fontSize: '1rem',
-        fontWeight: 600,
-        color: '#202124',
-        marginBottom: '8px',
-      }}>
-        {title}
-      </h4>
-      <p style={{
-        fontSize: '0.875rem',
-        color: '#5f6368',
-        lineHeight: 1.5,
-      }}>
-        {description}
-      </p>
+    <div>
+      <div style={{ fontSize: '2rem', fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>{label}</div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 import TrendChart from '@/components/TrendChart';
 
@@ -45,6 +47,9 @@ interface FBInsight {
 }
 
 export default function DashboardPage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+
     const [accounts, setAccounts] = useState<AccountOption[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [dateRange, setDateRange] = useState({
@@ -64,6 +69,34 @@ export default function DashboardPage() {
     const [selectedCampaign, setSelectedCampaign] = useState<{ id: string, name: string } | null>(null);
     const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+    // Auth check - redirect nếu chưa đăng nhập
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.push("/");
+        }
+    }, [status, router]);
+
+    // Show loading while checking auth
+    if (status === "loading") {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-bg-primary)',
+            }}>
+                <div className="spinner"></div>
+                <span style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>Đang kiểm tra đăng nhập...</span>
+            </div>
+        );
+    }
+
+    // Don't render if not authenticated
+    if (status === "unauthenticated") {
+        return null;
+    }
     // Daily insights data for TrendChart (cached from API)
     const [dailyInsights, setDailyInsights] = useState<{
         date: string;
@@ -521,6 +554,22 @@ export default function DashboardPage() {
                         {syncStatus === 'error' && (
                             <span className="badge" style={{ background: '#e74c3c' }}>❌ Sync Failed</span>
                         )}
+
+                        {/* Nút Đăng xuất */}
+                        <button
+                            onClick={() => signOut({ callbackUrl: '/' })}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(255,255,255,0.3)',
+                                color: 'white',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Đăng xuất
+                        </button>
                     </div>
                 </div>
             </header>

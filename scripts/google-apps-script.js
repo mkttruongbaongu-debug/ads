@@ -481,7 +481,11 @@ function showStatus() {
  * @param {Object} data - { userId, accessToken, tokenType, expiresAt }
  */
 function saveToken(data) {
-    const { userId, accessToken, tokenType, expiresAt } = data;
+    // Support both camelCase and snake_case
+    const userId = data.userId || data.user_id;
+    const accessToken = data.accessToken || data.access_token;
+    const tokenType = data.tokenType || data.token_type || 'bearer';
+    const expiresAt = data.expiresAt || data.expires_at || '';
 
     if (!userId || !accessToken) {
         return createResponse({ success: false, error: 'Missing userId or accessToken' });

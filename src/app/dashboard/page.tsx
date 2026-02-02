@@ -95,7 +95,6 @@ export default function DashboardPage() {
         cta: string;
     }[]>([]);
     const [loadingCreatives, setLoadingCreatives] = useState(false);
-
     // Auth check - redirect nếu chưa đăng nhập
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -103,26 +102,7 @@ export default function DashboardPage() {
         }
     }, [status, router]);
 
-    // Show loading while checking auth
-    if (status === "loading") {
-        return (
-            <div style={{
-                minHeight: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--color-bg-primary)',
-            }}>
-                <div className="spinner"></div>
-                <span style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>Đang kiểm tra đăng nhập...</span>
-            </div>
-        );
-    }
-
-    // Don't render if not authenticated
-    if (status === "unauthenticated") {
-        return null;
-    }
+    // Auth loading/unauthenticated will be handled at the end of render
 
     // Fetch accounts on mount
     useEffect(() => {
@@ -502,6 +482,26 @@ export default function DashboardPage() {
     const formatNumber = (value: number) => {
         return new Intl.NumberFormat('vi-VN').format(value);
     };
+
+    // Handle auth states in render
+    if (status === "loading") {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-bg-primary)',
+            }}>
+                <div className="spinner"></div>
+                <span style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>Đang kiểm tra đăng nhập...</span>
+            </div>
+        );
+    }
+
+    if (status === "unauthenticated") {
+        return null;
+    }
 
     return (
         <div className="app-container">

@@ -1,7 +1,8 @@
 // API Route: Get Campaigns and Insights
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFacebookClient, FBMetricsRow, DateRange, FBInsight } from '@/lib/facebook';
+import { getDynamicFacebookClient } from '@/lib/facebook/client';
+import { FBMetricsRow, DateRange, FBInsight } from '@/lib/facebook';
 
 // Helper to extract action value by type
 function getActionValue(actions: { action_type: string; value: string }[] | undefined, actionType: string): number {
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
         }
 
         const dateRange: DateRange = { startDate, endDate };
-        const client = getFacebookClient();
+        const client = await getDynamicFacebookClient();
 
         // Fetch campaigns
         const campaigns = await client.getCampaigns(accountId);

@@ -1,7 +1,7 @@
 // API Route: Get Ad Creatives with content (caption, image, video)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFacebookClient } from '@/lib/facebook';
+import { getDynamicFacebookClient } from '@/lib/facebook/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const fbClient = getFacebookClient();
+        const fbClient = await getDynamicFacebookClient();
 
         // Lấy ads với creative content
         const ads = await fbClient.getAdsWithCreative(accountId);

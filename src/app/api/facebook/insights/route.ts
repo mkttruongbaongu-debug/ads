@@ -2,7 +2,7 @@
 // Performance Ads Expert Edition - All metrics included
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFacebookClient } from '@/lib/facebook';
+import { getDynamicFacebookClient } from '@/lib/facebook/client';
 import { IMPORTANT_ACTION_TYPES, calculateDerivedMetrics } from '@/lib/facebook/metrics';
 
 // Helper to find action value by types
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const fbClient = getFacebookClient();
+        const fbClient = await getDynamicFacebookClient();
 
         // Get daily breakdown insights with time_increment=1
         const insights = await fbClient.getInsights(

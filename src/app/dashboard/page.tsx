@@ -527,8 +527,38 @@ export default function DashboardPage() {
 
             {/* Main Content */}
             <main className="main-content">
-                {/* Error Alert */}
-                {error && (
+                {/* Auth Status Alert */}
+                {authStatus.needsLogin ? (
+                    <div style={{
+                        background: 'rgba(255,193,7,0.15)',
+                        border: '1px solid #ffc107',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        marginBottom: '1rem',
+                        color: '#ffc107',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '1rem'
+                    }}>
+                        <span>🔑 Vui lòng đăng nhập Facebook để xem dữ liệu quảng cáo</span>
+                        <a
+                            href="/api/auth/facebook"
+                            style={{
+                                background: '#1877f2',
+                                color: 'white',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                fontSize: '0.9rem'
+                            }}
+                        >
+                            🔐 Đăng nhập ngay
+                        </a>
+                    </div>
+                ) : error && !authStatus.needsLogin ? (
                     <div style={{
                         background: 'rgba(255,68,68,0.1)',
                         border: '1px solid #ff4444',
@@ -539,7 +569,7 @@ export default function DashboardPage() {
                     }}>
                         ⚠️ {error}
                     </div>
-                )}
+                ) : null}
 
                 {/* Filters */}
                 <div className="card" style={{ marginBottom: 'var(--space-xl)' }}>

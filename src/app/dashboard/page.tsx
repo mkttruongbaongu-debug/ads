@@ -69,6 +69,32 @@ export default function DashboardPage() {
     const [selectedCampaign, setSelectedCampaign] = useState<{ id: string, name: string } | null>(null);
     const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+    // Daily insights data for TrendChart (cached from API)
+    const [dailyInsights, setDailyInsights] = useState<{
+        date: string;
+        campaign_id: string;
+        spend: number;
+        impressions: number;
+        clicks: number;
+        ctr: number;
+        cpc: number;
+        cpm: number;
+    }[]>([]);
+
+    // Creative preview state
+    const [showCreatives, setShowCreatives] = useState(false);
+    const [creatives, setCreatives] = useState<{
+        ad_id: string;
+        ad_name: string;
+        campaign_name: string;
+        caption: string;
+        title: string;
+        image_url: string;
+        video_id: string;
+        content_type: string;
+        cta: string;
+    }[]>([]);
+    const [loadingCreatives, setLoadingCreatives] = useState(false);
 
     // Auth check - redirect nếu chưa đăng nhập
     useEffect(() => {
@@ -97,32 +123,6 @@ export default function DashboardPage() {
     if (status === "unauthenticated") {
         return null;
     }
-    // Daily insights data for TrendChart (cached from API)
-    const [dailyInsights, setDailyInsights] = useState<{
-        date: string;
-        campaign_id: string;
-        spend: number;
-        impressions: number;
-        clicks: number;
-        ctr: number;
-        cpc: number;
-        cpm: number;
-    }[]>([]);
-
-    // Creative preview state
-    const [showCreatives, setShowCreatives] = useState(false);
-    const [creatives, setCreatives] = useState<{
-        ad_id: string;
-        ad_name: string;
-        campaign_name: string;
-        caption: string;
-        title: string;
-        image_url: string;
-        video_id: string;
-        content_type: string;
-        cta: string;
-    }[]>([]);
-    const [loadingCreatives, setLoadingCreatives] = useState(false);
 
     // Fetch accounts on mount
     useEffect(() => {

@@ -26,6 +26,7 @@ interface MetricData {
     costPerPurchase?: number;  // Chi phí mỗi lượt mua
     revenue?: number;          // Doanh thu
     adsPercent?: number;       // % ADS trên doanh thu
+    conversionRate?: number;   // Tỷ lệ chốt (%)
 }
 
 interface AccountOption {
@@ -261,6 +262,7 @@ export default function DashboardPage() {
                         costPerPurchase,
                         revenue,
                         adsPercent,
+                        conversionRate: totalData > 0 ? (purchases / totalData) * 100 : 0,
                     };
                 });
                 setMetrics(campaignData);
@@ -856,6 +858,7 @@ export default function DashboardPage() {
                                     <th style={{ textAlign: 'right' }}>Tổng Data</th>
                                     <th style={{ textAlign: 'right' }}>CP/Data</th>
                                     <th style={{ textAlign: 'right' }}>Lượt mua</th>
+                                    <th style={{ textAlign: 'right' }}>Tỷ lệ chốt</th>
                                     <th style={{ textAlign: 'right' }}>CP/Mua</th>
                                     <th style={{ textAlign: 'right' }}>Doanh thu</th>
                                     <th style={{ textAlign: 'right' }}>%ADS</th>
@@ -864,7 +867,7 @@ export default function DashboardPage() {
                             <tbody>
                                 {metrics.length === 0 ? (
                                     <tr>
-                                        <td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
+                                        <td colSpan={13} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
                                             {isLoading ? 'Đang tải...' : 'Chọn tài khoản và nhấn "Tải dữ liệu" để xem campaigns'}
                                         </td>
                                     </tr>
@@ -904,6 +907,14 @@ export default function DashboardPage() {
                                             </td>
                                             <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: (row.purchases || 0) > 0 ? '#2ecc71' : '#888' }}>
                                                 {formatNumber(row.purchases || 0)}
+                                            </td>
+                                            <td style={{
+                                                textAlign: 'right',
+                                                fontFamily: 'var(--font-mono)',
+                                                fontWeight: 600,
+                                                color: (row.conversionRate || 0) > 5 ? '#2ecc71' : (row.conversionRate || 0) > 2 ? '#f39c12' : '#888'
+                                            }}>
+                                                {(row.conversionRate || 0).toFixed(2)}%
                                             </td>
                                             <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                                                 {formatCurrency(row.costPerPurchase || 0)}

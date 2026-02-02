@@ -592,16 +592,33 @@ function saveUser(data) {
     try {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         let sheet = ss.getSheetByName(CONFIG.USERS_SHEET);
+        const expectedHeaders = HEADERS.Users;
 
         // Tạo sheet nếu chưa có
         if (!sheet) {
             sheet = ss.insertSheet(CONFIG.USERS_SHEET);
-            sheet.getRange(1, 1, 1, HEADERS.Users.length).setValues([HEADERS.Users]);
-            sheet.getRange(1, 1, 1, HEADERS.Users.length)
+            sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
+            sheet.getRange(1, 1, 1, expectedHeaders.length)
                 .setBackground('#1a73e8')
                 .setFontColor('white')
                 .setFontWeight('bold');
             sheet.setFrozenRows(1);
+        } else {
+            // Sheet đã tồn tại - CHECK và AUTO-FIX headers
+            const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            const headersMatch = expectedHeaders.length === currentHeaders.length &&
+                expectedHeaders.every((h, i) => h === currentHeaders[i]);
+
+            if (!headersMatch) {
+                // Ghi đè headers mới
+                sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
+                sheet.getRange(1, 1, 1, expectedHeaders.length)
+                    .setBackground('#1a73e8')
+                    .setFontColor('white')
+                    .setFontWeight('bold');
+                sheet.setFrozenRows(1);
+                console.log('[saveUser] Auto-fixed headers for Users sheet');
+            }
         }
 
         const user = data.user;

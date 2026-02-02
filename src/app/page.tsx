@@ -1,66 +1,121 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from 'next/link';
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="app-container">
+      {/* Hero Section */}
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-xl)',
+        textAlign: 'center',
+        background: 'radial-gradient(ellipse at top, rgba(99, 102, 241, 0.15) 0%, transparent 50%)',
+      }}>
+        {/* Logo */}
+        <div style={{
+          fontSize: '4rem',
+          marginBottom: 'var(--space-lg)',
+        }}>
+          🔧
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+          fontWeight: 700,
+          marginBottom: 'var(--space-md)',
+          background: 'var(--color-accent-gradient)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}>
+          Thợ ADS AI
+        </h1>
+
+        {/* Subtitle */}
+        <p style={{
+          fontSize: '1.25rem',
+          color: 'var(--color-text-secondary)',
+          maxWidth: '600px',
+          marginBottom: 'var(--space-2xl)',
+          lineHeight: 1.6,
+        }}>
+          Trợ lý AI thông minh giúp bạn phân tích, tối ưu và quản lý quảng cáo Facebook như một chuyên gia
+        </p>
+
+        {/* Features */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: 'var(--space-lg)',
+          maxWidth: '900px',
+          width: '100%',
+          marginBottom: 'var(--space-2xl)',
+        }}>
+          <FeatureCard
+            icon="📊"
+            title="Full Metrics Report"
+            description="Xem đầy đủ chỉ số: Spend, CTR, CPC, CPM, ROAS, Conversions..."
+          />
+          <FeatureCard
+            icon="🤖"
+            title="AI Analysis"
+            description="GPT-4o phân tích xu hướng, phát hiện bất thường, đề xuất tối ưu"
+          />
+          <FeatureCard
+            icon="⚡"
+            title="Auto Optimize"
+            description="Tự động đề xuất tắt/bật adsets dựa trên hiệu suất thực tế"
+          />
         </div>
-      </main>
+
+        {/* CTA Button */}
+        <Link
+          href="/dashboard"
+          className="btn btn-primary"
+          style={{
+            padding: 'var(--space-md) var(--space-2xl)',
+            fontSize: '1.125rem',
+          }}
+        >
+          🚀 Bắt đầu ngay
+        </Link>
+
+        {/* Tech Stack */}
+        <div style={{
+          marginTop: 'var(--space-2xl)',
+          color: 'var(--color-text-muted)',
+          fontSize: '0.875rem',
+        }}>
+          Powered by Next.js • Facebook Marketing API • GPT-4o
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div className="card" style={{ textAlign: 'left' }}>
+      <div style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>{icon}</div>
+      <h3 style={{
+        fontSize: '1.125rem',
+        fontWeight: 600,
+        marginBottom: 'var(--space-xs)',
+        color: 'var(--color-text-primary)',
+      }}>
+        {title}
+      </h3>
+      <p style={{
+        fontSize: '0.875rem',
+        color: 'var(--color-text-secondary)',
+        lineHeight: 1.5,
+      }}>
+        {description}
+      </p>
     </div>
   );
 }

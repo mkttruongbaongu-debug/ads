@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 
 interface Issue {
@@ -165,6 +166,9 @@ const styles = {
         cursor: 'pointer',
         fontSize: '0.85rem',
         transition: 'all 0.2s ease',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
     },
     main: {
         maxWidth: '1000px',
@@ -412,11 +416,19 @@ export default function DashboardPage() {
             <header style={styles.header}>
                 {/* Top Row: Logo + Logout */}
                 <div style={styles.headerTop}>
-                    <span style={styles.logo}>⚡ QUÂN SƯ ADS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
+                        <span style={styles.logo}>QUÂN SƯ ADS</span>
+                    </div>
                     <button
                         onClick={() => signOut({ callbackUrl: '/' })}
                         style={styles.logoutBtn}
                     >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16,17 21,12 16,7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
                         Đăng xuất
                     </button>
                 </div>
@@ -478,7 +490,23 @@ export default function DashboardPage() {
                                 cursor: (isLoading || !selectedAccountId) ? 'not-allowed' : 'pointer',
                             }}
                         >
-                            {isLoading ? '⏳ Đang tải...' : '🔍 Tra cứu'}
+                            {isLoading ? (
+                                <>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                                        <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+                                        <path d="M12 2a10 10 0 0 1 10 10" />
+                                    </svg>
+                                    Đang tải...
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    </svg>
+                                    Tra cứu
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -492,7 +520,7 @@ export default function DashboardPage() {
             }}>
                 <input
                     type="text"
-                    placeholder="🔍 Lọc campaigns theo tên..."
+                    placeholder="Lọc campaigns theo tên..."
                     value={filterText}
                     onChange={(e) => setFilterText(e.target.value)}
                     style={{

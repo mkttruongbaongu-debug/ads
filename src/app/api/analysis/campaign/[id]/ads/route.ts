@@ -21,13 +21,14 @@ export async function GET(
             );
         }
 
-        const accessToken = await getValidAccessToken();
-        if (!accessToken) {
+        const tokenResult = await getValidAccessToken();
+        if (!tokenResult.accessToken) {
             return NextResponse.json(
-                { success: false, error: 'No valid Facebook access token', needsLogin: true },
+                { success: false, error: tokenResult.error || 'No valid Facebook access token', needsLogin: true },
                 { status: 401 }
             );
         }
+        const accessToken = tokenResult.accessToken;
 
         // Fetch ads with daily insights and creative info
         const adsRes = await fetch(

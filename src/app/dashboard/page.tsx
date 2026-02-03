@@ -42,6 +42,14 @@ interface AnalysisData {
     };
 }
 
+interface AdAccount {
+    id: string;
+    name: string;
+    isActive: boolean;
+    currency: string;
+    timezone: string;
+}
+
 // Styles
 const styles = {
     container: {
@@ -226,6 +234,14 @@ export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithIssues | null>(null);
 
+    // Account selector
+    const [accounts, setAccounts] = useState<AdAccount[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+
+    // Campaign filter
+    const [filterText, setFilterText] = useState('');
+
     // Date range - last 7 days
     const [endDate, setEndDate] = useState(() => {
         const today = new Date();
@@ -237,13 +253,36 @@ export default function DashboardPage() {
         return date.toISOString().split('T')[0];
     });
 
+    // Fetch ad accounts
+    const fetchAccounts = useCallback(async () => {
+        setIsLoadingAccounts(true);
+        try {
+            const res = await fetch('/api/facebook/accounts');
+            const json = await res.json();
+            if (json.success && json.data) {
+                setAccounts(json.data);
+                // Auto-select first active account
+                const firstActive = json.data.find((a: AdAccount) => a.isActive);
+                if (firstActive && !selectedAccountId) {
+                    setSelectedAccountId(firstActive.id);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch accounts:', err);
+        } finally {
+            setIsLoadingAccounts(false);
+        }
+    }, [selectedAccountId]);
+
     const fetchData = useCallback(async () => {
+        if (!selectedAccountId) return;
+
         setIsLoading(true);
         setError(null);
 
         try {
             const res = await fetch(
-                `/api/analysis/daily?startDate=${startDate}&endDate=${endDate}`
+                `/api/analysis/daily?startDate=${startDate}&endDate=${endDate}&accountId=${selectedAccountId}`
             );
             const json = await res.json();
 
@@ -261,15 +300,23 @@ export default function DashboardPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [startDate, endDate, router]);
+    }, [startDate, endDate, selectedAccountId, router]);
 
+    // Load accounts on mount
     useEffect(() => {
         if (status === 'unauthenticated') {
             router.push('/');
         } else if (status === 'authenticated') {
+            fetchAccounts();
+        }
+    }, [status, router, fetchAccounts]);
+
+    // Fetch data when account or date changes
+    useEffect(() => {
+        if (status === 'authenticated' && selectedAccountId) {
             fetchData();
         }
-    }, [status, router, fetchData]);
+    }, [status, selectedAccountId, startDate, endDate, fetchData]);
 
     if (status === 'loading' || status === 'unauthenticated') {
         return (
@@ -293,6 +340,33 @@ export default function DashboardPage() {
                 <span style={styles.logo}>QUÂN SƯ ADS</span>
 
                 <div style={styles.headerRight}>
+                    {/* Account Selector */}
+                    <select
+                        value={selectedAccountId}
+                        onChange={(e) => setSelectedAccountId(e.target.value)}
+                        disabled={isLoadingAccounts}
+                        style={{
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            color: 'white',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            maxWidth: '200px',
+                        }}
+                    >
+                        {isLoadingAccounts ? (
+                            <option>Đang tải...</option>
+                        ) : (
+                            accounts.map(acc => (
+                                <option key={acc.id} value={acc.id} style={{ color: '#18181b' }}>
+                                    {acc.name} {!acc.isActive ? '(Inactive)' : ''}
+                                </option>
+                            ))
+                        )}
+                    </select>
+
                     <div style={styles.dateInputs}>
                         <input
                             type="date"
@@ -329,6 +403,29 @@ export default function DashboardPage() {
                 </div>
             </header>
 
+            {/* Filter Bar */}
+            <div style={{
+                background: '#f4f4f5',
+                padding: '12px 24px',
+                borderBottom: '1px solid #e4e4e7',
+            }}>
+                <input
+                    type="text"
+                    placeholder="🔍 Lọc campaigns theo tên..."
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    style={{
+                        width: '100%',
+                        maxWidth: '400px',
+                        padding: '10px 16px',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        background: 'white',
+                    }}
+                />
+            </div>
+
             {/* Main Content */}
             <main style={styles.main}>
                 {/* Error State */}
@@ -352,111 +449,125 @@ export default function DashboardPage() {
                 )}
 
                 {/* Data */}
-                {data && !isLoading && (
-                    <>
-                        {/* Summary Row */}
-                        <div style={styles.summaryRow}>
-                            <div style={styles.summaryCard}>
-                                <p style={styles.summaryLabel}>Tổng chi tiêu</p>
-                                <p style={styles.summaryValue}>{formatMoney(data.summary.totalSpend)}</p>
-                            </div>
-                            <div style={styles.summaryCard}>
-                                <p style={styles.summaryLabel}>Doanh thu</p>
-                                <p style={styles.summaryValue}>{formatMoney(data.summary.totalRevenue)}</p>
-                            </div>
-                            <div style={{ ...styles.summaryCard, borderLeft: '4px solid #dc2626' }}>
-                                <p style={styles.summaryLabel}>Cần xử lý</p>
-                                <p style={{ ...styles.summaryValue, color: '#dc2626' }}>
-                                    {data.summary.critical}
-                                </p>
-                            </div>
-                            <div style={{ ...styles.summaryCard, borderLeft: '4px solid #22c55e' }}>
-                                <p style={styles.summaryLabel}>Đang tốt</p>
-                                <p style={{ ...styles.summaryValue, color: '#22c55e' }}>
-                                    {data.summary.good}
-                                </p>
-                            </div>
-                        </div>
+                {data && !isLoading && (() => {
+                    // Filter campaigns by name
+                    const filterLower = filterText.toLowerCase();
+                    const filteredCritical = filterText
+                        ? data.critical.filter(c => c.name.toLowerCase().includes(filterLower))
+                        : data.critical;
+                    const filteredWarning = filterText
+                        ? data.warning.filter(c => c.name.toLowerCase().includes(filterLower))
+                        : data.warning;
+                    const filteredGood = filterText
+                        ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
+                        : data.good;
 
-                        {/* Critical Section */}
-                        {data.critical.length > 0 && (
-                            <div style={styles.section}>
-                                <div style={styles.sectionHeader}>
-                                    <span style={{ fontSize: '1.25rem' }}>🔴</span>
-                                    <h2 style={styles.sectionTitle}>Cần xử lý ngay</h2>
-                                    <span style={{ ...styles.badge, background: '#fee2e2', color: '#dc2626' }}>
-                                        {data.critical.length}
-                                    </span>
+                    return (
+                        <>
+                            {/* Summary Row */}
+                            <div style={styles.summaryRow}>
+                                <div style={styles.summaryCard}>
+                                    <p style={styles.summaryLabel}>Tổng chi tiêu</p>
+                                    <p style={styles.summaryValue}>{formatMoney(data.summary.totalSpend)}</p>
                                 </div>
-
-                                {data.critical.map(campaign => (
-                                    <CampaignCard
-                                        key={campaign.id}
-                                        campaign={campaign}
-                                        borderColor="#dc2626"
-                                        formatMoney={formatMoney}
-                                        onSelect={() => setSelectedCampaign(campaign)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Warning Section */}
-                        {data.warning.length > 0 && (
-                            <div style={styles.section}>
-                                <div style={styles.sectionHeader}>
-                                    <span style={{ fontSize: '1.25rem' }}>🟡</span>
-                                    <h2 style={styles.sectionTitle}>Theo dõi</h2>
-                                    <span style={{ ...styles.badge, background: '#fef3c7', color: '#d97706' }}>
-                                        {data.warning.length}
-                                    </span>
+                                <div style={styles.summaryCard}>
+                                    <p style={styles.summaryLabel}>Doanh thu</p>
+                                    <p style={styles.summaryValue}>{formatMoney(data.summary.totalRevenue)}</p>
                                 </div>
-
-                                {data.warning.map(campaign => (
-                                    <CampaignCard
-                                        key={campaign.id}
-                                        campaign={campaign}
-                                        borderColor="#f59e0b"
-                                        formatMoney={formatMoney}
-                                        onSelect={() => setSelectedCampaign(campaign)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Good Section */}
-                        {data.good.length > 0 && (
-                            <div style={styles.section}>
-                                <div style={styles.sectionHeader}>
-                                    <span style={{ fontSize: '1.25rem' }}>🟢</span>
-                                    <h2 style={styles.sectionTitle}>Đang tốt</h2>
-                                    <span style={{ ...styles.badge, background: '#dcfce7', color: '#16a34a' }}>
-                                        {data.good.length}
-                                    </span>
+                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #dc2626' }}>
+                                    <p style={styles.summaryLabel}>Cần xử lý</p>
+                                    <p style={{ ...styles.summaryValue, color: '#dc2626' }}>
+                                        {data.summary.critical}
+                                    </p>
                                 </div>
-
-                                <div style={{
-                                    background: 'white',
-                                    borderRadius: '12px',
-                                    padding: '16px',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                }}>
-                                    <p style={{ color: '#71717a', margin: 0 }}>
-                                        {data.good.map(c => c.name).join(', ')}
+                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #22c55e' }}>
+                                    <p style={styles.summaryLabel}>Đang tốt</p>
+                                    <p style={{ ...styles.summaryValue, color: '#22c55e' }}>
+                                        {data.summary.good}
                                     </p>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Empty State */}
-                        {data.summary.total === 0 && (
-                            <div style={styles.emptyState}>
-                                <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
-                                <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
-                            </div>
-                        )}
-                    </>
-                )}
+                            {/* Critical Section */}
+                            {filteredCritical.length > 0 && (
+                                <div style={styles.section}>
+                                    <div style={styles.sectionHeader}>
+                                        <span style={{ fontSize: '1.25rem' }}>🔴</span>
+                                        <h2 style={styles.sectionTitle}>Cần xử lý ngay</h2>
+                                        <span style={{ ...styles.badge, background: '#fee2e2', color: '#dc2626' }}>
+                                            {filteredCritical.length}
+                                        </span>
+                                    </div>
+
+                                    {filteredCritical.map(campaign => (
+                                        <CampaignCard
+                                            key={campaign.id}
+                                            campaign={campaign}
+                                            borderColor="#dc2626"
+                                            formatMoney={formatMoney}
+                                            onSelect={() => setSelectedCampaign(campaign)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Warning Section */}
+                            {filteredWarning.length > 0 && (
+                                <div style={styles.section}>
+                                    <div style={styles.sectionHeader}>
+                                        <span style={{ fontSize: '1.25rem' }}>🟡</span>
+                                        <h2 style={styles.sectionTitle}>Theo dõi</h2>
+                                        <span style={{ ...styles.badge, background: '#fef3c7', color: '#d97706' }}>
+                                            {filteredWarning.length}
+                                        </span>
+                                    </div>
+
+                                    {filteredWarning.map(campaign => (
+                                        <CampaignCard
+                                            key={campaign.id}
+                                            campaign={campaign}
+                                            borderColor="#f59e0b"
+                                            formatMoney={formatMoney}
+                                            onSelect={() => setSelectedCampaign(campaign)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Good Section */}
+                            {filteredGood.length > 0 && (
+                                <div style={styles.section}>
+                                    <div style={styles.sectionHeader}>
+                                        <span style={{ fontSize: '1.25rem' }}>🟢</span>
+                                        <h2 style={styles.sectionTitle}>Đang tốt</h2>
+                                        <span style={{ ...styles.badge, background: '#dcfce7', color: '#16a34a' }}>
+                                            {filteredGood.length}
+                                        </span>
+                                    </div>
+
+                                    <div style={{
+                                        background: 'white',
+                                        borderRadius: '12px',
+                                        padding: '16px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    }}>
+                                        <p style={{ color: '#71717a', margin: 0 }}>
+                                            {filteredGood.map(c => c.name).join(', ')}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Empty State */}
+                            {data.summary.total === 0 && (
+                                <div style={styles.emptyState}>
+                                    <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
+                                    <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
             </main>
 
             {/* Campaign Detail Panel */}

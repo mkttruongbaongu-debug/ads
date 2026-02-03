@@ -79,7 +79,7 @@ export async function GET(
 
             // Calculate totals
             const totals = insightsData.reduce((acc, day) => {
-                const spend = parseFloat(day.spend || '0') * 27000;
+                const spend = parseFloat(day.spend || '0');
                 const impressions = parseInt(day.impressions || '0');
                 const clicks = parseInt(day.clicks || '0');
 
@@ -95,7 +95,7 @@ export async function GET(
                     impressions: acc.impressions + impressions,
                     clicks: acc.clicks + clicks,
                     purchases: acc.purchases + (purchases ? parseInt(purchases.value) : 0),
-                    revenue: acc.revenue + (revenue ? parseFloat(revenue.value) * 27000 : 0),
+                    revenue: acc.revenue + (revenue ? parseFloat(revenue.value) : 0),
                 };
             }, { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0 });
 
@@ -112,7 +112,7 @@ export async function GET(
                     ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
                 },
                 dailyMetrics: insightsData.map(day => {
-                    const spend = parseFloat(day.spend || '0') * 27000;
+                    const spend = parseFloat(day.spend || '0');
                     const purchases = day.actions?.find(a =>
                         a.action_type === 'purchase' || a.action_type === 'omni_purchase'
                     );

@@ -63,7 +63,7 @@ export async function POST(
             actions?: Array<{ action_type: string; value: string }>;
             action_values?: Array<{ action_type: string; value: string }>;
         }) => {
-            const spend = parseFloat(day.spend || '0') * 27000;
+            const spend = parseFloat(day.spend || '0');
             const purchases = day.actions?.find(a =>
                 a.action_type === 'purchase' || a.action_type === 'omni_purchase'
             );
@@ -71,7 +71,7 @@ export async function POST(
                 a.action_type === 'purchase' || a.action_type === 'omni_purchase'
             );
             const purchaseCount = purchases ? parseInt(purchases.value) : 0;
-            const revenueAmount = revenue ? parseFloat(revenue.value) * 27000 : 0;
+            const revenueAmount = revenue ? parseFloat(revenue.value) : 0;
 
             return {
                 date: day.date_start,
@@ -81,11 +81,11 @@ export async function POST(
                 purchases: purchaseCount,
                 revenue: revenueAmount,
                 ctr: parseFloat(day.ctr || '0'),
-                cpc: parseFloat(day.cpc || '0') * 27000,
+                cpc: parseFloat(day.cpc || '0'),
                 cpp: purchaseCount > 0 ? spend / purchaseCount : 0,
                 roas: spend > 0 ? revenueAmount / spend : 0,
                 frequency: day.frequency ? parseFloat(day.frequency) : undefined,
-                cpm: parseFloat(day.cpm || '0') * 27000,
+                cpm: parseFloat(day.cpm || '0'),
             };
         });
 

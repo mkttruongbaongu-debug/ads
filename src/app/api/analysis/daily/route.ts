@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
             const insightsData = campaign.insights?.data || [];
 
             const dailyMetrics: DailyMetric[] = insightsData.map(day => {
-                const spend = parseFloat(day.spend || '0') * 27000; // USD to VND
+                const spend = parseFloat(day.spend || '0'); // Already in account currency (VND)
                 const impressions = parseInt(day.impressions || '0');
                 const clicks = parseInt(day.clicks || '0');
 
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
                 );
 
                 const purchaseCount = purchases ? parseInt(purchases.value) : 0;
-                const revenueAmount = revenue ? parseFloat(revenue.value) * 27000 : 0;
+                const revenueAmount = revenue ? parseFloat(revenue.value) : 0;
 
                 return {
                     date: day.date_start,
@@ -117,11 +117,11 @@ export async function GET(request: NextRequest) {
                     purchases: purchaseCount,
                     revenue: revenueAmount,
                     ctr: parseFloat(day.ctr || '0'),
-                    cpc: parseFloat(day.cpc || '0') * 27000,
+                    cpc: parseFloat(day.cpc || '0'),
                     cpp: purchaseCount > 0 ? spend / purchaseCount : 0,
                     roas: spend > 0 ? revenueAmount / spend : 0,
                     frequency: day.frequency ? parseFloat(day.frequency) : undefined,
-                    cpm: parseFloat(day.cpm || '0') * 27000,
+                    cpm: parseFloat(day.cpm || '0'),
                 };
             });
 

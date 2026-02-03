@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
+import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 
 interface Issue {
     type: string;
@@ -223,6 +224,7 @@ export default function DashboardPage() {
     const [data, setData] = useState<AnalysisData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithIssues | null>(null);
 
     // Date range - last 7 days
     const [endDate, setEndDate] = useState(() => {
@@ -393,6 +395,7 @@ export default function DashboardPage() {
                                         campaign={campaign}
                                         borderColor="#dc2626"
                                         formatMoney={formatMoney}
+                                        onSelect={() => setSelectedCampaign(campaign)}
                                     />
                                 ))}
                             </div>
@@ -415,6 +418,7 @@ export default function DashboardPage() {
                                         campaign={campaign}
                                         borderColor="#f59e0b"
                                         formatMoney={formatMoney}
+                                        onSelect={() => setSelectedCampaign(campaign)}
                                     />
                                 ))}
                             </div>
@@ -454,6 +458,16 @@ export default function DashboardPage() {
                     </>
                 )}
             </main>
+
+            {/* Campaign Detail Panel */}
+            {selectedCampaign && (
+                <CampaignDetailPanel
+                    campaign={selectedCampaign}
+                    dateRange={{ startDate, endDate }}
+                    onClose={() => setSelectedCampaign(null)}
+                    formatMoney={formatMoney}
+                />
+            )}
         </div>
     );
 }
@@ -462,13 +476,18 @@ function CampaignCard({
     campaign,
     borderColor,
     formatMoney,
+    onSelect,
 }: {
     campaign: CampaignWithIssues;
     borderColor: string;
     formatMoney: (n: number) => string;
+    onSelect: () => void;
 }) {
     return (
-        <div style={{ ...styles.campaignCard, borderLeftColor: borderColor }}>
+        <div
+            style={{ ...styles.campaignCard, borderLeftColor: borderColor }}
+            onClick={onSelect}
+        >
             <h3 style={styles.campaignName}>{campaign.name}</h3>
 
             {/* Issues */}
@@ -491,12 +510,28 @@ function CampaignCard({
                 </div>
             ))}
 
-            {/* Metrics */}
-            <div style={styles.metricsRow}>
-                <span>Chi tiêu: <strong>{formatMoney(campaign.totals.spend)}</strong></span>
-                <span>Đơn: <strong>{campaign.totals.purchases}</strong></span>
-                <span>CPP: <strong>{formatMoney(campaign.totals.cpp)}</strong></span>
-                <span>ROAS: <strong>{campaign.totals.roas.toFixed(2)}x</strong></span>
+            {/* Metrics + AI Button Row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                <div style={styles.metricsRow}>
+                    <span>Chi tiêu: <strong>{formatMoney(campaign.totals.spend)}</strong></span>
+                    <span>Đơn: <strong>{campaign.totals.purchases}</strong></span>
+                    <span>CPP: <strong>{formatMoney(campaign.totals.cpp)}</strong></span>
+                </div>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onSelect(); }}
+                    style={{
+                        background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                    }}
+                >
+                    🧠 Phân tích
+                </button>
             </div>
         </div>
     );

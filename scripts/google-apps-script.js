@@ -524,6 +524,10 @@ function getOrCreateSheet(sheetName) {
 function logAction(action, accountId, date, rowsCount, status, message) {
     try {
         const sheet = getOrCreateSheet(CONFIG.LOGS_SHEET);
+
+        // ĐẢM BẢO HEADERS
+        ensureHeaders(sheet, CONFIG.LOGS_SHEET);
+
         sheet.appendRow([
             new Date().toISOString(),
             action,

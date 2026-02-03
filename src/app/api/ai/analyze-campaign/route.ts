@@ -1,0 +1,148 @@
+// API Route: AI Campaign Analysis with OpenAI
+// Prompt designed like a Vietnam Market Ads Expert + Alex Hormozi style
+
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+
+interface CampaignData {
+    id: string;
+    name: string;
+    status: string;
+    spend: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    cpc: number;
+    leads?: number;
+    purchases?: number;
+    revenue?: number;
+}
+
+interface DailyTrend {
+    date: string;
+    spend: number;
+    leads: number;
+    cpl: number;
+}
+
+interface LocalInsight {
+    type: string;
+    title: string;
+    message: string;
+    action?: string;
+}
+
+export async function POST(request: NextRequest) {
+    try {
+        const body = await request.json();
+        const { campaign, dailyTrends, insights } = body as {
+            campaign: CampaignData;
+            dailyTrends: DailyTrend[];
+            insights: LocalInsight[];
+        };
+
+        if (!campaign) {
+            return NextResponse.json({ success: false, error: 'Missing campaign data' }, { status: 400 });
+        }
+
+        // Calculate derived metrics
+        const cpl = campaign.leads && campaign.leads > 0 ? campaign.spend / campaign.leads : 0;
+        const cvr = campaign.clicks > 0 && campaign.leads ? (campaign.leads / campaign.clicks) * 100 : 0;
+
+        // Build context for AI
+        const prompt = buildAdsExpertPrompt(campaign, dailyTrends, insights, cpl, cvr);
+
+        // Call OpenAI
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Bạn là chuyên gia quảng cáo Facebook tại Việt Nam với 10+ năm kinh nghiệm. Bạn kết hợp phong cách phân tích dữ liệu sắc bén của Media Buyer chuyên nghiệp với tư duy content của Alex Hormozi. Trả lời ngắn gọn, thực tế, có hành động cụ thể.'
+                },
+                { role: 'user', content: prompt }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7,
+        });
+
+        const advice = completion.choices[0]?.message?.content || 'Không thể phân tích';
+
+        return NextResponse.json({
+            success: true,
+            advice,
+            metrics: { cpl, cvr }
+        });
+    } catch (error) {
+        console.error('AI analysis error:', error);
+        return NextResponse.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+    }
+}
+
+function buildAdsExpertPrompt(
+    campaign: CampaignData,
+    dailyTrends: DailyTrend[],
+    insights: LocalInsight[],
+    cpl: number,
+    cvr: number
+): string {
+    const trendSummary = dailyTrends.length > 0
+        ? dailyTrends.map(t => `${t.date}: ${(t.spend / 1000).toFixed(0)}k spend, ${t.leads} data, CPL ${(t.cpl / 1000).toFixed(0)}k`).join('\n')
+        : 'Không có dữ liệu trend theo ngày';
+
+    const insightsSummary = insights.map(i => `- ${i.title}: ${i.message}`).join('\n');
+
+    return `
+CAMPAIGN CẦN PHÂN TÍCH:
+- Tên: ${campaign.name}
+- Trạng thái: ${campaign.status}
+- Chi tiêu: ${campaign.spend.toLocaleString('vi-VN')}đ
+- Impressions: ${campaign.impressions.toLocaleString()}
+- Clicks: ${campaign.clicks.toLocaleString()}
+- CTR: ${campaign.ctr.toFixed(2)}%
+- CPC: ${campaign.cpc.toLocaleString('vi-VN')}đ
+- Data/Leads: ${campaign.leads || 0}
+- CPL: ${cpl > 0 ? (cpl / 1000).toFixed(0) + 'k' : 'Chưa có data'}
+- CVR (Leads/Clicks): ${cvr.toFixed(2)}%
+
+DIỄN BIẾN THEO NGÀY:
+${trendSummary}
+
+INSIGHTS TỪ HỆ THỐNG:
+${insightsSummary || 'Chưa có insights'}
+
+HÃY PHÂN TÍCH VÀ ĐƯA RA:
+
+1. **ĐÁNH GIÁ TỔNG QUAN** (1-2 câu)
+   - Campaign này đang ở mức nào? (Tốt/Trung bình/Kém)
+   
+2. **HÀNH ĐỘNG CỤ THỂ** (quan trọng nhất)
+   Chọn 1 trong các quyết định:
+   - 🟢 SCALE: Tăng ngân sách bao nhiêu %?
+   - 🟡 GIỮ NGUYÊN: Theo dõi thêm bao lâu?
+   - 🔴 TẮT: Tại sao cần tắt ngay?
+   - 🔄 TỐI ƯU: Cần thay đổi gì?
+
+3. **GỢI Ý CONTENT** (nếu CTR thấp hoặc CPL cao)
+   - Hook mới theo style Alex Hormozi
+   - Góc content thử nghiệm
+   - Offer hấp dẫn hơn
+
+4. **TARGETING** (nếu cần tối ưu)
+   - Đề xuất audience mới
+   - Loại trừ những ai?
+
+QUAN TRỌNG:
+- Viết ngắn gọn, đi thẳng vào vấn đề
+- Dùng bullet points và emoji
+- Đưa ra con số cụ thể (tăng 20%, CPL mục tiêu 50k, v.v.)
+- Ưu tiên lợi nhuận và hiệu quả, không chạy theo vanity metrics
+`;
+}

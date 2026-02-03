@@ -5,6 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 import TrendChart from '@/components/TrendChart';
+import CampaignPanel from '@/components/CampaignPanel';
 
 interface MetricData {
     campaignId: string;
@@ -67,7 +68,10 @@ export default function DashboardPage() {
         reason?: string;
     }>({ authenticated: true, needsLogin: false });
     const [aiInsights, setAiInsights] = useState<string[]>([]);
-    const [selectedCampaign, setSelectedCampaign] = useState<{ id: string, name: string } | null>(null);
+    // Campaign được chọn để hiển thị trong CampaignPanel (full data)
+    const [selectedCampaign, setSelectedCampaign] = useState<MetricData | null>(null);
+    // Campaign được chọn để hiển thị TrendChart (chỉ id/name - backward compat)
+    const [selectedCampaignForChart, setSelectedCampaignForChart] = useState<{ id: string, name: string } | null>(null);
     const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
     // Daily insights data for TrendChart (cached from API)
@@ -891,9 +895,9 @@ export default function DashboardPage() {
                                     metrics.map((row) => (
                                         <tr
                                             key={row.campaignId}
-                                            onClick={() => setSelectedCampaign({ id: row.campaignId, name: row.campaignName })}
+                                            onClick={() => setSelectedCampaign(row)}
                                             style={{ cursor: 'pointer' }}
-                                            title="Click để xem diễn biến"
+                                            title="Click để xem chi tiết & AI phân tích"
                                         >
                                             <td style={{ fontWeight: 500, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 📊 {row.campaignName}
@@ -953,15 +957,23 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Trend Chart Modal */}
+                {/* Campaign Deep Dive Panel */}
                 {selectedCampaign && (
-                    <TrendChart
-                        campaignId={selectedCampaign.id}
-                        campaignName={selectedCampaign.name}
-                        campaignData={dailyInsights
-                            .filter(row => row.campaign_id === selectedCampaign.id)
-                            .sort((a, b) => a.date.localeCompare(b.date))
-                        }
+                    <CampaignPanel
+                        campaign={{
+                            id: selectedCampaign.campaignId,
+                            name: selectedCampaign.campaignName,
+                            status: selectedCampaign.status,
+                            spend: selectedCampaign.spend,
+                            impressions: selectedCampaign.impressions,
+                            clicks: selectedCampaign.clicks,
+                            ctr: selectedCampaign.ctr,
+                            cpc: selectedCampaign.cpc,
+                            leads: selectedCampaign.totalData,
+                            purchases: selectedCampaign.purchases,
+                            revenue: selectedCampaign.revenue,
+                        }}
+                        dateRange={dateRange}
                         onClose={() => setSelectedCampaign(null)}
                     />
                 )}

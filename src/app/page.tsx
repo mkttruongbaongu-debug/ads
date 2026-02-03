@@ -542,13 +542,20 @@ const styles = {
   },
 };
 
-const markets = [
-  { symbol: 'BTC', name: 'Bitcoin', price: '$43,567.80', change: '+2.34%', up: true, volume: '$28.5B' },
-  { symbol: 'ETH', name: 'Ethereum', price: '$2,345.60', change: '+3.12%', up: true, volume: '$15.2B' },
-  { symbol: 'BNB', name: 'BNB', price: '$312.45', change: '-0.89%', up: false, volume: '$1.8B' },
-  { symbol: 'SOL', name: 'Solana', price: '$98.72', change: '+5.67%', up: true, volume: '$2.4B' },
-  { symbol: 'XRP', name: 'Ripple', price: '$0.62', change: '-1.23%', up: false, volume: '$1.2B' },
-  { symbol: 'ADA', name: 'Cardano', price: '$0.58', change: '+1.45%', up: true, volume: '$890M' },
+// Demo campaigns data
+const campaigns = [
+  { id: 'CP001', name: 'Ưu đãi Tết 2026', status: 'active', spend: '₫12.5M', roas: '4.2x', roasUp: true, ctr: '3.8%', action: 'Scale' },
+  { id: 'CP002', name: 'Flash Sale T2', status: 'active', spend: '₫8.2M', roas: '3.1x', roasUp: true, ctr: '2.9%', action: 'Scale' },
+  { id: 'CP003', name: 'Remarketing Q1', status: 'warning', spend: '₫5.7M', roas: '1.8x', roasUp: false, ctr: '1.2%', action: 'Tối ưu' },
+  { id: 'CP004', name: 'Awareness Brand', status: 'critical', spend: '₫15.3M', roas: '0.6x', roasUp: false, ctr: '0.4%', action: 'Dừng' },
+  { id: 'CP005', name: 'Lookalike 1%', status: 'active', spend: '₫6.8M', roas: '5.1x', roasUp: true, ctr: '4.2%', action: 'Scale' },
+];
+
+const features = [
+  { icon: '🔍', title: 'AI Phát Hiện Lỗ', desc: 'Tự động scan và phát hiện chiến dịch đang "đốt tiền" trong 30 giây' },
+  { icon: '📊', title: 'Phân Tích ROAS', desc: 'Đo lường chính xác hiệu quả từng chiến dịch, adset, và ad' },
+  { icon: '💡', title: 'Đề Xuất Thông Minh', desc: 'AI gợi ý hành động cụ thể: Scale, Tối ưu, hay Dừng ngay' },
+  { icon: '⚡', title: 'Tối Ưu Tự Động', desc: 'Một click áp dụng thay đổi, tiết kiệm hàng giờ thao tác thủ công' },
 ];
 
 export default function LandingPage() {
@@ -657,42 +664,72 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Markets Section */}
+      {/* Features Section */}
       <section id="markets" style={styles.section}>
         <div style={styles.sectionHeader}>
           <div>
-            <h2 style={styles.sectionTitle}>Tính năng</h2>
-            <p style={styles.sectionDesc}>Phân tích 100+ chiến dịch quảng cáo</p>
+            <h2 style={styles.sectionTitle}>Tại sao <span style={styles.gradientText}>97% chủ shop</span> không biết chiến dịch nào lỗ?</h2>
+            <p style={styles.sectionDesc}>Vì họ không có công cụ phân tích đúng. Bạn thì có.</p>
           </div>
-          <button style={styles.btnSecondary}>Xem tất cả</button>
+        </div>
+
+        {/* Feature Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '48px' }}>
+          {features.map((f, i) => (
+            <div key={i} style={{ ...styles.card, padding: '24px', textAlign: 'center' as const }}>
+              <div style={{ fontSize: '40px', marginBottom: '16px' }}>{f.icon}</div>
+              <h3 style={{ fontWeight: 700, color: colors.text, marginBottom: '8px', fontSize: '16px' }}>{f.title}</h3>
+              <p style={{ fontSize: '14px', color: colors.textMuted, lineHeight: 1.5 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Campaign Demo Table */}
+        <div style={styles.sectionHeader}>
+          <div>
+            <h3 style={{ ...styles.sectionTitle, fontSize: '20px' }}>Demo: Phân tích chiến dịch</h3>
+            <p style={styles.sectionDesc}>Xem AI phát hiện chiến dịch lỗ trong 1 giây</p>
+          </div>
+          <Link href="/dashboard" style={styles.btnSecondary}>Thử với tài khoản của bạn →</Link>
         </div>
         <div style={styles.card}>
           <table style={styles.table}>
             <thead style={styles.tableHead}>
               <tr>
-                <th style={styles.th}>Tên</th>
-                <th style={styles.thRight}>Giá</th>
-                <th style={styles.thRight}>Thay đổi 24h</th>
-                <th style={styles.thRight}>Volume 24h</th>
-                <th style={styles.thRight}>Hành động</th>
+                <th style={styles.th}>Chiến dịch</th>
+                <th style={styles.thRight}>Chi tiêu</th>
+                <th style={styles.thRight}>ROAS</th>
+                <th style={styles.thRight}>CTR</th>
+                <th style={styles.thRight}>Đề xuất AI</th>
               </tr>
             </thead>
             <tbody>
-              {markets.map((m) => (
-                <tr key={m.symbol} style={styles.tr}>
+              {campaigns.map((c) => (
+                <tr key={c.id} style={styles.tr}>
                   <td style={styles.td}>
                     <div style={styles.coinInfo}>
-                      <div style={styles.coinIcon}>{m.symbol.slice(0, 2)}</div>
+                      <div style={{
+                        ...styles.coinIcon,
+                        background: c.status === 'active' ? colors.success : c.status === 'warning' ? colors.warning : colors.error,
+                        color: colors.bg
+                      }}>
+                        {c.status === 'active' ? '✓' : c.status === 'warning' ? '!' : '✕'}
+                      </div>
                       <div>
-                        <div style={styles.coinName}>{m.symbol}</div>
-                        <div style={styles.coinSymbol}>{m.name}</div>
+                        <div style={styles.coinName}>{c.name}</div>
+                        <div style={styles.coinSymbol}>{c.id}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={styles.tdRight}><span style={styles.priceText}>{m.price}</span></td>
-                  <td style={styles.tdRight}><span style={m.up ? styles.priceUp : styles.priceDown}>{m.change}</span></td>
-                  <td style={styles.tdRight}><span style={styles.volumeText}>{m.volume}</span></td>
-                  <td style={styles.tdRight}><button style={styles.tradeBtn}>Trade</button></td>
+                  <td style={styles.tdRight}><span style={styles.priceText}>{c.spend}</span></td>
+                  <td style={styles.tdRight}><span style={c.roasUp ? styles.priceUp : styles.priceDown}>{c.roas}</span></td>
+                  <td style={styles.tdRight}><span style={styles.volumeText}>{c.ctr}</span></td>
+                  <td style={styles.tdRight}>
+                    <button style={{
+                      ...styles.tradeBtn,
+                      background: c.action === 'Scale' ? colors.success : c.action === 'Tối ưu' ? colors.warning : colors.error,
+                    }}>{c.action}</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -717,8 +754,8 @@ export default function LandingPage() {
             </div>
             <div style={styles.securityCard}>
               <div style={styles.securityIcon}>🛡️</div>
-              <h3 style={styles.securityCardTitle}>Meta Verified</h3>
-              <p style={styles.securityCardDesc}>Đối tác chính thức của Meta</p>
+              <h3 style={styles.securityCardTitle}>Tech Provider</h3>
+              <p style={styles.securityCardDesc}>Nhà cung cấp công nghệ được Meta xác minh</p>
             </div>
             <div style={styles.securityCard}>
               <div style={styles.securityIcon}>🔐</div>

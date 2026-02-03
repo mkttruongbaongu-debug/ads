@@ -270,7 +270,7 @@ export default function DashboardPage() {
     const router = useRouter();
 
     const [data, setData] = useState<AnalysisData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithIssues | null>(null);
 

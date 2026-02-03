@@ -74,9 +74,8 @@ export const authOptions: AuthOptions = {
             clientSecret: process.env.FB_APP_SECRET!,
             authorization: {
                 params: {
-                    // Tạm thời dùng scope cơ bản để test login
-                    // Sau khi login OK sẽ thêm: ads_read,ads_management,business_management,read_insights
-                    scope: "email,public_profile",
+                    // Full permissions for ads management
+                    scope: "email,public_profile,ads_read,ads_management,business_management,read_insights",
                 },
             },
         }),

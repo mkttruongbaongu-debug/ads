@@ -50,70 +50,77 @@ interface AdAccount {
     timezone: string;
 }
 
-// Styles
+// Glassmorphism Design System
 const styles = {
     container: {
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
         fontFamily: 'Inter, -apple-system, sans-serif',
+        color: '#ffffff',
     },
     header: {
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        padding: '0',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        background: 'rgba(15, 23, 42, 0.8)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        position: 'sticky' as const,
+        top: 0,
+        zIndex: 100,
     },
     headerTop: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '16px 32px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '20px 32px',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
     },
     logo: {
-        fontSize: '1.5rem',
+        fontSize: '1.75rem',
         fontWeight: 800,
-        background: 'linear-gradient(135deg, #60a5fa, #a78bfa)',
+        background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%)',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
-        letterSpacing: '-0.02em',
+        letterSpacing: '-0.03em',
     },
     headerControls: {
         display: 'flex',
-        alignItems: 'center',
-        gap: '24px',
+        alignItems: 'flex-end',
+        gap: '20px',
         padding: '16px 32px',
     },
     controlGroup: {
         display: 'flex',
         flexDirection: 'column' as const,
-        gap: '6px',
+        gap: '8px',
     },
     controlLabel: {
-        fontSize: '0.75rem',
-        color: 'rgba(255,255,255,0.5)',
+        fontSize: '0.7rem',
+        color: 'rgba(255,255,255,0.4)',
         textTransform: 'uppercase' as const,
-        letterSpacing: '0.05em',
+        letterSpacing: '0.1em',
         fontWeight: 600,
     },
     selectInput: {
-        background: 'rgba(255,255,255,0.08)',
-        border: '1px solid rgba(255,255,255,0.15)',
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.1)',
         color: 'white',
-        padding: '10px 14px',
-        borderRadius: '10px',
+        padding: '12px 16px',
+        borderRadius: '12px',
         fontSize: '0.875rem',
         cursor: 'pointer',
-        minWidth: '180px',
+        minWidth: '200px',
         outline: 'none',
+        transition: 'all 0.2s ease',
     },
     dateInputsGroup: {
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        background: 'rgba(255,255,255,0.08)',
-        padding: '8px 14px',
-        borderRadius: '10px',
-        border: '1px solid rgba(255,255,255,0.15)',
+        gap: '10px',
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(8px)',
+        padding: '10px 16px',
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.1)',
     },
     dateInput: {
         background: 'transparent',
@@ -124,144 +131,162 @@ const styles = {
         outline: 'none',
     },
     searchBtn: {
-        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
         color: 'white',
         border: 'none',
-        padding: '12px 28px',
-        borderRadius: '10px',
+        padding: '14px 32px',
+        borderRadius: '12px',
         cursor: 'pointer',
-        fontSize: '0.9rem',
+        fontSize: '0.95rem',
         fontWeight: 600,
-        boxShadow: '0 4px 15px rgba(59,130,246,0.4)',
-        transition: 'all 0.2s ease',
+        boxShadow: '0 8px 32px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+        transition: 'all 0.3s ease',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
     },
     logoutBtn: {
-        background: 'transparent',
-        border: '1px solid rgba(255,255,255,0.2)',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.15)',
         color: 'rgba(255,255,255,0.7)',
-        padding: '8px 16px',
-        borderRadius: '8px',
+        padding: '10px 20px',
+        borderRadius: '10px',
         cursor: 'pointer',
-        fontSize: '0.8rem',
+        fontSize: '0.85rem',
         transition: 'all 0.2s ease',
+        backdropFilter: 'blur(8px)',
     },
     main: {
-        maxWidth: '900px',
+        maxWidth: '1000px',
         margin: '0 auto',
-        padding: '24px',
+        padding: '32px',
     },
     summaryRow: {
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '16px',
-        marginBottom: '24px',
+        gap: '20px',
+        marginBottom: '32px',
     },
     summaryCard: {
-        background: 'white',
-        borderRadius: '12px',
-        padding: '16px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(16px)',
+        borderRadius: '16px',
+        padding: '24px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        transition: 'all 0.3s ease',
     },
     summaryLabel: {
         fontSize: '0.75rem',
-        color: '#71717a',
+        color: 'rgba(255,255,255,0.5)',
         textTransform: 'uppercase' as const,
-        letterSpacing: '0.05em',
-        margin: '0 0 4px',
+        letterSpacing: '0.08em',
+        margin: '0 0 8px',
+        fontWeight: 500,
     },
     summaryValue: {
-        fontSize: '1.5rem',
+        fontSize: '1.75rem',
         fontWeight: 700,
-        color: '#18181b',
+        color: '#ffffff',
         margin: 0,
+        letterSpacing: '-0.02em',
     },
     section: {
-        marginBottom: '24px',
+        marginBottom: '28px',
     },
     sectionHeader: {
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        marginBottom: '12px',
+        gap: '10px',
+        marginBottom: '16px',
     },
     sectionTitle: {
-        fontSize: '1rem',
+        fontSize: '1.1rem',
         fontWeight: 600,
-        color: '#18181b',
+        color: 'rgba(255,255,255,0.9)',
         margin: 0,
     },
     badge: {
         fontSize: '0.75rem',
-        padding: '2px 8px',
-        borderRadius: '10px',
-        fontWeight: 500,
+        padding: '4px 12px',
+        borderRadius: '20px',
+        fontWeight: 600,
+        backdropFilter: 'blur(4px)',
     },
     campaignCard: {
-        background: 'white',
-        borderRadius: '12px',
-        padding: '16px',
-        marginBottom: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: '16px',
+        padding: '20px',
+        marginBottom: '16px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
         cursor: 'pointer',
-        transition: 'box-shadow 0.2s',
+        transition: 'all 0.3s ease',
         borderLeft: '4px solid',
     },
     campaignName: {
-        fontSize: '1rem',
+        fontSize: '1.05rem',
         fontWeight: 600,
-        color: '#18181b',
-        margin: '0 0 8px',
+        color: '#ffffff',
+        margin: '0 0 12px',
     },
     issueBox: {
-        background: '#fef2f2',
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '8px',
+        background: 'rgba(239, 68, 68, 0.1)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '12px',
+        padding: '14px',
+        marginBottom: '12px',
+        border: '1px solid rgba(239, 68, 68, 0.2)',
     },
     issueMessage: {
-        fontSize: '0.875rem',
-        fontWeight: 500,
-        color: '#dc2626',
-        margin: '0 0 4px',
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        color: '#fca5a5',
+        margin: '0 0 6px',
     },
     issueDetail: {
-        fontSize: '0.8125rem',
-        color: '#71717a',
-        margin: '0 0 8px',
+        fontSize: '0.8rem',
+        color: 'rgba(255,255,255,0.6)',
+        margin: '0 0 10px',
     },
     issueAction: {
-        fontSize: '0.8125rem',
-        fontWeight: 500,
-        color: '#059669',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+        color: '#34d399',
         margin: 0,
     },
     metricsRow: {
         display: 'flex',
         gap: '24px',
-        fontSize: '0.8125rem',
-        color: '#52525b',
+        fontSize: '0.85rem',
+        color: 'rgba(255,255,255,0.6)',
     },
     loader: {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '80px 0',
-        color: '#71717a',
+        padding: '100px 0',
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '1rem',
     },
     error: {
         textAlign: 'center' as const,
-        padding: '40px',
-        color: '#dc2626',
+        padding: '48px',
+        color: '#fca5a5',
+        background: 'rgba(239, 68, 68, 0.1)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: '16px',
+        border: '1px solid rgba(239, 68, 68, 0.2)',
     },
     emptyState: {
         textAlign: 'center' as const,
-        padding: '60px 24px',
-        background: 'white',
-        borderRadius: '12px',
-        color: '#71717a',
+        padding: '80px 32px',
+        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: '20px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        color: 'rgba(255,255,255,0.6)',
     },
 };
 
@@ -457,9 +482,9 @@ export default function DashboardPage() {
 
             {/* Filter Bar */}
             <div style={{
-                background: '#f4f4f5',
-                padding: '12px 24px',
-                borderBottom: '1px solid #e4e4e7',
+                background: 'rgba(255,255,255,0.02)',
+                padding: '16px 32px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
             }}>
                 <input
                     type="text"
@@ -469,11 +494,13 @@ export default function DashboardPage() {
                     style={{
                         width: '100%',
                         maxWidth: '400px',
-                        padding: '10px 16px',
-                        border: '1px solid #e4e4e7',
-                        borderRadius: '8px',
+                        padding: '12px 18px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
                         fontSize: '0.875rem',
-                        background: 'white',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        outline: 'none',
                     }}
                 />
             </div>
@@ -535,15 +562,15 @@ export default function DashboardPage() {
                                     <p style={styles.summaryLabel}>Doanh thu</p>
                                     <p style={styles.summaryValue}>{formatMoney(data.summary.totalRevenue)}</p>
                                 </div>
-                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #dc2626' }}>
+                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #f87171' }}>
                                     <p style={styles.summaryLabel}>Cần xử lý</p>
-                                    <p style={{ ...styles.summaryValue, color: '#dc2626' }}>
+                                    <p style={{ ...styles.summaryValue, color: '#f87171' }}>
                                         {data.summary.critical}
                                     </p>
                                 </div>
-                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #22c55e' }}>
+                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #4ade80' }}>
                                     <p style={styles.summaryLabel}>Đang tốt</p>
-                                    <p style={{ ...styles.summaryValue, color: '#22c55e' }}>
+                                    <p style={{ ...styles.summaryValue, color: '#4ade80' }}>
                                         {data.summary.good}
                                     </p>
                                 </div>
@@ -555,7 +582,7 @@ export default function DashboardPage() {
                                     <div style={styles.sectionHeader}>
                                         <span style={{ fontSize: '1.25rem' }}>🔴</span>
                                         <h2 style={styles.sectionTitle}>Cần xử lý ngay</h2>
-                                        <span style={{ ...styles.badge, background: '#fee2e2', color: '#dc2626' }}>
+                                        <span style={{ ...styles.badge, background: 'rgba(248,113,113,0.2)', color: '#fca5a5' }}>
                                             {filteredCritical.length}
                                         </span>
                                     </div>
@@ -578,7 +605,7 @@ export default function DashboardPage() {
                                     <div style={styles.sectionHeader}>
                                         <span style={{ fontSize: '1.25rem' }}>🟡</span>
                                         <h2 style={styles.sectionTitle}>Theo dõi</h2>
-                                        <span style={{ ...styles.badge, background: '#fef3c7', color: '#d97706' }}>
+                                        <span style={{ ...styles.badge, background: 'rgba(251,191,36,0.2)', color: '#fcd34d' }}>
                                             {filteredWarning.length}
                                         </span>
                                     </div>
@@ -601,18 +628,19 @@ export default function DashboardPage() {
                                     <div style={styles.sectionHeader}>
                                         <span style={{ fontSize: '1.25rem' }}>🟢</span>
                                         <h2 style={styles.sectionTitle}>Đang tốt</h2>
-                                        <span style={{ ...styles.badge, background: '#dcfce7', color: '#16a34a' }}>
+                                        <span style={{ ...styles.badge, background: 'rgba(74,222,128,0.2)', color: '#4ade80' }}>
                                             {filteredGood.length}
                                         </span>
                                     </div>
 
                                     <div style={{
-                                        background: 'white',
-                                        borderRadius: '12px',
-                                        padding: '16px',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        backdropFilter: 'blur(12px)',
+                                        borderRadius: '16px',
+                                        padding: '20px',
+                                        border: '1px solid rgba(255,255,255,0.1)',
                                     }}>
-                                        <p style={{ color: '#71717a', margin: 0 }}>
+                                        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>
                                             {filteredGood.map(c => c.name).join(', ')}
                                         </p>
                                     </div>

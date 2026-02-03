@@ -124,6 +124,19 @@ export const authOptions: AuthOptions = {
     },
     pages: {
         signIn: "/", // Redirect về landing page khi chưa đăng nhập
+        error: "/", // Redirect về landing page khi có lỗi
+    },
+    debug: process.env.NODE_ENV === 'development', // Enable debug in development
+    logger: {
+        error(code, metadata) {
+            console.error('[NextAuth Error]', code, metadata);
+        },
+        warn(code) {
+            console.warn('[NextAuth Warn]', code);
+        },
+        debug(code, metadata) {
+            console.log('[NextAuth Debug]', code, metadata);
+        },
     },
     secret: process.env.NEXTAUTH_SECRET || "quan-su-ads-secret-2026",
 };

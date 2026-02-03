@@ -69,6 +69,50 @@ const HEADERS = {
     ]
 };
 
+/**
+ * Helper: Đảm bảo sheet có headers đúng
+ * Nếu sheet trống hoặc row 1 không phải headers -> insert headers
+ */
+function ensureHeaders(sheet, sheetName) {
+    const headers = HEADERS[sheetName];
+    if (!headers || headers.length === 0) return false;
+
+    const lastRow = sheet.getLastRow();
+    let needHeaders = false;
+
+    if (lastRow === 0) {
+        // Sheet trống hoàn toàn
+        needHeaders = true;
+    } else {
+        // Check cell A1 có phải header không
+        const firstCell = sheet.getRange(1, 1).getValue();
+        if (firstCell !== headers[0]) {
+            needHeaders = true;
+        }
+    }
+
+    if (needHeaders) {
+        // Insert row ở đầu nếu có data
+        if (lastRow > 0) {
+            sheet.insertRowBefore(1);
+        }
+
+        // Thêm headers
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+        // Format: Bold, Blue background, White text, Frozen
+        const headerRange = sheet.getRange(1, 1, 1, headers.length);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#1a73e8');
+        headerRange.setFontColor('#ffffff');
+        sheet.setFrozenRows(1);
+
+        return true; // Headers đã được thêm
+    }
+
+    return false; // Headers đã có sẵn
+}
+
 // ==================== MAIN FUNCTIONS ====================
 
 /**
@@ -551,8 +595,12 @@ function saveToken(data) {
     }
 
     const sheet = getOrCreateSheet(CONFIG.TOKENS_SHEET);
+
+    // ĐẢM BẢO HEADERS TRƯỚC KHI XỬ LÝ DATA
+    ensureHeaders(sheet, CONFIG.TOKENS_SHEET);
+
     const allData = sheet.getDataRange().getValues();
-    const headers = allData[0];
+    const headers = allData[0] || HEADERS[CONFIG.TOKENS_SHEET];
     const now = new Date().toISOString();
 
     // Tìm row có userId này
@@ -598,8 +646,11 @@ function getToken(params) {
         sheet = getOrCreateSheet(CONFIG.TOKENS_SHEET);
     }
 
+    // ĐẢM BẢO HEADERS TRƯỚC KHI ĐỌC DATA
+    ensureHeaders(sheet, CONFIG.TOKENS_SHEET);
+
     const allData = sheet.getDataRange().getValues();
-    const headers = allData[0];
+    const headers = allData[0] || HEADERS[CONFIG.TOKENS_SHEET];
 
     // Nếu sheet trống hoặc chỉ có headers → chưa có token
     if (allData.length <= 1) {

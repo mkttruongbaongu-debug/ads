@@ -50,18 +50,34 @@ interface AdAccount {
     timezone: string;
 }
 
-// Glassmorphism Design System
+// CEX Trading Design System
+const colors = {
+    bgPrimary: '#0B0B10',
+    bgSecondary: '#0F172A',
+    bgCard: 'rgba(15,23,42,0.8)',
+    accentGold: '#F59E0B',
+    accentPurple: '#8B5CF6',
+    success: '#22C55E',
+    error: '#EF4444',
+    warning: '#FBBF24',
+    textPrimary: '#F8FAFC',
+    textSecondary: 'rgba(255,255,255,0.7)',
+    textMuted: 'rgba(255,255,255,0.5)',
+    border: 'rgba(255,255,255,0.1)',
+    borderGlow: 'rgba(245,158,11,0.3)',
+};
+
 const styles = {
     container: {
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        background: `linear-gradient(180deg, ${colors.bgPrimary} 0%, ${colors.bgSecondary} 50%, ${colors.bgPrimary} 100%)`,
         fontFamily: 'Inter, -apple-system, sans-serif',
-        color: '#ffffff',
+        color: colors.textPrimary,
     },
     header: {
-        background: 'rgba(15, 23, 42, 0.8)',
+        background: 'rgba(11, 11, 16, 0.9)',
         backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        borderBottom: `1px solid ${colors.border}`,
         position: 'sticky' as const,
         top: 0,
         zIndex: 100,
@@ -71,12 +87,12 @@ const styles = {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '20px 32px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        borderBottom: `1px solid ${colors.border}`,
     },
     logo: {
         fontSize: '1.75rem',
         fontWeight: 800,
-        background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%)',
+        background: `linear-gradient(135deg, ${colors.accentGold} 0%, ${colors.accentPurple} 100%)`,
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         letterSpacing: '-0.03em',
@@ -94,7 +110,7 @@ const styles = {
     },
     controlLabel: {
         fontSize: '0.7rem',
-        color: 'rgba(255,255,255,0.4)',
+        color: colors.textMuted,
         textTransform: 'uppercase' as const,
         letterSpacing: '0.1em',
         fontWeight: 600,
@@ -102,10 +118,10 @@ const styles = {
     selectInput: {
         background: 'rgba(255,255,255,0.05)',
         backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: `1px solid ${colors.border}`,
         color: 'white',
         padding: '12px 16px',
-        borderRadius: '12px',
+        borderRadius: '8px',
         fontSize: '0.875rem',
         cursor: 'pointer',
         minWidth: '200px',
@@ -119,8 +135,8 @@ const styles = {
         background: 'rgba(255,255,255,0.05)',
         backdropFilter: 'blur(8px)',
         padding: '10px 16px',
-        borderRadius: '12px',
-        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '8px',
+        border: `1px solid ${colors.border}`,
     },
     dateInput: {
         background: 'transparent',
@@ -131,15 +147,15 @@ const styles = {
         outline: 'none',
     },
     searchBtn: {
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
-        color: 'white',
+        background: `linear-gradient(135deg, ${colors.accentGold} 0%, #D97706 100%)`,
+        color: colors.bgPrimary,
         border: 'none',
         padding: '14px 32px',
-        borderRadius: '12px',
+        borderRadius: '8px',
         cursor: 'pointer',
         fontSize: '0.95rem',
-        fontWeight: 600,
-        boxShadow: '0 8px 32px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+        fontWeight: 700,
+        boxShadow: `0 0 20px ${colors.borderGlow}`,
         transition: 'all 0.3s ease',
         display: 'flex',
         alignItems: 'center',
@@ -147,7 +163,7 @@ const styles = {
     },
     logoutBtn: {
         background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.15)',
+        border: `1px solid ${colors.border}`,
         color: 'rgba(255,255,255,0.7)',
         padding: '10px 20px',
         borderRadius: '10px',

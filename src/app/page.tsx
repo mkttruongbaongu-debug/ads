@@ -831,7 +831,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div style={styles.footerBottom}>
-            <p style={styles.copyright}>© 2026 QUÂN SƯ ADS. Đế Vương Ký.</p>
+            <p style={styles.copyright}>© 2026 QUÂN SƯ ADS - Một dự án đến từ Trường Bào Ngư</p>
             <div style={styles.legalLinks}>
               <a href="#" style={styles.footerLink}>Điều khoản</a>
               <a href="#" style={styles.footerLink}>Bảo mật</a>

@@ -1,21 +1,40 @@
 // API Route: Log AI usage to Google Sheets and get user's usage summary
+// CHI TIẾT ĐỦ ĐỂ TÍNH TIỀN USER
 
 import { NextRequest, NextResponse } from 'next/server';
 
-interface UsageData {
+interface BillingData {
+    // Request info
+    requestId: string;
+    timestamp: string;
     userId: string;
-    action: string;
+    actionType: string;
+    model: string;
+
+    // Token breakdown
     inputTokens: number;
+    inputUncached: number;
     cachedTokens: number;
     outputTokens: number;
-    costUsd: number;
-    costVnd: number;
+    totalTokens: number;
+
+    // Cost USD breakdown
+    costInputUsd: number;
+    costCachedUsd: number;
+    costOutputUsd: number;
+    costTotalUsd: number;
+
+    // Cost VND breakdown (để tính tiền)
+    costInputVnd: number;
+    costCachedVnd: number;
+    costOutputVnd: number;
+    costTotalVnd: number;
 }
 
-// POST: Log new usage
+// POST: Log new usage with full billing details
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json() as UsageData;
+        const body = await request.json() as BillingData;
 
         const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
         const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
@@ -24,7 +43,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Script URL not configured' }, { status: 500 });
         }
 
-        // Send to Apps Script
+        // Send full billing data to Apps Script
         const response = await fetch(scriptUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -32,14 +51,31 @@ export async function POST(request: NextRequest) {
                 secret,
                 action: 'logAiUsage',
                 data: {
-                    timestamp: new Date().toISOString(),
-                    userId: body.userId,
-                    actionType: body.action,
-                    inputTokens: body.inputTokens,
-                    cachedTokens: body.cachedTokens,
-                    outputTokens: body.outputTokens,
-                    costUsd: body.costUsd,
-                    costVnd: body.costVnd
+                    // Request info
+                    requestId: body.requestId,
+                    timestamp: body.timestamp || new Date().toISOString(),
+                    userId: body.userId || 'anonymous',
+                    actionType: body.actionType || 'analyze_campaign',
+                    model: body.model || 'gpt-5-mini',
+
+                    // Token breakdown
+                    inputTokens: body.inputTokens || 0,
+                    inputUncached: body.inputUncached || 0,
+                    cachedTokens: body.cachedTokens || 0,
+                    outputTokens: body.outputTokens || 0,
+                    totalTokens: body.totalTokens || 0,
+
+                    // Cost USD breakdown
+                    costInputUsd: body.costInputUsd || 0,
+                    costCachedUsd: body.costCachedUsd || 0,
+                    costOutputUsd: body.costOutputUsd || 0,
+                    costTotalUsd: body.costTotalUsd || 0,
+
+                    // Cost VND breakdown
+                    costInputVnd: body.costInputVnd || 0,
+                    costCachedVnd: body.costCachedVnd || 0,
+                    costOutputVnd: body.costOutputVnd || 0,
+                    costTotalVnd: body.costTotalVnd || 0,
                 }
             })
         });
@@ -55,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// GET: Get user's usage summary
+// GET: Get user's usage summary for billing
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;

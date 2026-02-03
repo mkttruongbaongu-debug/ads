@@ -84,31 +84,69 @@ export async function POST(request: NextRequest) {
             input: 0.25 / 1_000_000,      // $0.25 per 1M
             cached: 0.03 / 1_000_000,     // $0.03 per 1M  
             output: 2.00 / 1_000_000,     // $2.00 per 1M
+            USD_TO_VND: 25500,            // Tỷ giá USD/VND
         };
 
         const uncachedInputTokens = inputTokens - cachedTokens;
-        const cost = {
-            input: uncachedInputTokens * PRICING.input,
-            cached: cachedTokens * PRICING.cached,
-            output: outputTokens * PRICING.output,
-            total: 0
+
+        // Chi phí chi tiết (USD)
+        const costBreakdown = {
+            input_tokens: uncachedInputTokens,
+            input_cost_usd: uncachedInputTokens * PRICING.input,
+            cached_tokens: cachedTokens,
+            cached_cost_usd: cachedTokens * PRICING.cached,
+            output_tokens: outputTokens,
+            output_cost_usd: outputTokens * PRICING.output,
         };
-        cost.total = cost.input + cost.cached + cost.output;
+
+        const totalCostUsd = costBreakdown.input_cost_usd + costBreakdown.cached_cost_usd + costBreakdown.output_cost_usd;
+        const totalCostVnd = totalCostUsd * PRICING.USD_TO_VND;
+
+        // Request metadata
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const timestamp = new Date().toISOString();
 
         return NextResponse.json({
             success: true,
             advice,
             metrics: { cpl, cvr },
-            usage: {
-                input_tokens: inputTokens,
-                cached_tokens: cachedTokens,
-                output_tokens: outputTokens,
-                cost_usd: cost.total,
-                cost_vnd: Math.round(cost.total * 25500), // ~25,500 VND/USD
-                breakdown: {
-                    input_cost: cost.input,
-                    cached_cost: cost.cached,
-                    output_cost: cost.output
+            billing: {
+                request_id: requestId,
+                timestamp: timestamp,
+                model: 'gpt-5-mini',
+
+                // Token counts
+                tokens: {
+                    input: inputTokens,
+                    input_uncached: uncachedInputTokens,
+                    cached: cachedTokens,
+                    output: outputTokens,
+                    total: inputTokens + outputTokens,
+                },
+
+                // Chi phí chi tiết (USD)
+                cost_usd: {
+                    input: Number(costBreakdown.input_cost_usd.toFixed(8)),
+                    cached: Number(costBreakdown.cached_cost_usd.toFixed(8)),
+                    output: Number(costBreakdown.output_cost_usd.toFixed(8)),
+                    total: Number(totalCostUsd.toFixed(8)),
+                },
+
+                // Chi phí chi tiết (VND) - để tính tiền user
+                cost_vnd: {
+                    input: Math.round(costBreakdown.input_cost_usd * PRICING.USD_TO_VND),
+                    cached: Math.round(costBreakdown.cached_cost_usd * PRICING.USD_TO_VND),
+                    output: Math.round(costBreakdown.output_cost_usd * PRICING.USD_TO_VND),
+                    total: Math.round(totalCostVnd),
+                },
+
+                // Pricing info (để reference)
+                pricing: {
+                    model: 'gpt-5-mini',
+                    input_per_1m: '$0.25',
+                    cached_per_1m: '$0.03',
+                    output_per_1m: '$2.00',
+                    usd_to_vnd: PRICING.USD_TO_VND,
                 }
             }
         });

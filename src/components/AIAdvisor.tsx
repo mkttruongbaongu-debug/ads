@@ -81,22 +81,46 @@ export default function AIAdvisor({ campaign, dailyTrends = [] }: AIAdvisorProps
             if (json.success && json.advice) {
                 setAiAdvice(json.advice);
 
-                // Set usage data
-                if (json.usage) {
-                    setUsage(json.usage);
+                // Set usage data from billing response
+                if (json.billing) {
+                    setUsage({
+                        input_tokens: json.billing.tokens.input,
+                        cached_tokens: json.billing.tokens.cached,
+                        output_tokens: json.billing.tokens.output,
+                        cost_usd: json.billing.cost_usd.total,
+                        cost_vnd: json.billing.cost_vnd.total,
+                    });
 
-                    // Log usage to backend (fire and forget)
+                    // Log FULL billing data to backend (fire and forget)
                     fetch('/api/ai/usage', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            // Request info
+                            requestId: json.billing.request_id,
+                            timestamp: json.billing.timestamp,
                             userId: 'default', // TODO: Get from auth context
-                            action: 'analyze_campaign',
-                            inputTokens: json.usage.input_tokens,
-                            cachedTokens: json.usage.cached_tokens,
-                            outputTokens: json.usage.output_tokens,
-                            costUsd: json.usage.cost_usd,
-                            costVnd: json.usage.cost_vnd
+                            actionType: 'analyze_campaign',
+                            model: json.billing.model,
+
+                            // Token breakdown
+                            inputTokens: json.billing.tokens.input,
+                            inputUncached: json.billing.tokens.input_uncached,
+                            cachedTokens: json.billing.tokens.cached,
+                            outputTokens: json.billing.tokens.output,
+                            totalTokens: json.billing.tokens.total,
+
+                            // Cost USD breakdown
+                            costInputUsd: json.billing.cost_usd.input,
+                            costCachedUsd: json.billing.cost_usd.cached,
+                            costOutputUsd: json.billing.cost_usd.output,
+                            costTotalUsd: json.billing.cost_usd.total,
+
+                            // Cost VND breakdown (để tính tiền)
+                            costInputVnd: json.billing.cost_vnd.input,
+                            costCachedVnd: json.billing.cost_vnd.cached,
+                            costOutputVnd: json.billing.cost_vnd.output,
+                            costTotalVnd: json.billing.cost_vnd.total,
                         })
                     }).catch(console.error);
                 }

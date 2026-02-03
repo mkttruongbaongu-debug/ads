@@ -69,8 +69,14 @@ const HEADERS = {
         'fb_user_id', 'name', 'email', 'avatar', 'plan', 'created_at', 'last_login'
     ],
     AiUsage: [
-        'timestamp', 'user_id', 'action_type', 'input_tokens', 'cached_tokens', 'output_tokens',
-        'cost_usd', 'cost_vnd', 'model'
+        // Request info
+        'request_id', 'timestamp', 'user_id', 'action_type', 'model',
+        // Token breakdown
+        'input_tokens', 'input_uncached', 'cached_tokens', 'output_tokens', 'total_tokens',
+        // Cost USD breakdown
+        'cost_input_usd', 'cost_cached_usd', 'cost_output_usd', 'cost_total_usd',
+        // Cost VND breakdown (để tính tiền)
+        'cost_input_vnd', 'cost_cached_vnd', 'cost_output_vnd', 'cost_total_vnd'
     ]
 };
 
@@ -915,31 +921,52 @@ function fixHeaders(data) {
 // ==================== AI USAGE TRACKING ====================
 
 /**
- * Log AI usage to AiUsage sheet
+ * Log AI usage to AiUsage sheet - CHI TIẾT ĐẦY ĐỦ ĐỂ TÍNH TIỀN
  */
 function logAiUsage(data) {
     try {
         const sheet = getOrCreateSheet(CONFIG.AI_USAGE_SHEET);
         ensureHeaders(sheet, CONFIG.AI_USAGE_SHEET);
 
+        // Row theo thứ tự headers:
+        // request_id, timestamp, user_id, action_type, model,
+        // input_tokens, input_uncached, cached_tokens, output_tokens, total_tokens,
+        // cost_input_usd, cost_cached_usd, cost_output_usd, cost_total_usd,
+        // cost_input_vnd, cost_cached_vnd, cost_output_vnd, cost_total_vnd
         const row = [
+            data.requestId || `req_${Date.now()}`,
             data.timestamp || new Date().toISOString(),
             data.userId || 'anonymous',
             data.actionType || 'analyze_campaign',
+            data.model || 'gpt-5-mini',
+            // Token breakdown
             data.inputTokens || 0,
+            data.inputUncached || 0,
             data.cachedTokens || 0,
             data.outputTokens || 0,
-            data.costUsd || 0,
-            data.costVnd || 0,
-            'gpt-5-mini'
+            data.totalTokens || 0,
+            // Cost USD breakdown
+            data.costInputUsd || 0,
+            data.costCachedUsd || 0,
+            data.costOutputUsd || 0,
+            data.costTotalUsd || 0,
+            // Cost VND breakdown
+            data.costInputVnd || 0,
+            data.costCachedVnd || 0,
+            data.costOutputVnd || 0,
+            data.costTotalVnd || 0,
         ];
 
         sheet.appendRow(row);
-        logAction('logAiUsage', data.userId, '', 1, 'success', 'AI usage logged');
+
+        // Log ngắn gọn
+        logAction('logAiUsage', data.userId, '', 1, 'success',
+            `${data.totalTokens || 0} tokens, ${data.costTotalVnd || 0}đ`);
 
         return createResponse({
             success: true,
-            message: 'AI usage logged successfully'
+            message: 'AI usage logged successfully',
+            requestId: data.requestId
         });
     } catch (error) {
         return createResponse({ success: false, error: error.message });

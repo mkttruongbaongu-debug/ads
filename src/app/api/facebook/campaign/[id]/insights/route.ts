@@ -1,6 +1,7 @@
 // API Route: Get daily insights for a specific campaign
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getValidAccessToken } from '@/lib/facebook/token';
 
 interface RouteParams {
     params: Promise<{
@@ -15,10 +16,16 @@ export async function GET(request: NextRequest, context: RouteParams) {
         const startDate = searchParams.get('startDate') || '';
         const endDate = searchParams.get('endDate') || '';
 
-        const accessToken = process.env.FB_ACCESS_TOKEN;
-        if (!accessToken) {
-            return NextResponse.json({ success: false, error: 'FB_ACCESS_TOKEN not configured' }, { status: 500 });
+        // Lấy token từ database (Google Sheets) hoặc fallback env
+        const tokenResult = await getValidAccessToken();
+        if (!tokenResult.accessToken) {
+            return NextResponse.json({
+                success: false,
+                error: tokenResult.error || 'No valid access token',
+                needsReauth: true
+            }, { status: 401 });
         }
+        const accessToken = tokenResult.accessToken;
 
         // Fetch daily breakdown for this campaign
         const fields = [

@@ -42,10 +42,19 @@ interface AIAdvisorProps {
     onClose?: () => void;
 }
 
+interface UsageData {
+    input_tokens: number;
+    cached_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+    cost_vnd: number;
+}
+
 export default function AIAdvisor({ campaign, dailyTrends = [] }: AIAdvisorProps) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [insights, setInsights] = useState<AIInsight[]>([]);
     const [aiAdvice, setAiAdvice] = useState<string>('');
+    const [usage, setUsage] = useState<UsageData | null>(null);
 
     const analyzeWithAI = async () => {
         setIsAnalyzing(true);
@@ -71,6 +80,26 @@ export default function AIAdvisor({ campaign, dailyTrends = [] }: AIAdvisorProps
             const json = await response.json();
             if (json.success && json.advice) {
                 setAiAdvice(json.advice);
+
+                // Set usage data
+                if (json.usage) {
+                    setUsage(json.usage);
+
+                    // Log usage to backend (fire and forget)
+                    fetch('/api/ai/usage', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: 'default', // TODO: Get from auth context
+                            action: 'analyze_campaign',
+                            inputTokens: json.usage.input_tokens,
+                            cachedTokens: json.usage.cached_tokens,
+                            outputTokens: json.usage.output_tokens,
+                            costUsd: json.usage.cost_usd,
+                            costVnd: json.usage.cost_vnd
+                        })
+                    }).catch(console.error);
+                }
             }
         } catch (error) {
             console.error('AI analysis error:', error);
@@ -269,7 +298,12 @@ export default function AIAdvisor({ campaign, dailyTrends = [] }: AIAdvisorProps
                 <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30">
                     <div className="flex items-center gap-2 mb-3">
                         <Brain className="w-5 h-5 text-purple-400" />
-                        <span className="text-purple-400 font-medium">Gemini AI Analysis</span>
+                        <span className="text-purple-400 font-medium">GPT-5-mini Analysis</span>
+                        {usage && (
+                            <span className="ml-auto text-xs text-gray-500">
+                                {usage.input_tokens + usage.output_tokens} tokens • {usage.cost_vnd.toLocaleString()}đ
+                            </span>
+                        )}
                     </div>
                     <div className="text-gray-300 text-sm whitespace-pre-line">
                         {aiAdvice}

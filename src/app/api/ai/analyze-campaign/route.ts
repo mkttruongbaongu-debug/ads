@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
         // Build context for AI
         const prompt = buildAdsExpertPrompt(campaign, dailyTrends, insights, cpl, cvr);
 
-        // Call OpenAI
+        // Call OpenAI with gpt-5-mini
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-mini',
             messages: [
                 {
                     role: 'system',
@@ -72,10 +72,45 @@ export async function POST(request: NextRequest) {
 
         const advice = completion.choices[0]?.message?.content || 'Không thể phân tích';
 
+        // Token usage tracking
+        const usage = completion.usage;
+        const inputTokens = usage?.prompt_tokens || 0;
+        const cachedTokens = usage?.prompt_tokens_details?.cached_tokens || 0;
+        const outputTokens = usage?.completion_tokens || 0;
+
+        // GPT-5-mini pricing (per 1M tokens)
+        // Input: $0.25, Cached: $0.03, Output: $2.00
+        const PRICING = {
+            input: 0.25 / 1_000_000,      // $0.25 per 1M
+            cached: 0.03 / 1_000_000,     // $0.03 per 1M  
+            output: 2.00 / 1_000_000,     // $2.00 per 1M
+        };
+
+        const uncachedInputTokens = inputTokens - cachedTokens;
+        const cost = {
+            input: uncachedInputTokens * PRICING.input,
+            cached: cachedTokens * PRICING.cached,
+            output: outputTokens * PRICING.output,
+            total: 0
+        };
+        cost.total = cost.input + cost.cached + cost.output;
+
         return NextResponse.json({
             success: true,
             advice,
-            metrics: { cpl, cvr }
+            metrics: { cpl, cvr },
+            usage: {
+                input_tokens: inputTokens,
+                cached_tokens: cachedTokens,
+                output_tokens: outputTokens,
+                cost_usd: cost.total,
+                cost_vnd: Math.round(cost.total * 25500), // ~25,500 VND/USD
+                breakdown: {
+                    input_cost: cost.input,
+                    cached_cost: cost.cached,
+                    output_cost: cost.output
+                }
+            }
         });
     } catch (error) {
         console.error('AI analysis error:', error);

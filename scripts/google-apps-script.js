@@ -19,6 +19,7 @@ const CONFIG = {
     LOGS_SHEET: 'Logs',
     TOKENS_SHEET: 'Tokens',  // Lưu Facebook OAuth tokens
     USERS_SHEET: 'Users',    // Lưu thông tin người dùng đăng ký
+    AI_USAGE_SHEET: 'AiUsage', // Lưu AI token usage và chi phí
 
     // API Secret (để bảo vệ endpoint)
     API_SECRET: 'tho-ads-ai-2026' // Thay đổi secret này
@@ -66,6 +67,10 @@ const HEADERS = {
     ],
     Users: [
         'fb_user_id', 'name', 'email', 'avatar', 'plan', 'created_at', 'last_login'
+    ],
+    AiUsage: [
+        'timestamp', 'user_id', 'action_type', 'input_tokens', 'cached_tokens', 'output_tokens',
+        'cost_usd', 'cost_vnd', 'model'
     ]
 };
 
@@ -150,6 +155,8 @@ function doPost(e) {
                 return getUser(data);
             case 'fixHeaders':
                 return fixHeaders(data);
+            case 'logAiUsage':
+                return logAiUsage(data);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -181,6 +188,8 @@ function doGet(e) {
                 return getStatus();
             case 'getToken':
                 return getToken(params);
+            case 'getAiUsage':
+                return getAiUsage(params);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -898,6 +907,120 @@ function fixHeaders(data) {
             columnCount: headers.length
         });
 
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+// ==================== AI USAGE TRACKING ====================
+
+/**
+ * Log AI usage to AiUsage sheet
+ */
+function logAiUsage(data) {
+    try {
+        const sheet = getOrCreateSheet(CONFIG.AI_USAGE_SHEET);
+        ensureHeaders(sheet, CONFIG.AI_USAGE_SHEET);
+
+        const row = [
+            data.timestamp || new Date().toISOString(),
+            data.userId || 'anonymous',
+            data.actionType || 'analyze_campaign',
+            data.inputTokens || 0,
+            data.cachedTokens || 0,
+            data.outputTokens || 0,
+            data.costUsd || 0,
+            data.costVnd || 0,
+            'gpt-5-mini'
+        ];
+
+        sheet.appendRow(row);
+        logAction('logAiUsage', data.userId, '', 1, 'success', 'AI usage logged');
+
+        return createResponse({
+            success: true,
+            message: 'AI usage logged successfully'
+        });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Get AI usage summary for a user
+ */
+function getAiUsage(params) {
+    try {
+        const userId = params.userId || 'anonymous';
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.AI_USAGE_SHEET);
+
+        if (!sheet || sheet.getLastRow() <= 1) {
+            return createResponse({
+                success: true,
+                data: {
+                    userId: userId,
+                    totalInputTokens: 0,
+                    totalCachedTokens: 0,
+                    totalOutputTokens: 0,
+                    totalCostUsd: 0,
+                    totalCostVnd: 0,
+                    requestCount: 0,
+                    history: []
+                }
+            });
+        }
+
+        const allData = sheet.getDataRange().getValues();
+        const headers = allData[0];
+
+        // Find column indices
+        const userIdIdx = headers.indexOf('user_id');
+        const inputIdx = headers.indexOf('input_tokens');
+        const cachedIdx = headers.indexOf('cached_tokens');
+        const outputIdx = headers.indexOf('output_tokens');
+        const costUsdIdx = headers.indexOf('cost_usd');
+        const costVndIdx = headers.indexOf('cost_vnd');
+        const timestampIdx = headers.indexOf('timestamp');
+        const actionIdx = headers.indexOf('action_type');
+
+        // Filter and aggregate
+        let totalInput = 0, totalCached = 0, totalOutput = 0, totalUsd = 0, totalVnd = 0;
+        const history = [];
+
+        for (let i = 1; i < allData.length; i++) {
+            const row = allData[i];
+            if (row[userIdIdx] === userId) {
+                totalInput += Number(row[inputIdx]) || 0;
+                totalCached += Number(row[cachedIdx]) || 0;
+                totalOutput += Number(row[outputIdx]) || 0;
+                totalUsd += Number(row[costUsdIdx]) || 0;
+                totalVnd += Number(row[costVndIdx]) || 0;
+
+                // Keep last 10 entries for history
+                if (history.length < 10) {
+                    history.push({
+                        timestamp: row[timestampIdx],
+                        action: row[actionIdx],
+                        tokens: (Number(row[inputIdx]) || 0) + (Number(row[outputIdx]) || 0),
+                        costVnd: Number(row[costVndIdx]) || 0
+                    });
+                }
+            }
+        }
+
+        return createResponse({
+            success: true,
+            data: {
+                userId: userId,
+                totalInputTokens: totalInput,
+                totalCachedTokens: totalCached,
+                totalOutputTokens: totalOutput,
+                totalCostUsd: totalUsd.toFixed(6),
+                totalCostVnd: Math.round(totalVnd),
+                requestCount: history.length,
+                history: history.reverse() // Most recent first
+            }
+        });
     } catch (error) {
         return createResponse({ success: false, error: error.message });
     }

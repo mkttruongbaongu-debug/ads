@@ -306,6 +306,14 @@ export default function DashboardPage() {
                     ctr?: number;
                     cpc?: number;
                     cpm?: number;
+                    // Action metrics cho TrendChart
+                    messages?: number;
+                    comments?: number;
+                    purchases?: number;
+                    purchase_value?: number;
+                    cost_per_message?: number;
+                    cost_per_purchase?: number;
+                    aov?: number;
                 }) => ({
                     date: row.date_start || '',
                     campaign_id: row.campaign_id || '',
@@ -315,6 +323,14 @@ export default function DashboardPage() {
                     ctr: row.ctr || 0,
                     cpc: row.cpc || 0,
                     cpm: row.cpm || 0,
+                    // Action metrics - QUAN TRỌNG cho TrendChart
+                    messages: row.messages || 0,
+                    comments: row.comments || 0,
+                    purchases: row.purchases || 0,
+                    purchase_value: row.purchase_value || 0,
+                    cost_per_message: row.cost_per_message || 0,
+                    cost_per_purchase: row.cost_per_purchase || 0,
+                    aov: row.aov || 0,
                 }));
                 setDailyInsights(insights);
                 console.log(`📊 Daily insights loaded: ${insights.length} records`);

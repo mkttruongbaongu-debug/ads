@@ -54,33 +54,66 @@ interface AdAccount {
 const styles = {
     container: {
         minHeight: '100vh',
-        background: '#fafafa',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
         fontFamily: 'Inter, -apple-system, sans-serif',
     },
     header: {
-        background: '#18181b',
-        padding: '12px 24px',
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        padding: '0',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    },
+    headerTop: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        padding: '16px 32px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
     },
     logo: {
-        fontSize: '1.125rem',
-        fontWeight: 700,
-        color: 'white',
+        fontSize: '1.5rem',
+        fontWeight: 800,
+        background: 'linear-gradient(135deg, #60a5fa, #a78bfa)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        letterSpacing: '-0.02em',
     },
-    headerRight: {
+    headerControls: {
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
+        gap: '24px',
+        padding: '16px 32px',
     },
-    dateInputs: {
+    controlGroup: {
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: '6px',
+    },
+    controlLabel: {
+        fontSize: '0.75rem',
+        color: 'rgba(255,255,255,0.5)',
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.05em',
+        fontWeight: 600,
+    },
+    selectInput: {
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        color: 'white',
+        padding: '10px 14px',
+        borderRadius: '10px',
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+        minWidth: '180px',
+        outline: 'none',
+    },
+    dateInputsGroup: {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        background: 'rgba(255,255,255,0.1)',
-        padding: '6px 12px',
-        borderRadius: '8px',
+        background: 'rgba(255,255,255,0.08)',
+        padding: '8px 14px',
+        borderRadius: '10px',
+        border: '1px solid rgba(255,255,255,0.15)',
     },
     dateInput: {
         background: 'transparent',
@@ -88,25 +121,32 @@ const styles = {
         color: 'white',
         fontSize: '0.875rem',
         cursor: 'pointer',
+        outline: 'none',
     },
-    refreshBtn: {
-        background: '#3b82f6',
+    searchBtn: {
+        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
         color: 'white',
         border: 'none',
-        padding: '8px 16px',
-        borderRadius: '8px',
+        padding: '12px 28px',
+        borderRadius: '10px',
         cursor: 'pointer',
-        fontSize: '0.875rem',
-        fontWeight: 500,
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        boxShadow: '0 4px 15px rgba(59,130,246,0.4)',
+        transition: 'all 0.2s ease',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
     },
     logoutBtn: {
         background: 'transparent',
         border: '1px solid rgba(255,255,255,0.2)',
-        color: 'white',
+        color: 'rgba(255,255,255,0.7)',
         padding: '8px 16px',
         borderRadius: '8px',
         cursor: 'pointer',
-        fontSize: '0.875rem',
+        fontSize: '0.8rem',
+        transition: 'all 0.2s ease',
     },
     main: {
         maxWidth: '900px',
@@ -311,12 +351,7 @@ export default function DashboardPage() {
         }
     }, [status, router, fetchAccounts]);
 
-    // Fetch data when account or date changes
-    useEffect(() => {
-        if (status === 'authenticated' && selectedAccountId) {
-            fetchData();
-        }
-    }, [status, selectedAccountId, startDate, endDate, fetchData]);
+    // NO auto-fetch - user must click "Tra cứu" button
 
     if (status === 'loading' || status === 'unauthenticated') {
         return (
@@ -337,69 +372,77 @@ export default function DashboardPage() {
         <div style={styles.container}>
             {/* Header */}
             <header style={styles.header}>
-                <span style={styles.logo}>QUÂN SƯ ADS</span>
-
-                <div style={styles.headerRight}>
-                    {/* Account Selector */}
-                    <select
-                        value={selectedAccountId}
-                        onChange={(e) => setSelectedAccountId(e.target.value)}
-                        disabled={isLoadingAccounts}
-                        style={{
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            color: 'white',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            maxWidth: '200px',
-                        }}
-                    >
-                        {isLoadingAccounts ? (
-                            <option>Đang tải...</option>
-                        ) : (
-                            accounts.map(acc => (
-                                <option key={acc.id} value={acc.id} style={{ color: '#18181b' }}>
-                                    {acc.name} {!acc.isActive ? '(Inactive)' : ''}
-                                </option>
-                            ))
-                        )}
-                    </select>
-
-                    <div style={styles.dateInputs}>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            style={styles.dateInput}
-                        />
-                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>→</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            style={styles.dateInput}
-                        />
-                    </div>
-
-                    <button
-                        onClick={fetchData}
-                        disabled={isLoading}
-                        style={{
-                            ...styles.refreshBtn,
-                            opacity: isLoading ? 0.6 : 1,
-                        }}
-                    >
-                        {isLoading ? '⏳' : '🔄'} Refresh
-                    </button>
-
+                {/* Top Row: Logo + Logout */}
+                <div style={styles.headerTop}>
+                    <span style={styles.logo}>⚡ QUÂN SƯ ADS</span>
                     <button
                         onClick={() => signOut({ callbackUrl: '/' })}
                         style={styles.logoutBtn}
                     >
                         Đăng xuất
                     </button>
+                </div>
+
+                {/* Controls Row */}
+                <div style={styles.headerControls}>
+                    {/* Account Selector */}
+                    <div style={styles.controlGroup}>
+                        <span style={styles.controlLabel}>Tài khoản</span>
+                        <select
+                            value={selectedAccountId}
+                            onChange={(e) => setSelectedAccountId(e.target.value)}
+                            disabled={isLoadingAccounts}
+                            style={styles.selectInput}
+                        >
+                            {isLoadingAccounts ? (
+                                <option>Đang tải...</option>
+                            ) : accounts.length === 0 ? (
+                                <option>Không có tài khoản</option>
+                            ) : (
+                                accounts.map(acc => (
+                                    <option key={acc.id} value={acc.id} style={{ color: '#18181b' }}>
+                                        {acc.name} {!acc.isActive ? '(Inactive)' : ''}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
+                    {/* Date Range */}
+                    <div style={styles.controlGroup}>
+                        <span style={styles.controlLabel}>Khoảng thời gian</span>
+                        <div style={styles.dateInputsGroup}>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                style={styles.dateInput}
+                            />
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}>→</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                style={styles.dateInput}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Search Button */}
+                    <div style={{ ...styles.controlGroup, justifyContent: 'flex-end' }}>
+                        <span style={styles.controlLabel}>&nbsp;</span>
+                        <button
+                            onClick={fetchData}
+                            disabled={isLoading || !selectedAccountId}
+                            style={{
+                                ...styles.searchBtn,
+                                opacity: (isLoading || !selectedAccountId) ? 0.6 : 1,
+                                cursor: (isLoading || !selectedAccountId) ? 'not-allowed' : 'pointer',
+                            }}
+                        >
+                            {isLoading ? '⏳ Đang tải...' : '🔍 Tra cứu'}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -434,7 +477,7 @@ export default function DashboardPage() {
                         <p>❌ {error}</p>
                         <button
                             onClick={fetchData}
-                            style={{ ...styles.refreshBtn, marginTop: '16px' }}
+                            style={{ ...styles.searchBtn, marginTop: '16px' }}
                         >
                             Thử lại
                         </button>

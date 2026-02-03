@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
             input: 0.25 / 1_000_000,      // $0.25 per 1M
             cached: 0.03 / 1_000_000,     // $0.03 per 1M  
             output: 2.00 / 1_000_000,     // $2.00 per 1M
-            USD_TO_VND: 25500,            // Tỷ giá USD/VND
+            USD_TO_VND: 27000,            // Tỷ giá USD/VND (đã tính phí giao dịch)
         };
 
         const uncachedInputTokens = inputTokens - cachedTokens;

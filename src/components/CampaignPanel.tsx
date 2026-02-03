@@ -233,7 +233,7 @@ export default function CampaignPanel({ campaign, dateRange, onClose }: Campaign
                                                                 border: 'none',
                                                                 borderRadius: '8px'
                                                             }}
-                                                            formatter={(value: number) => [`${value.toLocaleString('vi-VN')}đ`, 'Chi tiêu']}
+                                                            formatter={(value) => [`${Number(value || 0).toLocaleString('vi-VN')}đ`, 'Chi tiêu']}
                                                         />
                                                         <Line
                                                             type="monotone"

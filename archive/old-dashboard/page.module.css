@@ -1,0 +1,13 @@
+/* Dashboard specific styles */
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.filters-row {
+    display: flex;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+    align-items: flex-end;
+}

@@ -342,6 +342,15 @@ export default function DashboardPage() {
         }
     }, [startDate, endDate, selectedAccountId, router]);
 
+    // Track if user has searched
+    const [hasSearched, setHasSearched] = useState(false);
+
+    // Handle search button click
+    const handleSearch = useCallback(() => {
+        setHasSearched(true);
+        fetchData();
+    }, [fetchData]);
+
     // Load accounts on mount
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -432,7 +441,7 @@ export default function DashboardPage() {
                     <div style={{ ...styles.controlGroup, justifyContent: 'flex-end' }}>
                         <span style={styles.controlLabel}>&nbsp;</span>
                         <button
-                            onClick={fetchData}
+                            onClick={handleSearch}
                             disabled={isLoading || !selectedAccountId}
                             style={{
                                 ...styles.searchBtn,
@@ -476,11 +485,20 @@ export default function DashboardPage() {
                     <div style={styles.error}>
                         <p>❌ {error}</p>
                         <button
-                            onClick={fetchData}
+                            onClick={handleSearch}
                             style={{ ...styles.searchBtn, marginTop: '16px' }}
                         >
                             Thử lại
                         </button>
+                    </div>
+                )}
+
+                {/* Pre-search Empty State */}
+                {!hasSearched && !isLoading && !error && (
+                    <div style={styles.emptyState}>
+                        <p style={{ fontSize: '3rem', marginBottom: '16px' }}>📊</p>
+                        <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#374151' }}>Chọn tài khoản và khoảng thời gian</p>
+                        <p style={{ color: '#6b7280', marginTop: '8px' }}>Sau đó bấm <strong>🔍 Tra cứu</strong> để phân tích campaigns</p>
                     </div>
                 )}
 
@@ -492,7 +510,7 @@ export default function DashboardPage() {
                 )}
 
                 {/* Data */}
-                {data && !isLoading && (() => {
+                {hasSearched && data && !isLoading && (() => {
                     // Filter campaigns by name
                     const filterLower = filterText.toLowerCase();
                     const filteredCritical = filterText

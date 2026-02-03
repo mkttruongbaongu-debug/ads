@@ -110,6 +110,12 @@ FORMAT OUTPUT:
 
 export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysisResult> {
     try {
+        // Check API key
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('AI Analysis error: OPENAI_API_KEY not configured');
+            throw new Error('OPENAI_API_KEY not configured');
+        }
+
         const userPrompt = buildUserPrompt(context);
 
         const response = await openai.chat.completions.create({
@@ -130,11 +136,18 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
 
         return JSON.parse(content) as AIAnalysisResult;
     } catch (error) {
-        console.error('AI Analysis error:', error);
-        // Fallback response
+        const errMessage = error instanceof Error ? error.message : String(error);
+        console.error('AI Analysis error:', errMessage);
+        console.error('Full error:', error);
+
+        // Fallback response with actual error message
         return {
             summary: 'Không thể phân tích do lỗi kỹ thuật',
-            diagnosis: 'Vui lòng thử lại sau',
+            diagnosis: errMessage.includes('API key')
+                ? 'API key chưa được cấu hình'
+                : errMessage.includes('quota')
+                    ? 'Hết quota OpenAI'
+                    : 'Vui lòng thử lại sau',
             marketContext: '',
             actionPlan: {
                 immediate: 'Kiểm tra lại sau 5 phút',
@@ -142,7 +155,7 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
                 prevention: '',
             },
             confidence: 'low',
-            reasoning: 'Lỗi kỹ thuật khi gọi AI',
+            reasoning: `Lỗi kỹ thuật khi gọi AI: ${errMessage.substring(0, 100)}`,
         };
     }
 }

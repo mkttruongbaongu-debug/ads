@@ -450,8 +450,8 @@ export default function DashboardPage() {
                                 <option>Không có tài khoản</option>
                             ) : (
                                 accounts.map(acc => (
-                                    <option key={acc.id} value={acc.id} style={{ color: '#18181b' }}>
-                                        {acc.name} {!acc.isActive ? '(Inactive)' : ''}
+                                    <option key={acc.id} value={acc.id}>
+                                        {acc.name} {!acc.isActive ? '⚠️ Tạm dừng' : ''}
                                     </option>
                                 ))
                             )}

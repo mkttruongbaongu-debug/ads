@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 
 // CEX Trading Design System - Exact Colors
 const colors = {
@@ -55,13 +56,6 @@ const styles = {
     width: '32px',
     height: '32px',
     borderRadius: '4px',
-    background: colors.primary,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: colors.bg,
-    fontWeight: 700,
-    fontSize: '18px',
   },
   logoText: {
     fontSize: '20px',
@@ -564,7 +558,7 @@ export default function LandingPage() {
       <nav style={styles.navbar}>
         <div style={styles.navInner}>
           <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}>Q</div>
+            <Image src="/logo.png" alt="QUÂN SƯ ADS" width={32} height={32} style={styles.logoIcon} />
             <span style={styles.logoText}>QUÂN SƯ ADS</span>
           </div>
           <div style={styles.navLinks}>
@@ -578,38 +572,40 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero - Alex Hormozi Style */}
       <section style={styles.hero}>
         <div style={styles.heroGrid}>
           <div>
             <h1 style={styles.heroTitle}>
-              Tối ưu quảng cáo với{' '}
-              <span style={styles.gradientText}>AI thông minh</span>
+              Bạn đang <span style={styles.gradientText}>đốt tiền</span> vào quảng cáo<br />mà không biết tại sao?
             </h1>
             <p style={styles.heroDesc}>
-              Nền tảng phân tích quảng cáo Facebook hàng đầu Việt Nam. Theo dõi 100+ chiến dịch với công nghệ AI tiên tiến và chi phí tối ưu nhất.
+              <strong>97% chủ shop</strong> chạy ads Facebook không biết chiến dịch nào đang lỗ. Họ tiếp tục đổ tiền vào "hố đen" mỗi ngày — cho đến khi tài khoản về 0.
+            </p>
+            <p style={{ ...styles.heroDesc, color: colors.primary, fontWeight: 600 }}>
+              Đừng là một trong số họ.
             </p>
             <div style={styles.card}>
               <div style={styles.inputGroup}>
                 <input type="email" placeholder="Email hoặc Số điện thoại" style={styles.input} />
-                <Link href="/dashboard" style={styles.btnPrimary}>Bắt đầu</Link>
+                <Link href="/dashboard" style={styles.btnPrimary}>Xem chiến dịch lỗ</Link>
               </div>
               <p style={styles.rewardText}>
-                Đăng ký và nhận <span style={styles.rewardHighlight}>7 ngày</span> dùng thử miễn phí
+                Miễn phí. <span style={styles.rewardHighlight}>Không cần thẻ.</span> Biết ngay chiến dịch nào đang "ăn" tiền của bạn.
               </p>
             </div>
             <div style={styles.statsGrid}>
               <div>
-                <div style={styles.statValue}>₫76B</div>
-                <div style={styles.statLabel}>Ngân sách đã phân tích</div>
+                <div style={styles.statValue}>₫2.3B</div>
+                <div style={styles.statLabel}>Tiền ads đã "cứu"</div>
               </div>
               <div>
-                <div style={styles.statValue}>350+</div>
-                <div style={styles.statLabel}>Chiến dịch</div>
+                <div style={styles.statValue}>847</div>
+                <div style={styles.statLabel}>Chiến dịch lỗ phát hiện</div>
               </div>
               <div>
-                <div style={styles.statValue}>120+</div>
-                <div style={styles.statLabel}>Người dùng</div>
+                <div style={styles.statValue}>4.2x</div>
+                <div style={styles.statLabel}>ROAS trung bình</div>
               </div>
             </div>
           </div>
@@ -762,10 +758,10 @@ export default function LandingPage() {
           <div style={styles.footerGrid}>
             <div>
               <div style={styles.footerLogo}>
-                <div style={styles.logoIcon}>Q</div>
+                <Image src="/logo.png" alt="QUÂN SƯ ADS" width={32} height={32} style={styles.logoIcon} />
                 <span style={styles.logoText}>QUÂN SƯ ADS</span>
               </div>
-              <p style={styles.footerDesc}>Tối ưu quảng cáo với AI thông minh.</p>
+              <p style={styles.footerDesc}>Ngừng đốt tiền. Bắt đầu kiếm tiền.</p>
             </div>
             <div>
               <h4 style={styles.footerTitle}>Sản phẩm</h4>

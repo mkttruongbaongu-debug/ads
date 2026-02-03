@@ -74,8 +74,25 @@ export const authOptions: AuthOptions = {
             clientSecret: process.env.FB_APP_SECRET!,
             authorization: {
                 params: {
-                    // Full permissions for ads management
-                    scope: "email,public_profile,ads_read,ads_management,business_management,read_insights",
+                    // Full permissions for ads + pages + commerce management
+                    scope: [
+                        // Core
+                        "email",
+                        "public_profile",
+                        // Ads
+                        "ads_read",
+                        "ads_management",
+                        "business_management",
+                        "read_insights",
+                        // Pages
+                        "pages_manage_ads",
+                        "pages_read_engagement",
+                        "pages_manage_posts",
+                        "pages_manage_engagement",
+                        "pages_read_user_content",
+                        // Commerce
+                        "commerce_account_manage_orders",
+                    ].join(","),
                 },
             },
         }),

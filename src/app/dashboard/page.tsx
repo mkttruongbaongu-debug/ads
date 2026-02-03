@@ -449,11 +449,26 @@ export default function DashboardPage() {
                             ) : accounts.length === 0 ? (
                                 <option>Không có tài khoản</option>
                             ) : (
-                                accounts.map(acc => (
-                                    <option key={acc.id} value={acc.id}>
-                                        {acc.name} {!acc.isActive ? '⚠️ Tạm dừng' : ''}
-                                    </option>
-                                ))
+                                accounts.map(acc => {
+                                    // Map Facebook account_status to Vietnamese labels
+                                    const statusLabels: Record<number, string> = {
+                                        1: '', // ACTIVE - không cần hiển thị
+                                        2: '🚫 Đã vô hiệu',
+                                        3: '💳 Nợ tiền',
+                                        7: '⏳ Đang xét duyệt',
+                                        8: '💰 Chờ thanh toán',
+                                        9: '⚠️ Gia hạn',
+                                        100: '🔒 Sắp đóng',
+                                        101: '❌ Đã đóng',
+                                    };
+                                    const statusLabel = (acc as any).account_status ? statusLabels[(acc as any).account_status] || '' : '';
+
+                                    return (
+                                        <option key={acc.id} value={acc.id}>
+                                            {acc.name} {statusLabel}
+                                        </option>
+                                    );
+                                })
                             )}
                         </select>
                     </div>

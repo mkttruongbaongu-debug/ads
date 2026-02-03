@@ -628,6 +628,25 @@ export default function DashboardPage() {
                             <span className="badge" style={{ background: '#e74c3c' }}>❌ Sync Failed</span>
                         )}
 
+                        {/* CPP Analysis Button */}
+                        <a
+                            href="/analysis"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '8px',
+                                textDecoration: 'none',
+                                color: 'white',
+                                fontWeight: 600,
+                                fontSize: '0.875rem',
+                            }}
+                        >
+                            📊 CPP Analysis
+                        </a>
+
                         {/* User Profile */}
                         {userProfile && (
                             <div style={{

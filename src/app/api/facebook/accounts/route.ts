@@ -7,7 +7,18 @@ export async function GET(request: NextRequest) {
     try {
         // Use dynamic client to get token from Sheets/OAuth
         const client = await getDynamicFacebookClient();
-        const accounts = await client.getAdAccounts();
+        const rawAccounts = await client.getAdAccounts();
+
+        // Transform data: map account_status to isActive
+        // Facebook account_status: 1 = ACTIVE, others = INACTIVE/DISABLED
+        const accounts = rawAccounts.map(acc => ({
+            id: acc.id,
+            name: acc.name,
+            isActive: acc.account_status === 1, // 1 = ACTIVE
+            currency: acc.currency,
+            timezone: acc.timezone_name,
+            account_status: acc.account_status, // Keep original for debugging
+        }));
 
         return NextResponse.json({
             success: true,

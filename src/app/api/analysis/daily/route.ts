@@ -177,78 +177,9 @@ export async function GET(request: NextRequest) {
             good: analysisResult.good.length,
         });
 
-        // ========== SAVE TO GOOGLE SHEET ==========
-        console.log('[ANALYSIS/DAILY] 💾 Saving to DuLieuQuangCao sheet...');
-        if (APPS_SCRIPT_URL && APPS_SCRIPT_SECRET) {
-            try {
-                // Get fb_user_id from TaiKhoan
-                const getTaiKhoanUrl = new URL(APPS_SCRIPT_URL);
-                getTaiKhoanUrl.searchParams.set('secret', APPS_SCRIPT_SECRET);
-                getTaiKhoanUrl.searchParams.set('action', 'getTaiKhoan');
-                getTaiKhoanUrl.searchParams.set('fb_user_id', 'first');
-
-                const taiKhoanRes = await fetch(getTaiKhoanUrl.toString());
-                const taiKhoanData = await taiKhoanRes.json();
-                const fbUserId = taiKhoanData.data?.fb_user_id;
-
-                if (fbUserId) {
-                    // Build rows for DuLieuQuangCao - one row per campaign per day
-                    const rows: Array<Record<string, unknown>> = [];
-
-                    for (const campaign of campaigns) {
-                        for (const day of campaign.dailyMetrics) {
-                            rows.push({
-                                ad_account_id: adAccountId,
-                                campaign_id: campaign.id,
-                                campaign_name: campaign.name,
-                                status: campaign.status,
-                                date: day.date,
-                                spend: day.spend,
-                                impressions: day.impressions,
-                                clicks: day.clicks,
-                                purchases: day.purchases,
-                                revenue: day.revenue,
-                                ctr: day.ctr,
-                                cpc: day.cpc,
-                                cpp: day.cpp,
-                                roas: day.roas,
-                                cpm: day.cpm,
-                                frequency: day.frequency || 0,
-                            });
-                        }
-                    }
-
-                    console.log('[ANALYSIS/DAILY] 📊 Saving', rows.length, 'rows to sheet...');
-
-                    const saveRes = await fetch(APPS_SCRIPT_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            secret: APPS_SCRIPT_SECRET,
-                            action: 'saveDuLieuQuangCao',
-                            fb_user_id: fbUserId,
-                            rows: rows,
-                        }),
-                    });
-
-                    // Safe JSON parsing
-                    const saveText = await saveRes.text();
-                    try {
-                        const saveData = JSON.parse(saveText);
-                        console.log('[ANALYSIS/DAILY] ✅ Save result:', saveData.success ? `Inserted: ${saveData.inserted}, Updated: ${saveData.updated}` : saveData.error);
-                    } catch {
-                        console.error('[ANALYSIS/DAILY] ⚠️ Apps Script response not JSON:', saveText.slice(0, 200));
-                    }
-                } else {
-                    console.warn('[ANALYSIS/DAILY] ⚠️ No fb_user_id found, skip saving');
-                }
-            } catch (saveErr) {
-                console.error('[ANALYSIS/DAILY] ⚠️ Save error (non-fatal):', saveErr);
-                // Non-fatal: still return analysis result
-            }
-        } else {
-            console.warn('[ANALYSIS/DAILY] ⚠️ Apps Script not configured, skip saving');
-        }
+        // ========== SAVE TO GOOGLE SHEET (TEMPORARILY DISABLED - CAUSING TIMEOUT) ==========
+        // TODO: Move this to a background job or separate API call
+        console.log('[ANALYSIS/DAILY] ⏭️ Skipping save to sheet (optimization pending)');
 
         return NextResponse.json({
             success: true,

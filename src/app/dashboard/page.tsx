@@ -869,76 +869,7 @@ export default function DashboardPage() {
                                 </table>
                             </div>
 
-                            {/* Critical Section */}
-                            {filteredCritical.length > 0 && (
-                                <div style={styles.section}>
-                                    <div style={styles.sectionHeader}>
-                                        <span style={{ fontSize: '1.25rem' }}>🔴</span>
-                                        <h2 style={styles.sectionTitle}>Cần xử lý ngay</h2>
-                                        <span style={{ ...styles.badge, background: 'rgba(248,113,113,0.2)', color: '#fca5a5' }}>
-                                            {filteredCritical.length}
-                                        </span>
-                                    </div>
-
-                                    {filteredCritical.map(campaign => (
-                                        <CampaignCard
-                                            key={campaign.id}
-                                            campaign={campaign}
-                                            borderColor="#dc2626"
-                                            formatMoney={formatMoney}
-                                            onSelect={() => setSelectedCampaign(campaign)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Warning Section */}
-                            {filteredWarning.length > 0 && (
-                                <div style={styles.section}>
-                                    <div style={styles.sectionHeader}>
-                                        <span style={{ fontSize: '1.25rem' }}>🟡</span>
-                                        <h2 style={styles.sectionTitle}>Theo dõi</h2>
-                                        <span style={{ ...styles.badge, background: 'rgba(251,191,36,0.2)', color: '#fcd34d' }}>
-                                            {filteredWarning.length}
-                                        </span>
-                                    </div>
-
-                                    {filteredWarning.map(campaign => (
-                                        <CampaignCard
-                                            key={campaign.id}
-                                            campaign={campaign}
-                                            borderColor="#f59e0b"
-                                            formatMoney={formatMoney}
-                                            onSelect={() => setSelectedCampaign(campaign)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Good Section */}
-                            {filteredGood.length > 0 && (
-                                <div style={styles.section}>
-                                    <div style={styles.sectionHeader}>
-                                        <span style={{ fontSize: '1.25rem' }}>🟢</span>
-                                        <h2 style={styles.sectionTitle}>Đang tốt</h2>
-                                        <span style={{ ...styles.badge, background: 'rgba(74,222,128,0.2)', color: '#4ade80' }}>
-                                            {filteredGood.length}
-                                        </span>
-                                    </div>
-
-                                    <div style={{
-                                        background: 'rgba(255,255,255,0.05)',
-                                        backdropFilter: 'blur(12px)',
-                                        borderRadius: '16px',
-                                        padding: '20px',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                    }}>
-                                        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0 }}>
-                                            {filteredGood.map(c => c.name).join(', ')}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Campaign sections removed - Table View above shows all info */}
 
                             {/* Empty State */}
                             {data.summary.total === 0 && (

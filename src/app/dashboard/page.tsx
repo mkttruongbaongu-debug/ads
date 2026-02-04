@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 
@@ -357,8 +357,16 @@ export default function DashboardPage() {
         }
     }, []);
 
-    // Fetch ad accounts
+    // Track if accounts already fetched
+    const accountsFetchedRef = useRef(false);
+
+    // Fetch ad accounts - ONLY ONCE
     const fetchAccounts = useCallback(async () => {
+        if (accountsFetchedRef.current) {
+            console.log('[DASHBOARD] ⏭️ Accounts already fetched, skip');
+            return;
+        }
+        accountsFetchedRef.current = true;
         console.log('[DASHBOARD] 🔍 Fetching accounts...');
         setIsLoadingAccounts(true);
         try {
@@ -370,7 +378,7 @@ export default function DashboardPage() {
                 console.log('[DASHBOARD] ✅ Loaded', json.data.length, 'accounts, source:', json.source);
                 // Auto-select first active account
                 const firstActive = json.data.find((a: AdAccount) => a.isActive);
-                if (firstActive && !selectedAccountId) {
+                if (firstActive) {
                     setSelectedAccountId(firstActive.id);
                     console.log('[DASHBOARD] 🎯 Auto-selected account:', firstActive.name);
                 }
@@ -379,10 +387,11 @@ export default function DashboardPage() {
             }
         } catch (err) {
             console.error('[DASHBOARD] ❌ Failed to fetch accounts:', err);
+            accountsFetchedRef.current = false; // Allow retry on error
         } finally {
             setIsLoadingAccounts(false);
         }
-    }, [selectedAccountId]);
+    }, []);
 
     const fetchData = useCallback(async () => {
         if (!selectedAccountId) return;
@@ -444,7 +453,8 @@ export default function DashboardPage() {
             fetchAccounts();
             fetchUserProfile();
         }
-    }, [status, router, fetchAccounts, fetchUserProfile]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, router]);
 
     // NO auto-fetch - user must click "Tra cứu" button
 

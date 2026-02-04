@@ -318,6 +318,14 @@ export default function DashboardPage() {
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
     const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
 
+    // User profile from TaiKhoan
+    const [userProfile, setUserProfile] = useState<{
+        name: string;
+        avatar: string;
+        plan: string;
+    } | null>(null);
+    const [showUserMenu, setShowUserMenu] = useState(false);
+
     // Campaign filter
     const [filterText, setFilterText] = useState('');
 
@@ -331,6 +339,23 @@ export default function DashboardPage() {
         date.setDate(date.getDate() - 7);
         return date.toISOString().split('T')[0];
     });
+
+    // Fetch user profile from TaiKhoan
+    const fetchUserProfile = useCallback(async () => {
+        try {
+            const res = await fetch('/api/user/profile');
+            const json = await res.json();
+            if (json.success && json.data) {
+                setUserProfile({
+                    name: json.data.name || 'User',
+                    avatar: json.data.avatar || '',
+                    plan: json.data.plan || 'Free',
+                });
+            }
+        } catch (err) {
+            console.error('Failed to fetch user profile:', err);
+        }
+    }, []);
 
     // Fetch ad accounts
     const fetchAccounts = useCallback(async () => {
@@ -390,14 +415,15 @@ export default function DashboardPage() {
         fetchData();
     }, [fetchData]);
 
-    // Load accounts on mount
+    // Load accounts and user profile on mount
     useEffect(() => {
         if (status === 'unauthenticated') {
             router.push('/');
         } else if (status === 'authenticated') {
             fetchAccounts();
+            fetchUserProfile();
         }
-    }, [status, router, fetchAccounts]);
+    }, [status, router, fetchAccounts, fetchUserProfile]);
 
     // NO auto-fetch - user must click "Tra cứu" button
 
@@ -425,17 +451,115 @@ export default function DashboardPage() {
                         <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
                         <span style={styles.logo}>QUÂN SƯ ADS</span>
                     </div>
-                    <button
-                        onClick={() => signOut({ callbackUrl: '/' })}
-                        style={styles.logoutBtn}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                            <polyline points="16,17 21,12 16,7" />
-                            <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        Đăng xuất
-                    </button>
+                    {/* User Profile Dropdown - CEX Style */}
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setShowUserMenu(!showUserMenu)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '8px 12px',
+                                background: 'transparent',
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = colors.bgAlt}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                            {/* Avatar */}
+                            {userProfile?.avatar ? (
+                                <img
+                                    src={userProfile.avatar}
+                                    alt=""
+                                    style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                            ) : (
+                                <div style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: '50%',
+                                    background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryHover})`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#000',
+                                }}>
+                                    {userProfile?.name?.charAt(0) || 'U'}
+                                </div>
+                            )}
+                            {/* Name + Plan */}
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: colors.text }}>
+                                    {userProfile?.name || 'Loading...'}
+                                </div>
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: userProfile?.plan === 'Pro' ? colors.primary : colors.textMuted,
+                                    fontWeight: 500,
+                                }}>
+                                    {userProfile?.plan || 'Free'}
+                                </div>
+                            </div>
+                            {/* Arrow */}
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2">
+                                <polyline points="6,9 12,15 18,9" />
+                            </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showUserMenu && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '8px',
+                                background: colors.bgCard,
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: '8px',
+                                minWidth: '180px',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                                zIndex: 1000,
+                                overflow: 'hidden',
+                            }}>
+                                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}` }}>
+                                    <div style={{ fontSize: '12px', color: colors.textMuted }}>Đăng nhập với</div>
+                                    <div style={{ fontSize: '13px', color: colors.text, marginTop: '4px' }}>
+                                        {session?.user?.email || 'Facebook'}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: colors.error,
+                                        fontSize: '13px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(246,70,93,0.1)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                        <polyline points="16,17 21,12 16,7" />
+                                        <line x1="21" y1="12" x2="9" y2="12" />
+                                    </svg>
+                                    Đăng xuất
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Controls Row */}

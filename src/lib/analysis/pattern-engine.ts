@@ -127,15 +127,38 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         });
     }
 
-    // 4. Frequency cao
-    if (todayMetric && todayMetric.frequency && todayMetric.frequency > THRESHOLDS.HIGH_FREQUENCY) {
-        issues.push({
-            type: 'high_frequency',
-            severity: 'warning',
-            message: 'Audience đã xem quá nhiều lần',
-            detail: `Frequency: ${todayMetric.frequency.toFixed(1)}`,
-            action: 'Mở rộng audience hoặc tạm dừng 2-3 ngày',
-        });
+    // 4. Frequency - 3 mức cảnh báo (early warning system)
+    if (todayMetric && todayMetric.frequency) {
+        const freq = todayMetric.frequency;
+
+        if (freq > 3) {
+            // Critical - Audience đã mòn
+            issues.push({
+                type: 'high_frequency',
+                severity: 'critical',
+                message: 'Audience đã mòn hoàn toàn',
+                detail: `Frequency: ${freq.toFixed(1)} - Mỗi người xem > 3 lần`,
+                action: 'TẮT NGAY hoặc đổi audience mới 100%',
+            });
+        } else if (freq >= 2.5) {
+            // Warning - Cần refresh sớm
+            issues.push({
+                type: 'high_frequency',
+                severity: 'warning',
+                message: 'Cần refresh creative SỚM',
+                detail: `Frequency: ${freq.toFixed(1)} - Sắp bão hòa`,
+                action: 'Thay content mới trong 1-2 ngày',
+            });
+        } else if (freq >= 2) {
+            // Info - Theo dõi
+            issues.push({
+                type: 'high_frequency',
+                severity: 'info',
+                message: 'Frequency đang tăng',
+                detail: `Frequency: ${freq.toFixed(1)} - Theo dõi xu hướng`,
+                action: 'Chuẩn bị content mới để thay thế',
+            });
+        }
     }
 
     // 5. CTR tốt nhưng không có đơn

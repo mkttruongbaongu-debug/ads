@@ -527,7 +527,7 @@ export default function DashboardPage() {
                                 overflow: 'hidden',
                             }}>
                                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}` }}>
-                                    <div style={{ fontSize: '12px', color: colors.textMuted }}>Đăng nhập với</div>
+                                    <div style={{ fontSize: '12px', color: colors.textMuted }}>Tài khoản</div>
                                     <div style={{ fontSize: '13px', color: colors.text, marginTop: '4px' }}>
                                         {session?.user?.email || 'Facebook'}
                                     </div>

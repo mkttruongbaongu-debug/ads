@@ -292,11 +292,11 @@ const styles = {
     aiButton: {
         width: '100%',
         padding: '14px',
-        background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryHover})`,
+        background: colors.primary,
         color: colors.bg,
         border: 'none',
-        borderRadius: '10px',
-        fontSize: '1rem',
+        borderRadius: '6px',
+        fontSize: '0.9375rem',
         fontWeight: 600,
         cursor: 'pointer',
         display: 'flex',
@@ -334,17 +334,19 @@ const styles = {
         lineHeight: 1.6,
     },
     actionBox: {
-        background: 'rgba(14, 203, 129, 0.1)',
-        border: `1px solid rgba(14, 203, 129, 0.3)`,
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '8px',
+        background: colors.bgAlt,
+        border: `1px solid ${colors.border}`,
+        borderRadius: '6px',
+        padding: '12px 14px',
+        marginBottom: '10px',
     },
     actionLabel: {
-        fontSize: '0.75rem',
+        fontSize: '0.6875rem',
         fontWeight: 600,
-        color: colors.success,
-        margin: '0 0 4px',
+        color: colors.textMuted,
+        margin: '0 0 6px',
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.05em',
     },
     actionContent: {
         fontSize: '0.875rem',
@@ -685,24 +687,40 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                 {aiAnalysis && (
                                     <div style={styles.aiResult}>
-                                        {/* NEW: Verdict Header */}
+                                        {/* Verdict Header - CEX Style: No Gradient */}
                                         {aiAnalysis.verdict && (
                                             <div style={{
-                                                padding: '16px',
-                                                borderRadius: '12px',
+                                                padding: '14px 16px',
+                                                borderRadius: '6px',
                                                 marginBottom: '16px',
-                                                background: aiAnalysis.verdict.action === 'SCALE' ? 'linear-gradient(135deg, #059669, #10b981)' :
-                                                    aiAnalysis.verdict.action === 'MAINTAIN' ? 'linear-gradient(135deg, #0ea5e9, #38bdf8)' :
-                                                        aiAnalysis.verdict.action === 'WATCH' ? 'linear-gradient(135deg, #d97706, #fbbf24)' :
-                                                            aiAnalysis.verdict.action === 'REDUCE' ? 'linear-gradient(135deg, #ea580c, #fb923c)' :
-                                                                'linear-gradient(135deg, #dc2626, #f87171)',
+                                                background: colors.bgAlt,
+                                                border: `1px solid ${aiAnalysis.verdict.action === 'SCALE' ? colors.success :
+                                                    aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
+                                                        aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
+                                                            aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error}`,
+                                                borderLeftWidth: '4px',
                                             }}>
-                                                <p style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
-                                                    {aiAnalysis.verdict.headline}
-                                                </p>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <span style={{
+                                                        fontSize: '0.6875rem',
+                                                        fontWeight: 600,
+                                                        padding: '3px 8px',
+                                                        borderRadius: '4px',
+                                                        background: aiAnalysis.verdict.action === 'SCALE' ? colors.success :
+                                                            aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
+                                                                aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
+                                                                    aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error,
+                                                        color: aiAnalysis.verdict.action === 'WATCH' ? colors.bg : '#fff',
+                                                    }}>
+                                                        {aiAnalysis.verdict.action}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                                                        {aiAnalysis.verdict.headline}
+                                                    </span>
+                                                </div>
                                                 {aiAnalysis.verdict.condition && (
-                                                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', marginTop: '8px' }}>
-                                                        📋 {aiAnalysis.verdict.condition}
+                                                    <p style={{ fontSize: '0.8125rem', color: colors.textMuted, marginTop: '8px', marginBottom: 0 }}>
+                                                        {aiAnalysis.verdict.condition}
                                                     </p>
                                                 )}
                                             </div>
@@ -855,29 +873,29 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <p style={styles.aiBlockTitle}>Kế hoạch hành động</p>
 
                                             <div style={styles.actionBox}>
-                                                <p style={styles.actionLabel}>⚡ LÀM NGAY</p>
+                                                <p style={{ ...styles.actionLabel, color: colors.success }}>⚡ LÀM NGAY</p>
                                                 <p style={styles.actionContent}>
                                                     {typeof aiAnalysis.actionPlan.immediate === 'string'
                                                         ? aiAnalysis.actionPlan.immediate
                                                         : aiAnalysis.actionPlan.immediate.action}
                                                 </p>
                                                 {typeof aiAnalysis.actionPlan.immediate === 'object' && aiAnalysis.actionPlan.immediate.reason && (
-                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                    <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
                                                         💡 {aiAnalysis.actionPlan.immediate.reason}
                                                     </p>
                                                 )}
                                             </div>
 
                                             {aiAnalysis.actionPlan.shortTerm && (
-                                                <div style={{ ...styles.actionBox, background: '#0f172a', borderColor: '#1e3a5f' }}>
+                                                <div style={styles.actionBox}>
                                                     <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>📅 2-3 NGÀY TỚI</p>
-                                                    <p style={{ ...styles.actionContent, color: '#7dd3fc' }}>
+                                                    <p style={styles.actionContent}>
                                                         {typeof aiAnalysis.actionPlan.shortTerm === 'string'
                                                             ? aiAnalysis.actionPlan.shortTerm
                                                             : aiAnalysis.actionPlan.shortTerm.action}
                                                     </p>
                                                     {typeof aiAnalysis.actionPlan.shortTerm === 'object' && aiAnalysis.actionPlan.shortTerm.trigger && (
-                                                        <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
                                                             🎯 Trigger: {aiAnalysis.actionPlan.shortTerm.trigger}
                                                         </p>
                                                     )}
@@ -885,9 +903,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             )}
 
                                             {aiAnalysis.actionPlan.prevention && (
-                                                <div style={{ ...styles.actionBox, background: '#1a1625', borderColor: '#2e2640' }}>
+                                                <div style={styles.actionBox}>
                                                     <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>🛡️ PHÒNG NGỪA</p>
-                                                    <p style={{ ...styles.actionContent, color: '#c4b5fd' }}>{aiAnalysis.actionPlan.prevention}</p>
+                                                    <p style={styles.actionContent}>{aiAnalysis.actionPlan.prevention}</p>
                                                 </div>
                                             )}
                                         </div>

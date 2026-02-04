@@ -106,6 +106,60 @@ export function getTimeContext(date?: Date): TimeContext {
 }
 
 /**
+ * Weekly Benchmark - So sánh với tuần trước
+ */
+export interface WeeklyBenchmark {
+    cppChange: number;      // % thay đổi CPP
+    roasChange: number;     // % thay đổi ROAS
+    ctrChange: number;      // % thay đổi CTR
+    hasBenchmark: boolean;  // Có đủ data để so sánh không
+}
+
+export function calculateWeeklyBenchmark(dailyMetrics: DailyMetric[]): WeeklyBenchmark {
+    // Cần ít nhất 6 ngày data để so sánh 3 ngày gần nhất vs 3 ngày trước đó
+    if (dailyMetrics.length < 6) {
+        return { cppChange: 0, roasChange: 0, ctrChange: 0, hasBenchmark: false };
+    }
+
+    const recent3 = dailyMetrics.slice(-3);
+    const previous3 = dailyMetrics.slice(-6, -3);
+
+    // Average of recent 3 days
+    const recentCpp = recent3.reduce((sum, m) => sum + m.cpp, 0) / 3;
+    const recentRoas = recent3.reduce((sum, m) => sum + m.roas, 0) / 3;
+    const recentCtr = recent3.reduce((sum, m) => sum + m.ctr, 0) / 3;
+
+    // Average of previous 3 days
+    const prevCpp = previous3.reduce((sum, m) => sum + m.cpp, 0) / 3;
+    const prevRoas = previous3.reduce((sum, m) => sum + m.roas, 0) / 3;
+    const prevCtr = previous3.reduce((sum, m) => sum + m.ctr, 0) / 3;
+
+    // Calculate % change
+    const cppChange = prevCpp > 0 ? ((recentCpp - prevCpp) / prevCpp) * 100 : 0;
+    const roasChange = prevRoas > 0 ? ((recentRoas - prevRoas) / prevRoas) * 100 : 0;
+    const ctrChange = prevCtr > 0 ? ((recentCtr - prevCtr) / prevCtr) * 100 : 0;
+
+    return {
+        cppChange,
+        roasChange,
+        ctrChange,
+        hasBenchmark: true,
+    };
+}
+
+/**
+ * Format benchmark thay đổi
+ */
+function formatBenchmarkChange(change: number, metric: string): string {
+    if (change === 0) return '';
+    const sign = change > 0 ? '+' : '';
+    const emoji = (metric === 'CPP' && change > 0) || (metric === 'ROAS' && change < 0)
+        ? '📉' // Bad direction
+        : '📈'; // Good direction  
+    return ` ${emoji} ${sign}${change.toFixed(0)}% vs tuần trước`;
+}
+
+/**
  * Phát hiện tất cả issues của một campaign
  */
 export function detectIssues(campaign: CampaignData): Issue[] {
@@ -113,6 +167,7 @@ export function detectIssues(campaign: CampaignData): Issue[] {
     const metrics = campaign.dailyMetrics;
     const totals = campaign.totals;
     const timeContext = getTimeContext();
+    const benchmark = calculateWeeklyBenchmark(metrics);
 
     if (metrics.length === 0) return issues;
 
@@ -128,7 +183,7 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         });
     }
 
-    // 2. CPP tăng liên tục (điều chỉnh theo time context)
+    // 2. CPP tăng liên tục (điều chỉnh theo time context + benchmark)
     if (metrics.length >= THRESHOLDS.CPP_INCREASE_DAYS) {
         const recentMetrics = metrics.slice(-THRESHOLDS.CPP_INCREASE_DAYS);
         const allIncreasing = recentMetrics.every((m, i) => {
@@ -145,14 +200,17 @@ export function detectIssues(campaign: CampaignData): Issue[] {
                 // Giảm severity nếu cuối tháng
                 const severity = timeContext.isEndOfMonth ? 'info' : 'warning';
                 const contextNote = timeContext.isEndOfMonth
-                    ? ' [📅 Cuối tháng - có thể do hành vi tiêu dùng]'
+                    ? ' [📅 Cuối tháng]'
+                    : '';
+                const benchmarkNote = benchmark.hasBenchmark
+                    ? formatBenchmarkChange(benchmark.cppChange, 'CPP')
                     : '';
 
                 issues.push({
                     type: 'cpp_rising',
                     severity,
                     message: 'CPP tăng liên tục' + (timeContext.isEndOfMonth ? ' (cuối tháng)' : ''),
-                    detail: `${THRESHOLDS.CPP_INCREASE_DAYS} ngày: ${formatMoney(firstCpp)} → ${formatMoney(lastCpp)} (+${increase.toFixed(0)}%)${contextNote}`,
+                    detail: `${THRESHOLDS.CPP_INCREASE_DAYS} ngày: ${formatMoney(firstCpp)} → ${formatMoney(lastCpp)} (+${increase.toFixed(0)}%)${benchmarkNote}${contextNote}`,
                     action: timeContext.isEndOfMonth
                         ? 'Theo dõi thêm, có thể ổn định đầu tháng sau'
                         : 'Thay content mới',
@@ -161,14 +219,17 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         }
     }
 
-    // 3. Có đơn nhưng lỗ (ROAS < 1)
+    // 3. Có đơn nhưng lỗ (ROAS < 1) + benchmark
     if (totals.purchases > 0 && totals.roas < THRESHOLDS.MIN_ROAS) {
         const loss = totals.spend - totals.revenue;
+        const benchmarkNote = benchmark.hasBenchmark
+            ? formatBenchmarkChange(benchmark.roasChange, 'ROAS')
+            : '';
         issues.push({
             type: 'losing_money',
             severity: 'critical',
             message: 'Có đơn nhưng đang lỗ',
-            detail: `ROAS ${totals.roas.toFixed(2)}x, lỗ ${formatMoney(loss)}`,
+            detail: `ROAS ${totals.roas.toFixed(2)}x, lỗ ${formatMoney(loss)}${benchmarkNote}`,
             action: 'Giảm budget 50% hoặc tắt',
         });
     }

@@ -395,7 +395,17 @@ export default function DashboardPage() {
             const res = await fetch(
                 `/api/analysis/daily?startDate=${startDate}&endDate=${endDate}&accountId=${selectedAccountId}`
             );
-            const json = await res.json();
+
+            // Safe JSON parsing
+            const text = await res.text();
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseErr) {
+                console.error('[DASHBOARD] ❌ JSON parse error, raw response:', text.slice(0, 500));
+                throw new Error('Server response invalid');
+            }
+
             console.log('[DASHBOARD] 📊 Analysis response:', json.success ? `${json.data?.summary?.total || 0} campaigns` : json.error);
 
             if (!json.success) {

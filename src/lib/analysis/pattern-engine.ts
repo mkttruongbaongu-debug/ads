@@ -440,9 +440,10 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
         return { ...campaign, issues, actionRecommendation };
     });
 
-    const critical = results.filter(c => classifyCampaign(c.issues) === 'critical');
-    const warning = results.filter(c => classifyCampaign(c.issues) === 'warning');
-    const good = results.filter(c => classifyCampaign(c.issues) === 'good');
+    // Use actionRecommendation for classification (matches the badge)
+    const critical = results.filter(c => c.actionRecommendation.action === 'STOP');
+    const warning = results.filter(c => c.actionRecommendation.action === 'WATCH');
+    const good = results.filter(c => c.actionRecommendation.action === 'SCALE');
 
     return {
         critical,

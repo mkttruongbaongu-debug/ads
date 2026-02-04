@@ -66,6 +66,13 @@ const THRESHOLDS = {
     LEARNING_DAYS: 7,             // 7 ngày đầu = learning
     LEARNING_CONVERSIONS: 50,     // Cần 50 conversions để exit learning
     SPEND_SPIKE_PERCENT: 200,     // Spend gấp 2 = spike
+
+    // NEW: Profit-based thresholds (v2)
+    ROAS_LOSS: 2,                 // ROAS < 2 = chắc chắn lỗ (cost SP ~50%)
+    ROAS_EXCELLENT: 4,            // ROAS >= 4 = xuất sắc, có thể scale
+    ROAS_GOOD: 2.5,               // ROAS >= 2.5 = tốt
+    VARIANCE_THRESHOLD: 20,       // ±20% = ngưỡng biến động bất thường
+    MIN_SPEND_FOR_ANALYSIS: 500000, // 500k để có data đủ tin cậy
 };
 
 /**
@@ -157,6 +164,81 @@ function formatBenchmarkChange(change: number, metric: string): string {
         ? '📉' // Bad direction
         : '📈'; // Good direction  
     return ` ${emoji} ${sign}${change.toFixed(0)}% vs tuần trước`;
+}
+
+/**
+ * Trend Analysis v2 - So sánh với TB của chính campaign
+ */
+export interface TrendAnalysis {
+    cppVsTotal: number;       // % CPP 3 ngày gần so với TB toàn bộ
+    cppVsRecent7: number;     // % CPP 3 ngày gần so với 7 ngày gần
+    roasVsTotal: number;      // % ROAS so với TB toàn bộ
+    roasVsRecent7: number;    // % ROAS so với 7 ngày gần
+    trendDirection: 'improving' | 'stable' | 'worsening';
+    hasEnoughData: boolean;
+    summary: string;          // Mô tả ngắn gọn
+}
+
+/**
+ * Tính trend so với TB của chính campaign đó
+ * Logic: So sánh 3 ngày gần nhất với:
+ * - TB toàn bộ khoảng request
+ * - TB 7 ngày gần nhất
+ */
+export function calculateTrendVsAverage(dailyMetrics: DailyMetric[]): TrendAnalysis {
+    const noData: TrendAnalysis = {
+        cppVsTotal: 0,
+        cppVsRecent7: 0,
+        roasVsTotal: 0,
+        roasVsRecent7: 0,
+        trendDirection: 'stable',
+        hasEnoughData: false,
+        summary: 'Chưa đủ dữ liệu để phân tích trend',
+    };
+
+    if (dailyMetrics.length < 3) return noData;
+
+    // TB 3 ngày gần nhất
+    const recent3 = dailyMetrics.slice(-3);
+    const recent3Cpp = recent3.reduce((sum, m) => sum + (m.cpp || 0), 0) / 3;
+    const recent3Roas = recent3.reduce((sum, m) => sum + (m.roas || 0), 0) / 3;
+
+    // TB toàn bộ khoảng request
+    const totalCpp = dailyMetrics.reduce((sum, m) => sum + (m.cpp || 0), 0) / dailyMetrics.length;
+    const totalRoas = dailyMetrics.reduce((sum, m) => sum + (m.roas || 0), 0) / dailyMetrics.length;
+
+    // TB 7 ngày gần (hoặc tất cả nếu < 7 ngày)
+    const recent7 = dailyMetrics.slice(-Math.min(7, dailyMetrics.length));
+    const recent7Cpp = recent7.reduce((sum, m) => sum + (m.cpp || 0), 0) / recent7.length;
+    const recent7Roas = recent7.reduce((sum, m) => sum + (m.roas || 0), 0) / recent7.length;
+
+    // Tính % thay đổi
+    const cppVsTotal = totalCpp > 0 ? ((recent3Cpp - totalCpp) / totalCpp) * 100 : 0;
+    const cppVsRecent7 = recent7Cpp > 0 ? ((recent3Cpp - recent7Cpp) / recent7Cpp) * 100 : 0;
+    const roasVsTotal = totalRoas > 0 ? ((recent3Roas - totalRoas) / totalRoas) * 100 : 0;
+    const roasVsRecent7 = recent7Roas > 0 ? ((recent3Roas - recent7Roas) / recent7Roas) * 100 : 0;
+
+    // Xác định trend direction dựa trên CPP (quan trọng nhất)
+    let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+    let summary = 'CPP ổn định';
+
+    if (cppVsTotal > THRESHOLDS.VARIANCE_THRESHOLD || cppVsRecent7 > THRESHOLDS.VARIANCE_THRESHOLD) {
+        trendDirection = 'worsening';
+        summary = `CPP đang tăng ${Math.max(cppVsTotal, cppVsRecent7).toFixed(0)}% so với TB`;
+    } else if (cppVsTotal < -THRESHOLDS.VARIANCE_THRESHOLD || cppVsRecent7 < -THRESHOLDS.VARIANCE_THRESHOLD) {
+        trendDirection = 'improving';
+        summary = `CPP đang giảm ${Math.abs(Math.min(cppVsTotal, cppVsRecent7)).toFixed(0)}% - Tốt!`;
+    }
+
+    return {
+        cppVsTotal,
+        cppVsRecent7,
+        roasVsTotal,
+        roasVsRecent7,
+        trendDirection,
+        hasEnoughData: true,
+        summary,
+    };
 }
 
 /**
@@ -325,23 +407,28 @@ export function classifyCampaign(issues: Issue[]): 'critical' | 'warning' | 'goo
 }
 
 /**
- * Action Recommendation Types
+ * Action Recommendation Types - v2
+ * STOP: Chắc chắn lỗ (ROAS < 2)
+ * WATCH: Còn lời nhưng trend xấu
+ * GOOD: Ổn định, sinh lời
+ * SCALE: Xuất sắc, có thể tăng budget
  */
-export type ActionType = 'STOP' | 'WATCH' | 'SCALE';
+export type ActionType = 'STOP' | 'WATCH' | 'GOOD' | 'SCALE';
 
 export interface ActionRecommendation {
     action: ActionType;
     reason: string;
     emoji: string;
     color: string;
+    trendInfo?: string; // Thông tin trend chi tiết
 }
 
 /**
- * Xác định action recommendation cho campaign
- * Logic:
- * - STOP: Critical issues hoặc ROAS < 0.8 hoặc CPP tăng > 50%
- * - WATCH: Warning issues
- * - SCALE: Không issues + ROAS > 1.5 + CPP ổn định
+ * Xác định action recommendation cho campaign - v2 (Profit-based)
+ * 
+ * NGUYÊN TẮC MỚI:
+ * - STOP CHỈ KHI chắc chắn lỗ: ROAS < 2 hoặc đốt tiền không ra đơn
+ * - ROAS >= 2 = KHÔNG BAO GIỜ STOP, phân loại dựa trên TREND của chính campaign đó
  */
 export function getRecommendedAction(
     campaign: CampaignData,
@@ -349,58 +436,86 @@ export function getRecommendedAction(
 ): ActionRecommendation {
     const { totals, dailyMetrics } = campaign;
 
-    // Calculate CPP trend
-    let cppTrend = 0;
-    if (dailyMetrics.length >= 3) {
-        const recent = dailyMetrics.slice(-3);
-        const firstCpp = recent[0]?.cpp || 0;
-        const lastCpp = recent[recent.length - 1]?.cpp || 0;
-        if (firstCpp > 0) {
-            cppTrend = ((lastCpp - firstCpp) / firstCpp) * 100;
+    // Tính trend so với TB của chính campaign
+    const trend = calculateTrendVsAverage(dailyMetrics);
+
+    // ============================================
+    // 🔴 STOP: CHỈ KHI CHẮC CHẮN LỖ
+    // ============================================
+
+    // Điều kiện 1: ROAS < 2 VÀ đã chi đủ tiền để đánh giá
+    const isLosing = totals.roas < THRESHOLDS.ROAS_LOSS &&
+        totals.spend >= THRESHOLDS.MIN_SPEND_FOR_ANALYSIS;
+
+    // Điều kiện 2: Đốt tiền không ra đơn (chi > 1tr mà 0 đơn)
+    const isBurningMoney = totals.spend > 1000000 && totals.purchases === 0;
+
+    if (isLosing || isBurningMoney) {
+        let reason = '';
+        if (isBurningMoney) {
+            reason = `Chi ${formatMoney(totals.spend)} không ra đơn - Dừng ngay!`;
+        } else {
+            reason = `ROAS ${totals.roas.toFixed(2)}x < 2 = Lỗ (Cost SP ~50% + ADS)`;
         }
-    }
-
-    // 🔴 STOP conditions
-    const hasCriticalIssue = issues.some(i => i.severity === 'critical');
-    const roasVeryLow = totals.roas < 0.8 && totals.spend > 500000;
-    const cppSpiking = cppTrend > 50;
-    const burningMoney = totals.spend > 1000000 && totals.purchases === 0;
-
-    if (hasCriticalIssue || roasVeryLow || cppSpiking || burningMoney) {
-        let reason = 'Có vấn đề nghiêm trọng';
-        if (burningMoney) reason = `Đã chi ${formatMoney(totals.spend)}, 0 đơn`;
-        else if (roasVeryLow) reason = `ROAS chỉ ${totals.roas.toFixed(2)}x, đang lỗ nặng`;
-        else if (cppSpiking) reason = `CPP tăng ${cppTrend.toFixed(0)}% trong 3 ngày`;
 
         return {
             action: 'STOP',
             reason,
             emoji: '🔴',
             color: '#F6465D',
+            trendInfo: trend.summary,
         };
     }
 
-    // 🟢 SCALE conditions
-    const hasNoWarnings = !issues.some(i => i.severity === 'warning');
-    const roasGood = totals.roas >= 1.5;
-    const cppStable = cppTrend <= 10 && cppTrend >= -10;
-    const hasEnoughData = totals.purchases >= 5;
+    // ============================================
+    // ROAS >= 2: KHÔNG BAO GIỜ STOP
+    // Phân loại dựa trên TREND của chính campaign
+    // ============================================
 
-    if (hasNoWarnings && roasGood && cppStable && hasEnoughData) {
+    // 🔥 SCALE: ROAS xuất sắc + trend tốt/ổn định
+    if (totals.roas >= THRESHOLDS.ROAS_EXCELLENT &&
+        trend.trendDirection !== 'worsening' &&
+        totals.spend >= THRESHOLDS.MIN_SPEND_FOR_ANALYSIS) {
         return {
             action: 'SCALE',
-            reason: `ROAS ${totals.roas.toFixed(2)}x, CPP ổn định - Tăng budget 20-30%`,
-            emoji: '🟢',
-            color: '#0ECB81',
+            reason: `ROAS ${totals.roas.toFixed(2)}x xuất sắc, ${trend.summary} - Tăng budget 20-30%`,
+            emoji: '🔥',
+            color: '#1E90FF', // Dodger Blue
+            trendInfo: trend.summary,
         };
     }
 
-    // 🟡 WATCH - default for others
-    let watchReason = 'Có dấu hiệu cần theo dõi';
-    if (issues.length > 0) {
-        watchReason = issues[0].message;
+    // 🟡 WATCH: Còn lời nhưng trend đang xấu đi
+    if (trend.trendDirection === 'worsening') {
+        const cppChange = Math.max(trend.cppVsTotal, trend.cppVsRecent7);
+        return {
+            action: 'WATCH',
+            reason: `${trend.summary}. Theo dõi thêm 2-3 ngày.`,
+            emoji: '🟡',
+            color: '#F0B90B',
+            trendInfo: `CPP tăng ${cppChange.toFixed(0)}% so với TB`,
+        };
+    }
+
+    // 🟢 GOOD: ROAS tốt + trend ổn định/improving
+    if (totals.roas >= THRESHOLDS.ROAS_GOOD || trend.trendDirection === 'improving') {
+        return {
+            action: 'GOOD',
+            reason: `ROAS ${totals.roas.toFixed(2)}x, ${trend.summary}`,
+            emoji: '🟢',
+            color: '#0ECB81',
+            trendInfo: trend.summary,
+        };
+    }
+
+    // 🟡 WATCH: Default cho các trường hợp khác (chưa đủ data, ROAS trung bình)
+    let watchReason = 'Đang theo dõi';
+    if (!trend.hasEnoughData) {
+        watchReason = 'Chưa đủ dữ liệu để phân tích trend';
     } else if (totals.purchases < 5) {
-        watchReason = 'Chưa đủ data để đánh giá (< 5 đơn)';
+        watchReason = `Chỉ ${totals.purchases} đơn - Cần thêm data`;
+    } else if (totals.roas < THRESHOLDS.ROAS_GOOD) {
+        watchReason = `ROAS ${totals.roas.toFixed(2)}x - Cần cải thiện`;
     }
 
     return {
@@ -408,6 +523,7 @@ export function getRecommendedAction(
         reason: watchReason,
         emoji: '🟡',
         color: '#F0B90B',
+        trendInfo: trend.summary,
     };
 }
 
@@ -441,9 +557,13 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
     });
 
     // Use actionRecommendation for classification (matches the badge)
+    // STOP → critical, WATCH → warning, GOOD + SCALE → good
     const critical = results.filter(c => c.actionRecommendation.action === 'STOP');
     const warning = results.filter(c => c.actionRecommendation.action === 'WATCH');
-    const good = results.filter(c => c.actionRecommendation.action === 'SCALE');
+    const good = results.filter(c =>
+        c.actionRecommendation.action === 'GOOD' ||
+        c.actionRecommendation.action === 'SCALE'
+    );
 
     return {
         critical,

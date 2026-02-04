@@ -80,7 +80,11 @@ function MiniBarChart({
 
     const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
     const maxValue = Math.max(...values);
+    const minValue = Math.min(...values.filter(v => v > 0)); // Filter out 0s for better scaling
     const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+
+    // Chart container height in pixels
+    const chartHeight = 80;
 
     return (
         <div style={{ marginTop: '16px' }}>
@@ -94,34 +98,42 @@ function MiniBarChart({
             }}>
                 📊 {label} qua {data.length} ngày
             </p>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', height: '80px' }}>
+            <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', height: `${chartHeight}px` }}>
                 {data.map((d, idx) => {
                     const value = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
-                    const heightPercent = maxValue > 0 ? (value / maxValue) * 100 : 0;
+                    // Scale from minValue to maxValue for better visualization
+                    // If all values are same, show 50% height
+                    let heightPercent: number;
+                    if (maxValue === minValue) {
+                        heightPercent = 50;
+                    } else {
+                        // Scale between 15% (min) and 100% (max) for better visual differentiation
+                        heightPercent = 15 + ((value - minValue) / (maxValue - minValue)) * 85;
+                    }
+                    const barHeight = Math.max((heightPercent / 100) * chartHeight, 4);
                     const isHighlighted = highlightCondition ? highlightCondition(value, avgValue) : false;
 
                     return (
-                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                             <div
                                 style={{
                                     width: '100%',
-                                    height: `${Math.max(heightPercent, 5)}%`,
+                                    height: `${barHeight}px`,
                                     background: isHighlighted
                                         ? 'linear-gradient(180deg, #F6465D, #F6465D80)'
                                         : `linear-gradient(180deg, ${colors.primary}, ${colors.primary}80)`,
-                                    borderRadius: '4px 4px 0 0',
-                                    minHeight: '4px',
+                                    borderRadius: '3px 3px 0 0',
                                     transition: 'height 0.3s ease',
                                 }}
                                 title={`${d.date}: ${formatValue(value)}`}
                             />
                             <span style={{
-                                fontSize: '0.6rem',
+                                fontSize: '0.5rem',
                                 color: colors.textSubtle,
                                 marginTop: '4px',
                                 whiteSpace: 'nowrap'
                             }}>
-                                {d.date.slice(5)} {/* MM-DD */}
+                                {d.date.slice(8)} {/* DD only */}
                             </span>
                         </div>
                     );

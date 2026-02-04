@@ -436,9 +436,9 @@ export default function DashboardPage() {
     }
 
     const formatMoney = (amount: number) => {
-        // Làm tròn số và hiển thị với dấu chấm phân cách: 3.400.000đ
+        // Làm tròn số và hiển thị với dấu chấm phân cách: 3.400.000 ₫
         const rounded = Math.round(amount);
-        return rounded.toLocaleString('de-DE') + 'đ';
+        return rounded.toLocaleString('de-DE') + ' ₫';
     };
 
     return (

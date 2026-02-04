@@ -27,6 +27,12 @@ interface CampaignWithIssues {
         ctr: number;
     };
     issues: Issue[];
+    actionRecommendation?: {
+        action: 'STOP' | 'WATCH' | 'SCALE';
+        reason: string;
+        emoji: string;
+        color: string;
+    };
 }
 
 interface AnalysisData {
@@ -735,7 +741,30 @@ function CampaignCard({
             style={{ ...styles.campaignCard, borderLeftColor: borderColor }}
             onClick={onSelect}
         >
-            <h3 style={styles.campaignName}>{campaign.name}</h3>
+            {/* Header with name and action badge */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <h3 style={{ ...styles.campaignName, marginBottom: 0 }}>{campaign.name}</h3>
+                {campaign.actionRecommendation && (
+                    <span
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: campaign.actionRecommendation.color + '20',
+                            color: campaign.actionRecommendation.color,
+                            border: `1px solid ${campaign.actionRecommendation.color}40`,
+                            whiteSpace: 'nowrap',
+                        }}
+                        title={campaign.actionRecommendation.reason}
+                    >
+                        {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : 'THEO DÕI'}
+                    </span>
+                )}
+            </div>
 
             {/* Issues */}
             {campaign.issues.slice(0, 2).map((issue, idx) => (

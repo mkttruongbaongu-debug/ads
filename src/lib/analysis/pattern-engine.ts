@@ -195,6 +195,93 @@ export function classifyCampaign(issues: Issue[]): 'critical' | 'warning' | 'goo
 }
 
 /**
+ * Action Recommendation Types
+ */
+export type ActionType = 'STOP' | 'WATCH' | 'SCALE';
+
+export interface ActionRecommendation {
+    action: ActionType;
+    reason: string;
+    emoji: string;
+    color: string;
+}
+
+/**
+ * Xác định action recommendation cho campaign
+ * Logic:
+ * - STOP: Critical issues hoặc ROAS < 0.8 hoặc CPP tăng > 50%
+ * - WATCH: Warning issues
+ * - SCALE: Không issues + ROAS > 1.5 + CPP ổn định
+ */
+export function getRecommendedAction(
+    campaign: CampaignData,
+    issues: Issue[]
+): ActionRecommendation {
+    const { totals, dailyMetrics } = campaign;
+
+    // Calculate CPP trend
+    let cppTrend = 0;
+    if (dailyMetrics.length >= 3) {
+        const recent = dailyMetrics.slice(-3);
+        const firstCpp = recent[0]?.cpp || 0;
+        const lastCpp = recent[recent.length - 1]?.cpp || 0;
+        if (firstCpp > 0) {
+            cppTrend = ((lastCpp - firstCpp) / firstCpp) * 100;
+        }
+    }
+
+    // 🔴 STOP conditions
+    const hasCriticalIssue = issues.some(i => i.severity === 'critical');
+    const roasVeryLow = totals.roas < 0.8 && totals.spend > 500000;
+    const cppSpiking = cppTrend > 50;
+    const burningMoney = totals.spend > 1000000 && totals.purchases === 0;
+
+    if (hasCriticalIssue || roasVeryLow || cppSpiking || burningMoney) {
+        let reason = 'Có vấn đề nghiêm trọng';
+        if (burningMoney) reason = `Đã chi ${formatMoney(totals.spend)}, 0 đơn`;
+        else if (roasVeryLow) reason = `ROAS chỉ ${totals.roas.toFixed(2)}x, đang lỗ nặng`;
+        else if (cppSpiking) reason = `CPP tăng ${cppTrend.toFixed(0)}% trong 3 ngày`;
+
+        return {
+            action: 'STOP',
+            reason,
+            emoji: '🔴',
+            color: '#F6465D',
+        };
+    }
+
+    // 🟢 SCALE conditions
+    const hasNoWarnings = !issues.some(i => i.severity === 'warning');
+    const roasGood = totals.roas >= 1.5;
+    const cppStable = cppTrend <= 10 && cppTrend >= -10;
+    const hasEnoughData = totals.purchases >= 5;
+
+    if (hasNoWarnings && roasGood && cppStable && hasEnoughData) {
+        return {
+            action: 'SCALE',
+            reason: `ROAS ${totals.roas.toFixed(2)}x, CPP ổn định - Tăng budget 20-30%`,
+            emoji: '🟢',
+            color: '#0ECB81',
+        };
+    }
+
+    // 🟡 WATCH - default for others
+    let watchReason = 'Có dấu hiệu cần theo dõi';
+    if (issues.length > 0) {
+        watchReason = issues[0].message;
+    } else if (totals.purchases < 5) {
+        watchReason = 'Chưa đủ data để đánh giá (< 5 đơn)';
+    }
+
+    return {
+        action: 'WATCH',
+        reason: watchReason,
+        emoji: '🟡',
+        color: '#F0B90B',
+    };
+}
+
+/**
  * Format tiền VND
  */
 function formatMoney(amount: number): string {
@@ -205,9 +292,9 @@ function formatMoney(amount: number): string {
  * Phân tích tất cả campaigns và trả về Daily Action Board data
  */
 export function analyzeCampaigns(campaigns: CampaignData[]): {
-    critical: Array<CampaignData & { issues: Issue[] }>;
-    warning: Array<CampaignData & { issues: Issue[] }>;
-    good: Array<CampaignData & { issues: Issue[] }>;
+    critical: Array<CampaignData & { issues: Issue[]; actionRecommendation: ActionRecommendation }>;
+    warning: Array<CampaignData & { issues: Issue[]; actionRecommendation: ActionRecommendation }>;
+    good: Array<CampaignData & { issues: Issue[]; actionRecommendation: ActionRecommendation }>;
     summary: {
         total: number;
         critical: number;
@@ -219,7 +306,8 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
 } {
     const results = campaigns.map(campaign => {
         const issues = detectIssues(campaign);
-        return { ...campaign, issues };
+        const actionRecommendation = getRecommendedAction(campaign, issues);
+        return { ...campaign, issues, actionRecommendation };
     });
 
     const critical = results.filter(c => classifyCampaign(c.issues) === 'critical');

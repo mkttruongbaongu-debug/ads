@@ -3,16 +3,37 @@
 import { useState, useEffect } from 'react';
 
 interface AIAnalysis {
-    summary: string;
-    diagnosis: string;
-    marketContext: string;
-    actionPlan: {
-        immediate: string;
-        shortTerm: string;
-        prevention: string;
+    // NEW: Cơ sở phân tích
+    dataBasis?: {
+        days: number;
+        orders: number;
+        spend: number;
     };
-    confidence: 'high' | 'medium' | 'low';
-    reasoning: string;
+    // NEW: 4 chiều phân tích
+    dimensions?: {
+        financial: { status: 'excellent' | 'good' | 'warning' | 'critical'; summary: string };
+        content: { status: 'excellent' | 'good' | 'warning' | 'critical'; summary: string };
+        audience: { status: 'excellent' | 'good' | 'warning' | 'critical'; summary: string };
+        trend: { direction: 'improving' | 'stable' | 'declining'; summary: string };
+    };
+    // NEW: Verdict dứt khoát
+    verdict?: {
+        action: 'SCALE' | 'MAINTAIN' | 'WATCH' | 'REDUCE' | 'STOP';
+        headline: string;
+        condition?: string;
+    };
+    // NEW: Action plan v2
+    actionPlan: {
+        immediate: string | { action: string; reason: string };
+        shortTerm?: string | { action: string; trigger: string };
+        prevention?: string;
+    };
+    // Legacy fields
+    summary?: string;
+    diagnosis?: string;
+    marketContext?: string;
+    confidence?: 'high' | 'medium' | 'low';
+    reasoning?: string;
 }
 
 interface Issue {
@@ -664,51 +685,220 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                 {aiAnalysis && (
                                     <div style={styles.aiResult}>
-                                        <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
-
-                                        <span style={{ ...styles.confidence, ...getConfidenceStyle(aiAnalysis.confidence) }}>
-                                            Độ tin cậy: {aiAnalysis.confidence === 'high' ? 'Cao' : aiAnalysis.confidence === 'medium' ? 'Trung bình' : 'Thấp'}
-                                        </span>
-
-                                        <div style={{ ...styles.aiBlock, marginTop: '16px' }}>
-                                            <p style={styles.aiBlockTitle}>Chẩn đoán</p>
-                                            <p style={styles.aiBlockContent}>{aiAnalysis.diagnosis}</p>
-                                        </div>
-
-                                        {aiAnalysis.marketContext && (
-                                            <div style={styles.aiBlock}>
-                                                <p style={styles.aiBlockTitle}>Bối cảnh thị trường</p>
-                                                <p style={styles.aiBlockContent}>{aiAnalysis.marketContext}</p>
+                                        {/* NEW: Verdict Header */}
+                                        {aiAnalysis.verdict && (
+                                            <div style={{
+                                                padding: '16px',
+                                                borderRadius: '12px',
+                                                marginBottom: '16px',
+                                                background: aiAnalysis.verdict.action === 'SCALE' ? 'linear-gradient(135deg, #059669, #10b981)' :
+                                                    aiAnalysis.verdict.action === 'MAINTAIN' ? 'linear-gradient(135deg, #0ea5e9, #38bdf8)' :
+                                                        aiAnalysis.verdict.action === 'WATCH' ? 'linear-gradient(135deg, #d97706, #fbbf24)' :
+                                                            aiAnalysis.verdict.action === 'REDUCE' ? 'linear-gradient(135deg, #ea580c, #fb923c)' :
+                                                                'linear-gradient(135deg, #dc2626, #f87171)',
+                                            }}>
+                                                <p style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                                                    {aiAnalysis.verdict.headline}
+                                                </p>
+                                                {aiAnalysis.verdict.condition && (
+                                                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', marginTop: '8px' }}>
+                                                        📋 {aiAnalysis.verdict.condition}
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
 
-                                        <div style={{ ...styles.aiBlock, marginTop: '20px' }}>
+                                        {/* NEW: Data Basis (thay thế Độ tin cậy) */}
+                                        {aiAnalysis.dataBasis && (
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '12px',
+                                                marginBottom: '16px',
+                                                fontSize: '12px',
+                                                color: '#8b8b8b',
+                                            }}>
+                                                <span>📊 Cơ sở: {aiAnalysis.dataBasis.days} ngày</span>
+                                                <span>|</span>
+                                                <span>{aiAnalysis.dataBasis.orders} đơn</span>
+                                                <span>|</span>
+                                                <span>{formatMoney(aiAnalysis.dataBasis.spend)} chi tiêu</span>
+                                            </div>
+                                        )}
+
+                                        {/* NEW: 4 Dimensions */}
+                                        {aiAnalysis.dimensions && (
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                                gap: '12px',
+                                                marginBottom: '20px',
+                                            }}>
+                                                {/* Financial */}
+                                                <div style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    background: '#1a1a1a',
+                                                    border: '1px solid #2a2a2a',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                        <span>💰</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Tài chính</span>
+                                                        <span style={{
+                                                            marginLeft: 'auto',
+                                                            fontSize: '11px',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            background: aiAnalysis.dimensions.financial.status === 'excellent' ? '#059669' :
+                                                                aiAnalysis.dimensions.financial.status === 'good' ? '#3b82f6' :
+                                                                    aiAnalysis.dimensions.financial.status === 'warning' ? '#d97706' : '#dc2626',
+                                                            color: '#fff',
+                                                        }}>
+                                                            {aiAnalysis.dimensions.financial.status === 'excellent' ? '✓ Xuất sắc' :
+                                                                aiAnalysis.dimensions.financial.status === 'good' ? '✓ Tốt' :
+                                                                    aiAnalysis.dimensions.financial.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
+                                                        </span>
+                                                    </div>
+                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.financial.summary}</p>
+                                                </div>
+
+                                                {/* Content */}
+                                                <div style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    background: '#1a1a1a',
+                                                    border: '1px solid #2a2a2a',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                        <span>🎯</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Content</span>
+                                                        <span style={{
+                                                            marginLeft: 'auto',
+                                                            fontSize: '11px',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            background: aiAnalysis.dimensions.content.status === 'excellent' ? '#059669' :
+                                                                aiAnalysis.dimensions.content.status === 'good' ? '#3b82f6' :
+                                                                    aiAnalysis.dimensions.content.status === 'warning' ? '#d97706' : '#dc2626',
+                                                            color: '#fff',
+                                                        }}>
+                                                            {aiAnalysis.dimensions.content.status === 'excellent' ? '✓ Xuất sắc' :
+                                                                aiAnalysis.dimensions.content.status === 'good' ? '✓ Tốt' :
+                                                                    aiAnalysis.dimensions.content.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
+                                                        </span>
+                                                    </div>
+                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.content.summary}</p>
+                                                </div>
+
+                                                {/* Audience */}
+                                                <div style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    background: '#1a1a1a',
+                                                    border: '1px solid #2a2a2a',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                        <span>👥</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Audience</span>
+                                                        <span style={{
+                                                            marginLeft: 'auto',
+                                                            fontSize: '11px',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            background: aiAnalysis.dimensions.audience.status === 'excellent' ? '#059669' :
+                                                                aiAnalysis.dimensions.audience.status === 'good' ? '#3b82f6' :
+                                                                    aiAnalysis.dimensions.audience.status === 'warning' ? '#d97706' : '#dc2626',
+                                                            color: '#fff',
+                                                        }}>
+                                                            {aiAnalysis.dimensions.audience.status === 'excellent' ? '✓ Xuất sắc' :
+                                                                aiAnalysis.dimensions.audience.status === 'good' ? '✓ Tốt' :
+                                                                    aiAnalysis.dimensions.audience.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
+                                                        </span>
+                                                    </div>
+                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.audience.summary}</p>
+                                                </div>
+
+                                                {/* Trend */}
+                                                <div style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    background: '#1a1a1a',
+                                                    border: '1px solid #2a2a2a',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                        <span>📈</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Trend</span>
+                                                        <span style={{
+                                                            marginLeft: 'auto',
+                                                            fontSize: '11px',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            background: aiAnalysis.dimensions.trend.direction === 'improving' ? '#059669' :
+                                                                aiAnalysis.dimensions.trend.direction === 'stable' ? '#3b82f6' : '#dc2626',
+                                                            color: '#fff',
+                                                        }}>
+                                                            {aiAnalysis.dimensions.trend.direction === 'improving' ? '↗️ Đang tốt lên' :
+                                                                aiAnalysis.dimensions.trend.direction === 'stable' ? '→ Ổn định' : '↘️ Đang xấu đi'}
+                                                        </span>
+                                                    </div>
+                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.trend.summary}</p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Fallback: Legacy summary if no verdict */}
+                                        {!aiAnalysis.verdict && aiAnalysis.summary && (
+                                            <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
+                                        )}
+
+                                        {/* Action Plan */}
+                                        <div style={{ ...styles.aiBlock, marginTop: '16px' }}>
                                             <p style={styles.aiBlockTitle}>Kế hoạch hành động</p>
 
                                             <div style={styles.actionBox}>
                                                 <p style={styles.actionLabel}>⚡ LÀM NGAY</p>
-                                                <p style={styles.actionContent}>{aiAnalysis.actionPlan.immediate}</p>
+                                                <p style={styles.actionContent}>
+                                                    {typeof aiAnalysis.actionPlan.immediate === 'string'
+                                                        ? aiAnalysis.actionPlan.immediate
+                                                        : aiAnalysis.actionPlan.immediate.action}
+                                                </p>
+                                                {typeof aiAnalysis.actionPlan.immediate === 'object' && aiAnalysis.actionPlan.immediate.reason && (
+                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                        💡 {aiAnalysis.actionPlan.immediate.reason}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {aiAnalysis.actionPlan.shortTerm && (
-                                                <div style={{ ...styles.actionBox, background: '#eff6ff', borderColor: '#bfdbfe' }}>
-                                                    <p style={{ ...styles.actionLabel, color: '#2563eb' }}>📅 2-3 NGÀY TỚI</p>
-                                                    <p style={{ ...styles.actionContent, color: '#1e40af' }}>{aiAnalysis.actionPlan.shortTerm}</p>
+                                                <div style={{ ...styles.actionBox, background: '#0f172a', borderColor: '#1e3a5f' }}>
+                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>📅 2-3 NGÀY TỚI</p>
+                                                    <p style={{ ...styles.actionContent, color: '#7dd3fc' }}>
+                                                        {typeof aiAnalysis.actionPlan.shortTerm === 'string'
+                                                            ? aiAnalysis.actionPlan.shortTerm
+                                                            : aiAnalysis.actionPlan.shortTerm.action}
+                                                    </p>
+                                                    {typeof aiAnalysis.actionPlan.shortTerm === 'object' && aiAnalysis.actionPlan.shortTerm.trigger && (
+                                                        <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                                            🎯 Trigger: {aiAnalysis.actionPlan.shortTerm.trigger}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
 
                                             {aiAnalysis.actionPlan.prevention && (
-                                                <div style={{ ...styles.actionBox, background: '#f8f7ff', borderColor: '#e9e5ff' }}>
-                                                    <p style={{ ...styles.actionLabel, color: '#6366f1' }}>🛡️ PHÒNG NGỪA</p>
-                                                    <p style={{ ...styles.actionContent, color: '#4338ca' }}>{aiAnalysis.actionPlan.prevention}</p>
+                                                <div style={{ ...styles.actionBox, background: '#1a1625', borderColor: '#2e2640' }}>
+                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>🛡️ PHÒNG NGỪA</p>
+                                                    <p style={{ ...styles.actionContent, color: '#c4b5fd' }}>{aiAnalysis.actionPlan.prevention}</p>
                                                 </div>
                                             )}
                                         </div>
 
-                                        <div style={{ ...styles.aiBlock, borderTop: '1px solid #e9e5ff', paddingTop: '16px' }}>
-                                            <p style={styles.aiBlockTitle}>Lý do</p>
-                                            <p style={styles.aiBlockContent}>{aiAnalysis.reasoning}</p>
-                                        </div>
+                                        {/* Reasoning */}
+                                        {aiAnalysis.reasoning && (
+                                            <div style={{ ...styles.aiBlock, borderTop: '1px solid #2a2a2a', paddingTop: '16px', marginTop: '16px' }}>
+                                                <p style={styles.aiBlockTitle}>Lý do</p>
+                                                <p style={styles.aiBlockContent}>{aiAnalysis.reasoning}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -528,10 +528,15 @@ export function getRecommendedAction(
 }
 
 /**
- * Format tiền VND
+ * Format tiền VND - làm tròn và dùng dấu chấm phân cách
  */
 function formatMoney(amount: number): string {
-    return amount.toLocaleString('vi-VN') + 'đ';
+    const rounded = Math.round(amount);
+    if (rounded >= 1000000) {
+        return (rounded / 1000000).toFixed(1).replace('.', ',') + 'tr';
+    }
+    // Dùng de-DE để có dấu chấm phân cách hàng nghìn (18.196đ)
+    return rounded.toLocaleString('de-DE') + 'đ';
 }
 
 /**

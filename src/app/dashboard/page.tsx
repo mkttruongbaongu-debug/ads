@@ -410,10 +410,22 @@ export default function DashboardPage() {
     }
 
     const formatMoney = (amount: number) => {
-        if (amount >= 1000000) {
-            return (amount / 1000000).toFixed(1) + 'tr';
+        // Làm tròn số
+        const rounded = Math.round(amount);
+
+        if (rounded >= 1000000000) {
+            // Tỷ
+            return (rounded / 1000000000).toFixed(1).replace('.', ',') + ' tỷ';
         }
-        return amount.toLocaleString('vi-VN') + 'đ';
+        if (rounded >= 1000000) {
+            // Triệu - format: 3,4tr hoặc 44,2tr
+            return (rounded / 1000000).toFixed(1).replace('.', ',') + 'tr';
+        }
+        if (rounded >= 1000) {
+            // Nghìn - format: 18.196đ (dấu chấm phân cách hàng nghìn)
+            return rounded.toLocaleString('de-DE') + 'đ';
+        }
+        return rounded.toLocaleString('de-DE') + 'đ';
     };
 
     return (

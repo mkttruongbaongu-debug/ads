@@ -230,8 +230,15 @@ export async function GET(request: NextRequest) {
                             rows: rows,
                         }),
                     });
-                    const saveData = await saveRes.json();
-                    console.log('[ANALYSIS/DAILY] ✅ Save result:', saveData.success ? `Inserted: ${saveData.inserted}, Updated: ${saveData.updated}` : saveData.error);
+
+                    // Safe JSON parsing
+                    const saveText = await saveRes.text();
+                    try {
+                        const saveData = JSON.parse(saveText);
+                        console.log('[ANALYSIS/DAILY] ✅ Save result:', saveData.success ? `Inserted: ${saveData.inserted}, Updated: ${saveData.updated}` : saveData.error);
+                    } catch {
+                        console.error('[ANALYSIS/DAILY] ⚠️ Apps Script response not JSON:', saveText.slice(0, 200));
+                    }
                 } else {
                     console.warn('[ANALYSIS/DAILY] ⚠️ No fb_user_id found, skip saving');
                 }

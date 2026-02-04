@@ -17,12 +17,11 @@ const CONFIG = {
     CAMPAIGNS_SHEET: 'Campaigns',
     ACCOUNTS_SHEET: 'Accounts',
     LOGS_SHEET: 'Logs',
-    TOKENS_SHEET: 'Tokens',  // Lưu Facebook OAuth tokens
-    USERS_SHEET: 'Users',    // Lưu thông tin người dùng đăng ký
-    AI_USAGE_SHEET: 'AiUsage', // Lưu AI token usage và chi phí
+    TAI_KHOAN_SHEET: 'TaiKhoan',  // NEW: Gộp token + user + ad accounts cache
+    AI_USAGE_SHEET: 'AiUsage',
 
     // API Secret (để bảo vệ endpoint)
-    API_SECRET: 'tho-ads-ai-2026' // Thay đổi secret này
+    API_SECRET: 'tho-ads-ai-2026'
 };
 
 // ==================== HEADERS - COMPREHENSIVE METRICS ====================
@@ -62,11 +61,17 @@ const HEADERS = {
     Logs: [
         'timestamp', 'action', 'account_id', 'date', 'rows_count', 'status', 'message'
     ],
-    Tokens: [
-        'user_id', 'access_token', 'token_type', 'expires_at', 'created_at', 'updated_at'
-    ],
-    Users: [
-        'fb_user_id', 'name', 'email', 'avatar', 'plan', 'created_at', 'last_login'
+    TaiKhoan: [
+        // User Identity
+        'fb_user_id', 'name', 'email', 'avatar',
+        // OAuth Token
+        'access_token', 'token_type', 'token_expires_at',
+        // Ad Accounts Cache (JSON array)
+        'ad_accounts',
+        // Subscription
+        'plan',
+        // Timestamps
+        'created_at', 'last_login'
     ],
     AiUsage: [
         // Request info
@@ -153,12 +158,11 @@ function doPost(e) {
                 return clearSheet(data);
             case 'init':
                 return initializeSheets();
-            case 'saveToken':
-                return saveToken(data);
-            case 'saveUser':
-                return saveUser(data);
-            case 'getUser':
-                return getUser(data);
+            // NEW: TaiKhoan management
+            case 'saveTaiKhoan':
+                return saveTaiKhoan(data);
+            case 'saveAdAccounts':
+                return saveAdAccounts(data);
             case 'fixHeaders':
                 return fixHeaders(data);
             case 'logAiUsage':
@@ -192,8 +196,9 @@ function doGet(e) {
                 return getCampaignHistory(params);
             case 'status':
                 return getStatus();
-            case 'getToken':
-                return getToken(params);
+            // NEW: TaiKhoan
+            case 'getTaiKhoan':
+                return getTaiKhoan(params);
             case 'getAiUsage':
                 return getAiUsage(params);
             default:
@@ -1048,6 +1053,202 @@ function getAiUsage(params) {
                 history: history.reverse() // Most recent first
             }
         });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+// ==================== TAI KHOAN MANAGEMENT (NEW) ====================
+
+/**
+ * Lưu hoặc cập nhật thông tin TaiKhoan
+ * Gộp user info + token + ad accounts cache
+ * @param {Object} data - {
+ *   fb_user_id, name, email, avatar,
+ *   access_token, token_type, token_expires_at,
+ *   ad_accounts (optional - JSON array),
+ *   plan (optional - defaults to 'free')
+ * }
+ */
+function saveTaiKhoan(data) {
+    try {
+        const sheet = getOrCreateSheet(CONFIG.TAI_KHOAN_SHEET);
+        ensureHeaders(sheet, 'TaiKhoan');
+
+        const fbUserId = data.fb_user_id;
+        if (!fbUserId) {
+            return createResponse({ success: false, error: 'Missing fb_user_id' });
+        }
+
+        const now = new Date().toISOString();
+        const allData = sheet.getDataRange().getValues();
+        const headers = allData[0] || HEADERS.TaiKhoan;
+
+        // Find existing row
+        const userIdIdx = headers.indexOf('fb_user_id');
+        let existingRowIndex = -1;
+        let existingRow = null;
+
+        for (let i = 1; i < allData.length; i++) {
+            if (allData[i][userIdIdx] === fbUserId) {
+                existingRowIndex = i + 1;
+                existingRow = allData[i];
+                break;
+            }
+        }
+
+        // Build row data
+        const rowData = HEADERS.TaiKhoan.map((h, idx) => {
+            switch (h) {
+                case 'fb_user_id': return fbUserId;
+                case 'name': return data.name || (existingRow ? existingRow[idx] : '');
+                case 'email': return data.email || (existingRow ? existingRow[idx] : '');
+                case 'avatar': return data.avatar || (existingRow ? existingRow[idx] : '');
+                case 'access_token': return data.access_token || (existingRow ? existingRow[idx] : '');
+                case 'token_type': return data.token_type || 'bearer';
+                case 'token_expires_at': return data.token_expires_at || (existingRow ? existingRow[idx] : '');
+                case 'ad_accounts':
+                    // Keep existing if not provided
+                    if (data.ad_accounts) {
+                        return typeof data.ad_accounts === 'string'
+                            ? data.ad_accounts
+                            : JSON.stringify(data.ad_accounts);
+                    }
+                    return existingRow ? existingRow[idx] : '[]';
+                case 'plan': return data.plan || (existingRow ? existingRow[idx] : 'free');
+                case 'created_at': return existingRow ? existingRow[idx] : now;
+                case 'last_login': return now;
+                default: return '';
+            }
+        });
+
+        if (existingRowIndex > 0) {
+            // Update existing
+            sheet.getRange(existingRowIndex, 1, 1, rowData.length).setValues([rowData]);
+            logAction('saveTaiKhoan', fbUserId, '', 1, 'updated', 'TaiKhoan updated');
+        } else {
+            // Create new
+            sheet.appendRow(rowData);
+            logAction('saveTaiKhoan', fbUserId, '', 1, 'created', 'TaiKhoan created');
+        }
+
+        return createResponse({
+            success: true,
+            action: existingRowIndex > 0 ? 'updated' : 'created',
+            fb_user_id: fbUserId
+        });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Lấy thông tin TaiKhoan theo fb_user_id
+ * Trả về user info + token + ad accounts cache
+ */
+function getTaiKhoan(params) {
+    try {
+        const fbUserId = params.fb_user_id || params.userId;
+        if (!fbUserId) {
+            return createResponse({ success: false, error: 'Missing fb_user_id' });
+        }
+
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.TAI_KHOAN_SHEET);
+        if (!sheet) {
+            return createResponse({ success: true, found: false, message: 'Sheet not found' });
+        }
+
+        const allData = sheet.getDataRange().getValues();
+        if (allData.length <= 1) {
+            return createResponse({ success: true, found: false, message: 'No data' });
+        }
+
+        const headers = allData[0];
+        const userIdIdx = headers.indexOf('fb_user_id');
+
+        for (let i = 1; i < allData.length; i++) {
+            if (allData[i][userIdIdx] === fbUserId) {
+                const row = allData[i];
+                const obj = {};
+                headers.forEach((h, idx) => obj[h] = row[idx]);
+
+                // Parse ad_accounts JSON
+                let adAccounts = [];
+                try {
+                    adAccounts = obj.ad_accounts ? JSON.parse(obj.ad_accounts) : [];
+                } catch (e) {
+                    adAccounts = [];
+                }
+
+                // Check token expiry
+                const tokenExpiresAt = obj.token_expires_at ? new Date(obj.token_expires_at) : null;
+                const isTokenExpired = tokenExpiresAt && tokenExpiresAt < new Date();
+
+                return createResponse({
+                    success: true,
+                    found: true,
+                    data: {
+                        fb_user_id: obj.fb_user_id,
+                        name: obj.name,
+                        email: obj.email,
+                        avatar: obj.avatar,
+                        access_token: isTokenExpired ? null : obj.access_token,
+                        token_type: obj.token_type,
+                        token_expires_at: obj.token_expires_at,
+                        is_token_expired: isTokenExpired,
+                        ad_accounts: adAccounts,
+                        plan: obj.plan,
+                        created_at: obj.created_at,
+                        last_login: obj.last_login
+                    }
+                });
+            }
+        }
+
+        return createResponse({ success: true, found: false, message: 'User not found' });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Cập nhật ad_accounts cache cho user
+ * Dashboard gọi sau khi fetch từ Facebook để cache lại
+ */
+function saveAdAccounts(data) {
+    try {
+        const fbUserId = data.fb_user_id;
+        const adAccounts = data.ad_accounts;
+
+        if (!fbUserId || !adAccounts) {
+            return createResponse({ success: false, error: 'Missing fb_user_id or ad_accounts' });
+        }
+
+        const sheet = getOrCreateSheet(CONFIG.TAI_KHOAN_SHEET);
+        ensureHeaders(sheet, 'TaiKhoan');
+
+        const allData = sheet.getDataRange().getValues();
+        const headers = allData[0];
+        const userIdIdx = headers.indexOf('fb_user_id');
+        const adAccountsIdx = headers.indexOf('ad_accounts');
+
+        for (let i = 1; i < allData.length; i++) {
+            if (allData[i][userIdIdx] === fbUserId) {
+                const adAccountsJson = typeof adAccounts === 'string'
+                    ? adAccounts
+                    : JSON.stringify(adAccounts);
+                sheet.getRange(i + 1, adAccountsIdx + 1).setValue(adAccountsJson);
+
+                logAction('saveAdAccounts', fbUserId, '', adAccounts.length || 0, 'success', 'Ad accounts cached');
+                return createResponse({
+                    success: true,
+                    message: 'Ad accounts cached',
+                    count: Array.isArray(adAccounts) ? adAccounts.length : 0
+                });
+            }
+        }
+
+        return createResponse({ success: false, error: 'User not found, please saveTaiKhoan first' });
     } catch (error) {
         return createResponse({ success: false, error: error.message });
     }

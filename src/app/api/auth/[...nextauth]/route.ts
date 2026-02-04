@@ -1,52 +1,22 @@
 import NextAuth, { AuthOptions } from "next-auth";
 import FacebookProvider from "next-auth/providers/facebook";
 
-// Hàm gọi Google Apps Script để lưu user
-async function saveUserToSheet(user: {
+// Hàm gọi Google Apps Script để lưu TaiKhoan (user + token combined)
+async function saveTaiKhoanToSheet(data: {
     fb_user_id: string;
     name: string;
     email?: string;
     avatar?: string;
-}) {
-    try {
-        const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
-        const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
-
-        if (!scriptUrl) {
-            console.error('[saveUser] Missing APPS_SCRIPT_URL');
-            return;
-        }
-
-        const response = await fetch(scriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                secret,
-                action: 'saveUser',
-                user
-            }),
-        });
-
-        const result = await response.json();
-        console.log('[saveUser] Result:', result);
-    } catch (error) {
-        console.error('[saveUser] Error:', error);
-    }
-}
-
-// Hàm gọi Google Apps Script để lưu token
-async function saveTokenToSheet(tokenData: {
-    user_id: string;
     access_token: string;
-    token_type: string;
-    expires_at?: string;
+    token_type?: string;
+    token_expires_at?: string;
 }) {
     try {
         const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
         const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
 
         if (!scriptUrl) {
-            console.error('[saveToken] Missing APPS_SCRIPT_URL');
+            console.error('[saveTaiKhoan] Missing APPS_SCRIPT_URL');
             return;
         }
 
@@ -55,17 +25,19 @@ async function saveTokenToSheet(tokenData: {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 secret,
-                action: 'saveToken',
-                ...tokenData
+                action: 'saveTaiKhoan',
+                ...data
             }),
         });
 
         const result = await response.json();
-        console.log('[saveToken] Result:', result);
+        console.log('[saveTaiKhoan] Result:', result);
+        return result;
     } catch (error) {
-        console.error('[saveToken] Error:', error);
+        console.error('[saveTaiKhoan] Error:', error);
     }
 }
+
 
 export const authOptions: AuthOptions = {
     providers: [
@@ -113,29 +85,24 @@ export const authOptions: AuthOptions = {
             return session;
         },
         async signIn({ user, account, profile }) {
-            // Lưu user và token vào Google Sheets khi đăng nhập thành công
+            // Lưu TaiKhoan (user + token combined) vào Google Sheets
             if (account?.provider === "facebook" && account.access_token) {
-                // Lưu user info
-                await saveUserToSheet({
+                const tokenExpiresAt = account.expires_at
+                    ? new Date(account.expires_at * 1000).toISOString()
+                    : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // Default 60 days
+
+                // Gộp user info + token vào 1 call duy nhất
+                await saveTaiKhoanToSheet({
                     fb_user_id: account.providerAccountId,
                     name: user.name || '',
                     email: user.email || '',
                     avatar: user.image || '',
-                });
-
-                // Lưu token với userId = "default" để các API route có thể dùng
-                const expiresAt = account.expires_at
-                    ? new Date(account.expires_at * 1000).toISOString()
-                    : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // Default 60 days
-
-                await saveTokenToSheet({
-                    user_id: 'default', // Dùng 'default' để match với getValidAccessToken
                     access_token: account.access_token,
                     token_type: account.token_type || 'bearer',
-                    expires_at: expiresAt,
+                    token_expires_at: tokenExpiresAt,
                 });
 
-                console.log('[NextAuth] Saved user and token for:', user.name);
+                console.log('[NextAuth] Saved TaiKhoan for:', user.name);
             }
             return true;
         },

@@ -557,12 +557,32 @@ export default function DashboardPage() {
                                 zIndex: 1000,
                                 overflow: 'hidden',
                             }}>
-                                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}` }}>
-                                    <div style={{ fontSize: '12px', color: colors.textMuted }}>Tài khoản</div>
-                                    <div style={{ fontSize: '13px', color: colors.text, marginTop: '4px' }}>
-                                        {session?.user?.email || 'Facebook'}
-                                    </div>
-                                </div>
+                                {/* VIP Upgrade Button */}
+                                <button
+                                    onClick={() => alert('Tính năng nâng cấp VIP sẽ sớm ra mắt!')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: colors.primary,
+                                        fontSize: '13px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        borderBottom: `1px solid ${colors.border}`,
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(246,190,79,0.1)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                                    </svg>
+                                    Nâng cấp VIP
+                                </button>
+                                {/* Logout */}
                                 <button
                                     onClick={() => signOut({ callbackUrl: '/' })}
                                     style={{

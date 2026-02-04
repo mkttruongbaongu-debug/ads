@@ -55,11 +55,28 @@ interface Props {
     formatMoney: (n: number) => string;
 }
 
+// CEX Trading Design System - Exact Colors
+const colors = {
+    primary: '#F0B90B',
+    primaryHover: '#FCD535',
+    accent: '#0ECB81',
+    success: '#0ECB81',
+    error: '#F6465D',
+    warning: '#F0B90B',
+    bg: '#0B0E11',
+    bgAlt: '#1E2329',
+    bgCard: '#181A20',
+    text: '#EAECEF',
+    textMuted: '#848E9C',
+    textSubtle: '#5E6673',
+    border: '#2B3139',
+};
+
 const styles = {
     overlay: {
         position: 'fixed' as const,
         inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(0,0,0,0.7)',
         display: 'flex',
         justifyContent: 'flex-end',
         zIndex: 50,
@@ -67,14 +84,14 @@ const styles = {
     panel: {
         width: '100%',
         maxWidth: '650px',
-        background: '#ffffff',
+        background: colors.bgCard,
         height: '100%',
         overflowY: 'auto' as const,
-        boxShadow: '-4px 0 20px rgba(0,0,0,0.1)',
+        boxShadow: '-4px 0 20px rgba(0,0,0,0.3)',
     },
     header: {
         padding: '20px 24px 0',
-        borderBottom: '1px solid #e4e4e7',
+        borderBottom: `1px solid ${colors.border}`,
     },
     headerRow: {
         display: 'flex',
@@ -85,7 +102,7 @@ const styles = {
     title: {
         fontSize: '1.25rem',
         fontWeight: 700,
-        color: '#18181b',
+        color: colors.text,
         margin: '0 0 4px',
     },
     closeBtn: {
@@ -93,7 +110,7 @@ const styles = {
         border: 'none',
         fontSize: '1.5rem',
         cursor: 'pointer',
-        color: '#71717a',
+        color: colors.textMuted,
         padding: '4px',
     },
     tabs: {
@@ -106,14 +123,14 @@ const styles = {
         background: 'transparent',
         fontSize: '0.875rem',
         fontWeight: 500,
-        color: '#71717a',
+        color: colors.textMuted,
         cursor: 'pointer',
         borderBottom: '2px solid transparent',
         transition: 'all 0.2s',
     },
     tabActive: {
-        color: '#18181b',
-        borderBottomColor: '#18181b',
+        color: colors.primary,
+        borderBottomColor: colors.primary,
     },
     content: {
         padding: '24px',
@@ -124,7 +141,7 @@ const styles = {
     sectionTitle: {
         fontSize: '0.875rem',
         fontWeight: 600,
-        color: '#18181b',
+        color: colors.text,
         marginBottom: '12px',
         textTransform: 'uppercase' as const,
         letterSpacing: '0.05em',
@@ -135,26 +152,28 @@ const styles = {
         gap: '12px',
     },
     metricCard: {
-        background: '#f4f4f5',
+        background: colors.bgAlt,
         borderRadius: '8px',
         padding: '12px',
+        border: `1px solid ${colors.border}`,
     },
     metricLabel: {
         fontSize: '0.75rem',
-        color: '#71717a',
+        color: colors.textMuted,
         margin: '0 0 4px',
     },
     metricValue: {
         fontSize: '1.125rem',
         fontWeight: 600,
-        color: '#18181b',
+        color: colors.text,
         margin: 0,
+        fontFamily: '"JetBrains Mono", monospace',
     },
     aiButton: {
         width: '100%',
         padding: '14px',
-        background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-        color: 'white',
+        background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryHover})`,
+        color: colors.bg,
         border: 'none',
         borderRadius: '10px',
         fontSize: '1rem',
@@ -166,15 +185,15 @@ const styles = {
         gap: '8px',
     },
     aiResult: {
-        background: '#f8f7ff',
+        background: colors.bgAlt,
         borderRadius: '12px',
         padding: '20px',
-        border: '1px solid #e9e5ff',
+        border: `1px solid ${colors.border}`,
     },
     aiSummary: {
         fontSize: '1rem',
         fontWeight: 600,
-        color: '#18181b',
+        color: colors.text,
         margin: '0 0 12px',
         lineHeight: 1.5,
     },
@@ -184,19 +203,19 @@ const styles = {
     aiBlockTitle: {
         fontSize: '0.75rem',
         fontWeight: 600,
-        color: '#6366f1',
+        color: colors.primary,
         margin: '0 0 6px',
         textTransform: 'uppercase' as const,
     },
     aiBlockContent: {
         fontSize: '0.875rem',
-        color: '#52525b',
+        color: colors.textMuted,
         margin: 0,
         lineHeight: 1.6,
     },
     actionBox: {
-        background: '#ecfdf5',
-        border: '1px solid #a7f3d0',
+        background: 'rgba(14, 203, 129, 0.1)',
+        border: `1px solid rgba(14, 203, 129, 0.3)`,
         borderRadius: '8px',
         padding: '12px',
         marginBottom: '8px',
@@ -204,18 +223,18 @@ const styles = {
     actionLabel: {
         fontSize: '0.75rem',
         fontWeight: 600,
-        color: '#059669',
+        color: colors.success,
         margin: '0 0 4px',
     },
     actionContent: {
         fontSize: '0.875rem',
-        color: '#065f46',
+        color: colors.text,
         margin: 0,
     },
     loader: {
         textAlign: 'center' as const,
         padding: '40px',
-        color: '#6366f1',
+        color: colors.primary,
     },
     confidence: {
         display: 'inline-block',
@@ -229,17 +248,17 @@ const styles = {
         display: 'flex',
         gap: '16px',
         padding: '16px',
-        background: '#f9fafb',
+        background: colors.bgAlt,
         borderRadius: '12px',
         marginBottom: '12px',
-        border: '1px solid #e5e7eb',
+        border: `1px solid ${colors.border}`,
     },
     adThumbnail: {
         width: '80px',
         height: '80px',
         borderRadius: '8px',
         objectFit: 'cover' as const,
-        background: '#e5e7eb',
+        background: colors.border,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -253,7 +272,7 @@ const styles = {
     adName: {
         fontSize: '0.9375rem',
         fontWeight: 600,
-        color: '#18181b',
+        color: colors.text,
         margin: '0 0 8px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -266,7 +285,7 @@ const styles = {
     },
     adMetric: {
         fontSize: '0.8125rem',
-        color: '#52525b',
+        color: colors.textMuted,
     },
     adBadge: {
         display: 'inline-block',
@@ -376,7 +395,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     <div style={styles.headerRow}>
                         <div>
                             <h2 style={styles.title}>{campaign.name}</h2>
-                            <p style={{ fontSize: '0.875rem', color: '#71717a', margin: 0 }}>
+                            <p style={{ fontSize: '0.875rem', color: colors.textMuted, margin: 0 }}>
                                 {dateRange.startDate} → {dateRange.endDate}
                             </p>
                         </div>
@@ -449,8 +468,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         <div
                                             key={idx}
                                             style={{
-                                                background: issue.severity === 'critical' ? '#fef2f2' : '#fffbeb',
-                                                border: `1px solid ${issue.severity === 'critical' ? '#fecaca' : '#fde68a'}`,
+                                                background: issue.severity === 'critical' ? 'rgba(246, 70, 93, 0.1)' : 'rgba(240, 185, 11, 0.1)',
+                                                border: `1px solid ${issue.severity === 'critical' ? 'rgba(246, 70, 93, 0.3)' : 'rgba(240, 185, 11, 0.3)'}`,
                                                 borderRadius: '8px',
                                                 padding: '12px',
                                                 marginBottom: '8px',
@@ -458,15 +477,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         >
                                             <p style={{
                                                 fontWeight: 600,
-                                                color: issue.severity === 'critical' ? '#dc2626' : '#d97706',
+                                                color: issue.severity === 'critical' ? colors.error : colors.warning,
                                                 margin: '0 0 4px',
                                             }}>
                                                 {issue.message}
                                             </p>
-                                            <p style={{ fontSize: '0.875rem', color: '#52525b', margin: '0 0 8px' }}>
+                                            <p style={{ fontSize: '0.875rem', color: colors.textMuted, margin: '0 0 8px' }}>
                                                 {issue.detail}
                                             </p>
-                                            <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#059669', margin: 0 }}>
+                                            <p style={{ fontSize: '0.875rem', fontWeight: 500, color: colors.success, margin: 0 }}>
                                                 → {issue.action}
                                             </p>
                                         </div>
@@ -655,6 +674,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

@@ -94,7 +94,7 @@ NGUYÊN TẮC PHÂN TÍCH:
    - Không dùng từ ngữ marketing sáo rỗng
    - Nói thẳng vào vấn đề
 
-FORMAT OUTPUT:
+QUAN TRỌNG: Trả về kết quả dưới dạng JSON với format sau:
 {
   "summary": "Tóm tắt 1-2 câu vấn đề chính",
   "diagnosis": "Nguyên nhân gốc rễ",

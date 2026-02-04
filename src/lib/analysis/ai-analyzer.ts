@@ -295,5 +295,5 @@ Hãy phân tích theo 4 chiều (Tài chính, Content, Audience, Trend) và đư
 
 function formatMoney(amount: number): string {
     const rounded = Math.round(amount);
-    return rounded.toLocaleString('de-DE') + ' VNĐ';
+    return rounded.toLocaleString('de-DE') + 'đ';
 }

@@ -528,11 +528,11 @@ export function getRecommendedAction(
 }
 
 /**
- * Format tiền VND - làm tròn và dùng dấu chấm phân cách: 3.400.000 VNĐ
+ * Format tiền VND - làm tròn và dùng dấu chấm phân cách: 3.400.000đ
  */
 function formatMoney(amount: number): string {
     const rounded = Math.round(amount);
-    return rounded.toLocaleString('de-DE') + ' VNĐ';
+    return rounded.toLocaleString('de-DE') + 'đ';
 }
 
 /**

@@ -410,9 +410,9 @@ export default function DashboardPage() {
     }
 
     const formatMoney = (amount: number) => {
-        // Làm tròn số và hiển thị với dấu chấm phân cách: 3.400.000 VNĐ
+        // Làm tròn số và hiển thị với dấu chấm phân cách: 3.400.000đ
         const rounded = Math.round(amount);
-        return rounded.toLocaleString('de-DE') + ' VNĐ';
+        return rounded.toLocaleString('de-DE') + 'đ';
     };
 
     return (

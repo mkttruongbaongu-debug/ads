@@ -6,27 +6,33 @@ const FB_API_VERSION = 'v21.0';
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
 export async function GET(request: NextRequest) {
+    console.log('[ANALYSIS/DAILY] 🔍 Starting...');
     try {
         const searchParams = request.nextUrl.searchParams;
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const accountId = searchParams.get('accountId');
+        console.log('[ANALYSIS/DAILY] 📅 Params:', { startDate, endDate, accountId });
 
         if (!startDate || !endDate) {
+            console.warn('[ANALYSIS/DAILY] ⚠️ Missing dates');
             return NextResponse.json(
                 { success: false, error: 'startDate and endDate are required' },
                 { status: 400 }
             );
         }
 
+        console.log('[ANALYSIS/DAILY] 🔑 Getting access token...');
         const tokenResult = await getValidAccessToken();
         if (!tokenResult.accessToken) {
+            console.error('[ANALYSIS/DAILY] ❌ No valid token');
             return NextResponse.json(
                 { success: false, error: tokenResult.error || 'No valid Facebook access token', needsLogin: true },
                 { status: 401 }
             );
         }
         const accessToken = tokenResult.accessToken;
+        console.log('[ANALYSIS/DAILY] ✅ Token OK');
 
         // Get ad accounts if not specified
         let adAccountId = accountId;
@@ -54,7 +60,7 @@ export async function GET(request: NextRequest) {
             adAccountId = activeAccount.id;
         }
 
-        // Fetch all campaigns with daily insights
+        console.log('[ANALYSIS/DAILY] 📡 Fetching campaigns from Facebook...');
         const campaignsRes = await fetch(
             `${FB_API_BASE}/${adAccountId}/campaigns?` +
             `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
@@ -63,8 +69,10 @@ export async function GET(request: NextRequest) {
         );
 
         const campaignsData = await campaignsRes.json();
+        console.log('[ANALYSIS/DAILY] 📦 Got', campaignsData.data?.length || 0, 'campaigns from Facebook');
 
         if (campaignsData.error) {
+            console.error('[ANALYSIS/DAILY] ❌ Facebook error:', campaignsData.error.message);
             return NextResponse.json(
                 { success: false, error: campaignsData.error.message },
                 { status: 400 }
@@ -154,9 +162,16 @@ export async function GET(request: NextRequest) {
         const activeCampaigns = campaigns.filter(c =>
             c.status === 'ACTIVE' && c.totals.spend > 0
         );
+        console.log('[ANALYSIS/DAILY] 🎯 Active campaigns with spend:', activeCampaigns.length);
 
         // Analyze campaigns
+        console.log('[ANALYSIS/DAILY] 🧠 Running pattern analysis...');
         const analysisResult = analyzeCampaigns(activeCampaigns);
+        console.log('[ANALYSIS/DAILY] ✅ Analysis complete:', {
+            critical: analysisResult.critical.length,
+            warning: analysisResult.warning.length,
+            good: analysisResult.good.length,
+        });
 
         return NextResponse.json({
             success: true,
@@ -170,7 +185,7 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('Daily analysis error:', error);
+        console.error('[ANALYSIS/DAILY] ❌ Fatal error:', error);
         return NextResponse.json(
             { success: false, error: 'Internal server error' },
             { status: 500 }

@@ -359,20 +359,26 @@ export default function DashboardPage() {
 
     // Fetch ad accounts
     const fetchAccounts = useCallback(async () => {
+        console.log('[DASHBOARD] 🔍 Fetching accounts...');
         setIsLoadingAccounts(true);
         try {
             const res = await fetch('/api/facebook/accounts');
             const json = await res.json();
+            console.log('[DASHBOARD] 📦 Accounts response:', json);
             if (json.success && json.data) {
                 setAccounts(json.data);
+                console.log('[DASHBOARD] ✅ Loaded', json.data.length, 'accounts, source:', json.source);
                 // Auto-select first active account
                 const firstActive = json.data.find((a: AdAccount) => a.isActive);
                 if (firstActive && !selectedAccountId) {
                     setSelectedAccountId(firstActive.id);
+                    console.log('[DASHBOARD] 🎯 Auto-selected account:', firstActive.name);
                 }
+            } else {
+                console.warn('[DASHBOARD] ⚠️ No accounts data:', json);
             }
         } catch (err) {
-            console.error('Failed to fetch accounts:', err);
+            console.error('[DASHBOARD] ❌ Failed to fetch accounts:', err);
         } finally {
             setIsLoadingAccounts(false);
         }
@@ -385,10 +391,12 @@ export default function DashboardPage() {
         setError(null);
 
         try {
+            console.log('[DASHBOARD] 🚀 Fetching analysis...', { startDate, endDate, selectedAccountId });
             const res = await fetch(
                 `/api/analysis/daily?startDate=${startDate}&endDate=${endDate}&accountId=${selectedAccountId}`
             );
             const json = await res.json();
+            console.log('[DASHBOARD] 📊 Analysis response:', json.success ? `${json.data?.summary?.total || 0} campaigns` : json.error);
 
             if (!json.success) {
                 if (json.needsLogin) {
@@ -399,7 +407,9 @@ export default function DashboardPage() {
             }
 
             setData(json.data);
+            console.log('[DASHBOARD] ✅ Analysis loaded:', json.data?.summary);
         } catch (err) {
+            console.error('[DASHBOARD] ❌ Analysis error:', err);
             setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
         } finally {
             setIsLoading(false);
@@ -411,6 +421,7 @@ export default function DashboardPage() {
 
     // Handle search button click
     const handleSearch = useCallback(() => {
+        console.log('[DASHBOARD] 🔘 Tra cứu clicked');
         setHasSearched(true);
         fetchData();
     }, [fetchData]);

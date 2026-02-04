@@ -247,6 +247,77 @@ export async function GET(request: NextRequest) {
             return a.campaign_name.localeCompare(b.campaign_name);
         });
 
+        // ========================================
+        // SAVE TO SHEET: DuLieuQuangCao
+        // ========================================
+        try {
+            const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
+            const APPS_SCRIPT_SECRET = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
+            if (APPS_SCRIPT_URL && APPS_SCRIPT_SECRET) {
+                // Get fb_user_id from TaiKhoan
+                const getTaiKhoanUrl = new URL(APPS_SCRIPT_URL);
+                getTaiKhoanUrl.searchParams.set('secret', APPS_SCRIPT_SECRET);
+                getTaiKhoanUrl.searchParams.set('action', 'getTaiKhoan');
+                getTaiKhoanUrl.searchParams.set('fb_user_id', 'first');
+
+                const taiKhoanRes = await fetch(getTaiKhoanUrl.toString());
+                const taiKhoanData = await taiKhoanRes.json();
+
+                if (taiKhoanData.success && taiKhoanData.found && taiKhoanData.data?.fb_user_id) {
+                    // Transform dailyData to DuLieuQuangCao format
+                    const rows = dailyData.map(d => ({
+                        ad_account_id: accountId,
+                        campaign_id: d.campaign_id,
+                        date: d.date,
+                        campaign_name: d.campaign_name,
+                        status: d.status,
+                        objective: d.objective,
+                        spend: d.spend,
+                        impressions: d.impressions,
+                        reach: d.reach,
+                        frequency: d.frequency,
+                        clicks: d.clicks,
+                        link_clicks: d.link_clicks,
+                        ctr: d.ctr,
+                        cpc: d.cpc,
+                        cpm: d.cpm,
+                        purchases: d.purchases,
+                        revenue: d.purchase_value,
+                        cpp: d.cost_per_purchase,
+                        roas: d.roas,
+                        landing_page_views: d.landing_page_views,
+                        video_views_3s: d.video_p25 || 0, // Using P25 as proxy for 3s view
+                        video_thruplay: d.video_thruplay,
+                        video_completion_rate: d.video_completion_rate,
+                        post_reactions: d.reactions,
+                        post_comments: d.comments,
+                        post_shares: d.saves, // Using saves as proxy
+                        post_engagement: d.post_engagement,
+                        quality_ranking: '', // Not available in basic API
+                        engagement_rate_ranking: '',
+                        conversion_rate_ranking: '',
+                    }));
+
+                    // Save to sheet
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            secret: APPS_SCRIPT_SECRET,
+                            action: 'saveDuLieuQuangCao',
+                            fb_user_id: taiKhoanData.data.fb_user_id,
+                            rows,
+                        }),
+                    });
+                    console.log('[INSIGHTS API] Saved', rows.length, 'rows to DuLieuQuangCao');
+                }
+            }
+        } catch (saveErr) {
+            console.error('[INSIGHTS API] Failed to save to DuLieuQuangCao:', saveErr);
+            // Don't throw - this is non-critical
+        }
+
         return NextResponse.json({
             success: true,
             data: dailyData,

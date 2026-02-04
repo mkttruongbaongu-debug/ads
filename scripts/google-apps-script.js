@@ -17,8 +17,9 @@ const CONFIG = {
     CAMPAIGNS_SHEET: 'Campaigns',
     ACCOUNTS_SHEET: 'Accounts',
     LOGS_SHEET: 'Logs',
-    TAI_KHOAN_SHEET: 'TaiKhoan',  // NEW: Gộp token + user + ad accounts cache
+    TAI_KHOAN_SHEET: 'TaiKhoan',  // Gộp token + user + ad accounts cache
     AI_USAGE_SHEET: 'AiUsage',
+    DU_LIEU_QUANG_CAO_SHEET: 'DuLieuQuangCao',  // NEW: Lưu full metrics theo ngày
 
     // API Secret (để bảo vệ endpoint)
     API_SECRET: 'tho-ads-ai-2026'
@@ -82,6 +83,29 @@ const HEADERS = {
         'cost_input_usd', 'cost_cached_usd', 'cost_output_usd', 'cost_total_usd',
         // Cost VND breakdown (để tính tiền)
         'cost_input_vnd', 'cost_cached_vnd', 'cost_output_vnd', 'cost_total_vnd'
+    ],
+    // NEW: Lưu trữ dữ liệu quảng cáo theo ngày để đối chiếu
+    DuLieuQuangCao: [
+        // Identity - dùng làm unique key
+        'fb_user_id', 'ad_account_id', 'campaign_id', 'date',
+        // Campaign Info
+        'campaign_name', 'status', 'objective',
+        // Spend & Reach
+        'spend', 'impressions', 'reach', 'frequency',
+        // Clicks & CTR
+        'clicks', 'link_clicks', 'ctr', 'cpc', 'cpm',
+        // Conversions
+        'purchases', 'revenue', 'cpp', 'roas',
+        // Landing Page
+        'landing_page_views',
+        // Content Quality - Video
+        'video_views_3s', 'video_thruplay', 'video_completion_rate',
+        // Content Quality - Engagement
+        'post_reactions', 'post_comments', 'post_shares', 'post_engagement',
+        // Ad Relevance Diagnostics
+        'quality_ranking', 'engagement_rate_ranking', 'conversion_rate_ranking',
+        // Timestamps
+        'created_at', 'updated_at'
     ]
 };
 
@@ -167,6 +191,11 @@ function doPost(e) {
                 return fixHeaders(data);
             case 'logAiUsage':
                 return logAiUsage(data);
+            // NEW: DuLieuQuangCao management
+            case 'saveDuLieuQuangCao':
+                return saveDuLieuQuangCao(data);
+            case 'getDuLieuQuangCao':
+                return getDuLieuQuangCao(data);
             default:
                 return createResponse({ success: false, error: 'Unknown action: ' + action });
         }
@@ -1256,6 +1285,153 @@ function saveAdAccounts(data) {
         }
 
         return createResponse({ success: false, error: 'User not found, please saveTaiKhoan first' });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+// ==================== DU LIEU QUANG CAO MANAGEMENT ====================
+
+/**
+ * Lưu dữ liệu quảng cáo với upsert logic
+ * Unique key: ad_account_id + campaign_id + date
+ * Nếu đã tồn tại -> ghi đè, chưa có -> tạo mới
+ * 
+ * @param {Object} data - {
+ *   fb_user_id: string,
+ *   rows: Array<{
+ *     ad_account_id, campaign_id, date, campaign_name, status, objective,
+ *     spend, impressions, reach, frequency, clicks, link_clicks, ctr, cpc, cpm,
+ *     purchases, revenue, cpp, roas, landing_page_views,
+ *     video_views_3s, video_thruplay, video_completion_rate,
+ *     post_reactions, post_comments, post_shares, post_engagement,
+ *     quality_ranking, engagement_rate_ranking, conversion_rate_ranking
+ *   }>
+ * }
+ */
+function saveDuLieuQuangCao(data) {
+    try {
+        const { fb_user_id, rows } = data;
+        if (!fb_user_id || !rows || !Array.isArray(rows)) {
+            return createResponse({ success: false, error: 'Missing fb_user_id or rows array' });
+        }
+
+        const sheet = getOrCreateSheet(CONFIG.DU_LIEU_QUANG_CAO_SHEET);
+        ensureHeaders(sheet, 'DuLieuQuangCao');
+
+        const headers = HEADERS.DuLieuQuangCao;
+        const allData = sheet.getDataRange().getValues();
+        const now = new Date().toISOString();
+
+        // Build index for existing rows: key = "ad_account_id|campaign_id|date"
+        const existingIndex = {};
+        const adAccountIdx = headers.indexOf('ad_account_id');
+        const campaignIdx = headers.indexOf('campaign_id');
+        const dateIdx = headers.indexOf('date');
+
+        for (let i = 1; i < allData.length; i++) {
+            const key = `${allData[i][adAccountIdx]}|${allData[i][campaignIdx]}|${allData[i][dateIdx]}`;
+            existingIndex[key] = i + 1; // 1-indexed row number
+        }
+
+        let inserted = 0;
+        let updated = 0;
+
+        for (const row of rows) {
+            const key = `${row.ad_account_id}|${row.campaign_id}|${row.date}`;
+
+            // Build row data following headers order
+            const rowData = headers.map(h => {
+                switch (h) {
+                    case 'fb_user_id': return fb_user_id;
+                    case 'created_at': return existingIndex[key] ? allData[existingIndex[key] - 1][headers.indexOf('created_at')] : now;
+                    case 'updated_at': return now;
+                    default: return row[h] !== undefined ? row[h] : '';
+                }
+            });
+
+            if (existingIndex[key]) {
+                // Update existing row
+                sheet.getRange(existingIndex[key], 1, 1, rowData.length).setValues([rowData]);
+                updated++;
+            } else {
+                // Append new row
+                sheet.appendRow(rowData);
+                inserted++;
+            }
+        }
+
+        logAction('saveDuLieuQuangCao', fb_user_id, '', rows.length, 'success',
+            `Inserted: ${inserted}, Updated: ${updated}`);
+
+        return createResponse({
+            success: true,
+            inserted,
+            updated,
+            total: rows.length
+        });
+    } catch (error) {
+        return createResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Lấy dữ liệu quảng cáo theo filters
+ * @param {Object} params - { fb_user_id, ad_account_id?, campaign_id?, start_date?, end_date? }
+ */
+function getDuLieuQuangCao(params) {
+    try {
+        const { fb_user_id, ad_account_id, campaign_id, start_date, end_date } = params;
+
+        if (!fb_user_id) {
+            return createResponse({ success: false, error: 'Missing fb_user_id' });
+        }
+
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.DU_LIEU_QUANG_CAO_SHEET);
+        if (!sheet) {
+            return createResponse({ success: true, data: [], message: 'Sheet not found' });
+        }
+
+        const allData = sheet.getDataRange().getValues();
+        if (allData.length <= 1) {
+            return createResponse({ success: true, data: [], message: 'No data' });
+        }
+
+        const headers = allData[0];
+        const fbUserIdIdx = headers.indexOf('fb_user_id');
+        const adAccountIdIdx = headers.indexOf('ad_account_id');
+        const campaignIdIdx = headers.indexOf('campaign_id');
+        const dateIdx = headers.indexOf('date');
+
+        const results = [];
+        for (let i = 1; i < allData.length; i++) {
+            const row = allData[i];
+
+            // Filter by fb_user_id
+            if (String(row[fbUserIdIdx]) !== String(fb_user_id)) continue;
+
+            // Filter by ad_account_id if provided
+            if (ad_account_id && String(row[adAccountIdIdx]) !== String(ad_account_id)) continue;
+
+            // Filter by campaign_id if provided
+            if (campaign_id && String(row[campaignIdIdx]) !== String(campaign_id)) continue;
+
+            // Filter by date range if provided
+            const rowDate = row[dateIdx];
+            if (start_date && rowDate < start_date) continue;
+            if (end_date && rowDate > end_date) continue;
+
+            // Build object
+            const obj = {};
+            headers.forEach((h, idx) => obj[h] = row[idx]);
+            results.push(obj);
+        }
+
+        return createResponse({
+            success: true,
+            data: results,
+            count: results.length
+        });
     } catch (error) {
         return createResponse({ success: false, error: error.message });
     }

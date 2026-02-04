@@ -1166,8 +1166,12 @@ function getTaiKhoan(params) {
         const headers = allData[0];
         const userIdIdx = headers.indexOf('fb_user_id');
 
+        // If fbUserId is 'first', get first available user (row 2)
+        const targetRowIdx = (fbUserId === 'first' && allData.length > 1) ? 1 : null;
+
         for (let i = 1; i < allData.length; i++) {
-            if (allData[i][userIdIdx] === fbUserId) {
+            // Match specific user OR return first if 'first' requested
+            if (allData[i][userIdIdx] === fbUserId || (targetRowIdx !== null && i === targetRowIdx)) {
                 const row = allData[i];
                 const obj = {};
                 headers.forEach((h, idx) => obj[h] = row[idx]);

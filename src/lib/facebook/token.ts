@@ -13,25 +13,29 @@ export interface TokenResult {
 }
 
 /**
- * Lấy access token hợp lệ: ưu tiên Sheets, fallback về .env
+ * Lấy access token hợp lệ: ưu tiên Sheets (TaiKhoan), fallback về .env
+ * @param userId - Facebook user ID (optional, sẽ lấy từ sheet nếu không truyền)
  */
-export async function getValidAccessToken(): Promise<TokenResult> {
+export async function getValidAccessToken(userId?: string): Promise<TokenResult> {
     try {
-        // Try to get token from Sheets first
+        // Try to get token from TaiKhoan sheet first
         const url = new URL(APPS_SCRIPT_URL!);
         url.searchParams.set('secret', APPS_SCRIPT_SECRET!);
-        url.searchParams.set('action', 'getToken');
-        url.searchParams.set('userId', 'default');
+        url.searchParams.set('action', 'getTaiKhoan');
+
+        // Use provided userId or 'first' to get first available user
+        url.searchParams.set('fb_user_id', userId || 'first');
 
         const response = await fetch(url.toString());
         const result = await response.json();
 
-        if (result.success && result.hasToken && !result.isExpired) {
+        // TaiKhoan returns: { success, found, data: { access_token, is_token_expired, ... } }
+        if (result.success && result.found && result.data?.access_token && !result.data.is_token_expired) {
             return {
-                accessToken: result.token.access_token,
+                accessToken: result.data.access_token,
                 source: 'sheets',
                 isExpired: false,
-                expiresAt: result.token.expires_at,
+                expiresAt: result.data.token_expires_at || null,
             };
         }
 
@@ -66,9 +70,9 @@ export async function getValidAccessToken(): Promise<TokenResult> {
         return {
             accessToken: null,
             source: 'none',
-            isExpired: result.isExpired || false,
-            expiresAt: result.token?.expires_at || null,
-            error: result.isExpired ? 'Token expired' : 'No token found',
+            isExpired: result.data?.is_token_expired || false,
+            expiresAt: result.data?.token_expires_at || null,
+            error: result.data?.is_token_expired ? 'Token expired' : 'No token found',
         };
 
     } catch (error) {

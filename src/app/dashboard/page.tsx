@@ -757,6 +757,118 @@ export default function DashboardPage() {
                                 </div>
                             </div>
 
+                            {/* Campaign Table View (like landing demo) */}
+                            <div style={{
+                                background: colors.bgCard,
+                                borderRadius: '8px',
+                                border: `1px solid ${colors.border}`,
+                                marginBottom: '28px',
+                                overflow: 'hidden',
+                            }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                        <tr>
+                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Chiến dịch
+                                            </th>
+                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Chi tiêu
+                                            </th>
+                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                ROAS
+                                            </th>
+                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                CTR
+                                            </th>
+                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Đề xuất AI
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
+                                            const action = campaign.actionRecommendation?.action || 'WATCH';
+                                            const actionLabel = action === 'STOP' ? 'Dừng' : action === 'WATCH' ? 'Tối ưu' : 'Scale';
+                                            const actionColor = action === 'STOP' ? colors.error : action === 'WATCH' ? colors.warning : colors.success;
+                                            const statusIcon = action === 'SCALE' ? '✓' : action === 'WATCH' ? '!' : '✕';
+                                            const roasValue = campaign.totals.roas;
+                                            const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
+
+                                            return (
+                                                <tr
+                                                    key={campaign.id}
+                                                    onClick={() => setSelectedCampaign(campaign)}
+                                                    style={{
+                                                        borderBottom: `1px solid ${colors.border}`,
+                                                        cursor: 'pointer',
+                                                        transition: 'background 0.15s',
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                >
+                                                    <td style={{ padding: '16px 20px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                borderRadius: '50%',
+                                                                background: actionColor,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontSize: '0.85rem',
+                                                                fontWeight: 700,
+                                                                color: colors.bg,
+                                                            }}>
+                                                                {statusIcon}
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem' }}>
+                                                                    {campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}
+                                                                </div>
+                                                                <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                                    {campaign.id}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
+                                                            {formatMoney(campaign.totals.spend)}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
+                                                            {roasValue.toFixed(1)}x
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
+                                                            {campaign.totals.ctr.toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                        <button style={{
+                                                            background: actionColor,
+                                                            color: action === 'WATCH' ? colors.bg : '#fff',
+                                                            border: 'none',
+                                                            padding: '6px 16px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.8rem',
+                                                            cursor: 'pointer',
+                                                            transition: 'opacity 0.15s',
+                                                        }}>
+                                                            {actionLabel}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
                             {/* Critical Section */}
                             {filteredCritical.length > 0 && (
                                 <div style={styles.section}>

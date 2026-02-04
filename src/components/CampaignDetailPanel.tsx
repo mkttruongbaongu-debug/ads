@@ -49,10 +49,97 @@ interface Props {
             ctr: number;
         };
         issues: Issue[];
+        dailyMetrics?: Array<{
+            date: string;
+            spend: number;
+            purchases: number;
+            cpp: number;
+            ctr: number;
+        }>;
     };
     dateRange: { startDate: string; endDate: string };
     onClose: () => void;
     formatMoney: (n: number) => string;
+}
+
+// Mini Bar Chart Component for issue visualization
+function MiniBarChart({
+    data,
+    metricKey,
+    label,
+    formatValue,
+    highlightCondition
+}: {
+    data: Array<{ date: string;[key: string]: number | string }>;
+    metricKey: 'cpp' | 'ctr';
+    label: string;
+    formatValue: (v: number) => string;
+    highlightCondition?: (value: number, avgValue: number) => boolean;
+}) {
+    if (!data || data.length === 0) return null;
+
+    const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
+    const maxValue = Math.max(...values);
+    const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+
+    return (
+        <div style={{ marginTop: '16px' }}>
+            <p style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: colors.textMuted,
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+            }}>
+                📊 {label} qua {data.length} ngày
+            </p>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', height: '80px' }}>
+                {data.map((d, idx) => {
+                    const value = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
+                    const heightPercent = maxValue > 0 ? (value / maxValue) * 100 : 0;
+                    const isHighlighted = highlightCondition ? highlightCondition(value, avgValue) : false;
+
+                    return (
+                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div
+                                style={{
+                                    width: '100%',
+                                    height: `${Math.max(heightPercent, 5)}%`,
+                                    background: isHighlighted
+                                        ? 'linear-gradient(180deg, #F6465D, #F6465D80)'
+                                        : `linear-gradient(180deg, ${colors.primary}, ${colors.primary}80)`,
+                                    borderRadius: '4px 4px 0 0',
+                                    minHeight: '4px',
+                                    transition: 'height 0.3s ease',
+                                }}
+                                title={`${d.date}: ${formatValue(value)}`}
+                            />
+                            <span style={{
+                                fontSize: '0.6rem',
+                                color: colors.textSubtle,
+                                marginTop: '4px',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                {d.date.slice(5)} {/* MM-DD */}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '8px',
+                fontSize: '0.7rem',
+                color: colors.textMuted
+            }}>
+                <span>Thấp nhất: {formatValue(Math.min(...values))}</span>
+                <span>TB: {formatValue(avgValue)}</span>
+                <span>Cao nhất: {formatValue(maxValue)}</span>
+            </div>
+        </div>
+    );
 }
 
 // CEX Trading Design System - Exact Colors
@@ -302,6 +389,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
+    const [dailyTrend, setDailyTrend] = useState<Array<{
+        date: string;
+        spend: number;
+        purchases: number;
+        cpp: number;
+        ctr: number;
+    }>>([]);
 
     // Ads data
     const [ads, setAds] = useState<Ad[]>([]);
@@ -358,6 +452,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             }
 
             setAiAnalysis(json.data.aiAnalysis);
+            // Save daily trend for chart
+            if (json.data.dailyTrend) {
+                setDailyTrend(json.data.dailyTrend);
+            }
         } catch (error) {
             setAiError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
         } finally {
@@ -490,6 +588,31 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             </p>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* Mini Bar Chart for Issue Metrics */}
+                            {dailyTrend.length > 0 && campaign.issues.length > 0 && (
+                                <div style={styles.section}>
+                                    <h3 style={styles.sectionTitle}>📈 Biểu đồ chi tiết</h3>
+                                    {campaign.issues.some(i => i.type.toLowerCase().includes('cpp')) && (
+                                        <MiniBarChart
+                                            data={dailyTrend}
+                                            metricKey="cpp"
+                                            label="CPP (Chi phí/đơn)"
+                                            formatValue={(v) => formatMoney(v)}
+                                            highlightCondition={(value, avg) => value > avg * 1.2}
+                                        />
+                                    )}
+                                    {campaign.issues.some(i => i.type.toLowerCase().includes('ctr')) && (
+                                        <MiniBarChart
+                                            data={dailyTrend}
+                                            metricKey="ctr"
+                                            label="CTR (Click rate)"
+                                            formatValue={(v) => v.toFixed(2) + '%'}
+                                            highlightCondition={(value, avg) => value < avg * 0.8}
+                                        />
+                                    )}
                                 </div>
                             )}
 

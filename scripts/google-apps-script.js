@@ -1084,13 +1084,15 @@ function saveTaiKhoan(data) {
         const allData = sheet.getDataRange().getValues();
         const headers = allData[0] || HEADERS.TaiKhoan;
 
-        // Find existing row
+        // Find existing row - convert to string for safe comparison 
+        // (fb_user_id can be number or string depending on source)
         const userIdIdx = headers.indexOf('fb_user_id');
+        const fbUserIdStr = String(fbUserId);
         let existingRowIndex = -1;
         let existingRow = null;
 
         for (let i = 1; i < allData.length; i++) {
-            if (allData[i][userIdIdx] === fbUserId) {
+            if (String(allData[i][userIdIdx]) === fbUserIdStr) {
                 existingRowIndex = i + 1;
                 existingRow = allData[i];
                 break;
@@ -1168,10 +1170,11 @@ function getTaiKhoan(params) {
 
         // If fbUserId is 'first', get first available user (row 2)
         const targetRowIdx = (fbUserId === 'first' && allData.length > 1) ? 1 : null;
+        const fbUserIdStr = String(fbUserId);
 
         for (let i = 1; i < allData.length; i++) {
             // Match specific user OR return first if 'first' requested
-            if (allData[i][userIdIdx] === fbUserId || (targetRowIdx !== null && i === targetRowIdx)) {
+            if (String(allData[i][userIdIdx]) === fbUserIdStr || (targetRowIdx !== null && i === targetRowIdx)) {
                 const row = allData[i];
                 const obj = {};
                 headers.forEach((h, idx) => obj[h] = row[idx]);

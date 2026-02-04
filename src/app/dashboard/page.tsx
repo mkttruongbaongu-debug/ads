@@ -621,6 +621,12 @@ export default function DashboardPage() {
                                         {data.summary.critical}
                                     </p>
                                 </div>
+                                <div style={{ ...styles.summaryCard, borderLeft: `4px solid ${colors.warning}` }}>
+                                    <p style={styles.summaryLabel}>Theo dõi</p>
+                                    <p style={{ ...styles.summaryValue, color: colors.warning }}>
+                                        {data.summary.warning}
+                                    </p>
+                                </div>
                                 <div style={{ ...styles.summaryCard, borderLeft: '4px solid #4ade80' }}>
                                     <p style={styles.summaryLabel}>Đang tốt</p>
                                     <p style={{ ...styles.summaryValue, color: '#4ade80' }}>

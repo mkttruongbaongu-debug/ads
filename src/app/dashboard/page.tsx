@@ -603,35 +603,157 @@ export default function DashboardPage() {
                         ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
                         : data.good;
 
+                    // Calculate aggregate metrics
+                    const allCampaigns = [...data.critical, ...data.warning, ...data.good];
+                    const totalPurchases = allCampaigns.reduce((sum, c) => sum + c.totals.purchases, 0);
+                    const totalClicks = allCampaigns.reduce((sum, c) => sum + (c.totals.ctr > 0 ? c.totals.purchases / (c.totals.ctr / 100) : 0), 0);
+                    const avgRoas = data.summary.totalSpend > 0
+                        ? data.summary.totalRevenue / data.summary.totalSpend
+                        : 0;
+                    const avgAov = totalPurchases > 0
+                        ? data.summary.totalRevenue / totalPurchases
+                        : 0;
+                    const avgCvr = totalClicks > 0
+                        ? (totalPurchases / totalClicks) * 100
+                        : 0;
+
                     return (
                         <>
-                            {/* Summary Row */}
-                            <div style={styles.summaryRow}>
-                                <div style={styles.summaryCard}>
-                                    <p style={styles.summaryLabel}>Tổng chi tiêu</p>
-                                    <p style={styles.summaryValue}>{formatMoney(data.summary.totalSpend)}</p>
+                            {/* CEX Trading Stats Panel */}
+                            <div style={{ marginBottom: '24px' }}>
+                                {/* Primary Row: Financial Metrics */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                    gap: '16px',
+                                    marginBottom: '12px',
+                                }}>
+                                    {/* Spend Card */}
+                                    <div style={{
+                                        background: colors.bgCard,
+                                        borderRadius: '8px',
+                                        padding: '20px 24px',
+                                        border: `1px solid ${colors.border}`,
+                                    }}>
+                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                            Tổng chi tiêu
+                                        </p>
+                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {formatMoney(data.summary.totalSpend)}
+                                        </p>
+                                    </div>
+
+                                    {/* Revenue Card */}
+                                    <div style={{
+                                        background: colors.bgCard,
+                                        borderRadius: '8px',
+                                        padding: '20px 24px',
+                                        border: `1px solid ${colors.border}`,
+                                    }}>
+                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                            Doanh thu
+                                        </p>
+                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {formatMoney(data.summary.totalRevenue)}
+                                        </p>
+                                    </div>
+
+                                    {/* ROAS Card - Highlighted */}
+                                    <div style={{
+                                        background: `linear-gradient(135deg, ${colors.bgCard} 0%, rgba(240,185,11,0.1) 100%)`,
+                                        borderRadius: '8px',
+                                        padding: '20px 24px',
+                                        border: `1px solid ${colors.primary}40`,
+                                    }}>
+                                        <p style={{ fontSize: '0.75rem', color: colors.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px', fontWeight: 600 }}>
+                                            ROAS
+                                        </p>
+                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.primary, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {avgRoas.toFixed(2)}x
+                                        </p>
+                                    </div>
                                 </div>
-                                <div style={styles.summaryCard}>
-                                    <p style={styles.summaryLabel}>Doanh thu</p>
-                                    <p style={styles.summaryValue}>{formatMoney(data.summary.totalRevenue)}</p>
-                                </div>
-                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #f87171' }}>
-                                    <p style={styles.summaryLabel}>Cần xử lý</p>
-                                    <p style={{ ...styles.summaryValue, color: '#f87171' }}>
-                                        {data.summary.critical}
-                                    </p>
-                                </div>
-                                <div style={{ ...styles.summaryCard, borderLeft: `4px solid ${colors.warning}` }}>
-                                    <p style={styles.summaryLabel}>Theo dõi</p>
-                                    <p style={{ ...styles.summaryValue, color: colors.warning }}>
-                                        {data.summary.warning}
-                                    </p>
-                                </div>
-                                <div style={{ ...styles.summaryCard, borderLeft: '4px solid #4ade80' }}>
-                                    <p style={styles.summaryLabel}>Đang tốt</p>
-                                    <p style={{ ...styles.summaryValue, color: '#4ade80' }}>
-                                        {data.summary.good}
-                                    </p>
+
+                                {/* Secondary Row: Performance + Campaign Counts */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(5, 1fr)',
+                                    gap: '12px',
+                                }}>
+                                    {/* CVR */}
+                                    <div style={{
+                                        background: 'rgba(255,255,255,0.02)',
+                                        borderRadius: '8px',
+                                        padding: '14px 18px',
+                                        border: `1px solid ${colors.border}`,
+                                    }}>
+                                        <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                            Tỷ lệ chốt
+                                        </p>
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {avgCvr.toFixed(2)}%
+                                        </p>
+                                    </div>
+
+                                    {/* AOV */}
+                                    <div style={{
+                                        background: 'rgba(255,255,255,0.02)',
+                                        borderRadius: '8px',
+                                        padding: '14px 18px',
+                                        border: `1px solid ${colors.border}`,
+                                    }}>
+                                        <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                            AOV
+                                        </p>
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {formatMoney(avgAov)}
+                                        </p>
+                                    </div>
+
+                                    {/* Critical Count */}
+                                    <div style={{
+                                        background: 'rgba(248,113,113,0.08)',
+                                        borderRadius: '8px',
+                                        padding: '14px 18px',
+                                        border: `1px solid rgba(248,113,113,0.3)`,
+                                    }}>
+                                        <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                            Cần xử lý
+                                        </p>
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {data.summary.critical}
+                                        </p>
+                                    </div>
+
+                                    {/* Warning Count */}
+                                    <div style={{
+                                        background: `rgba(240,185,11,0.08)`,
+                                        borderRadius: '8px',
+                                        padding: '14px 18px',
+                                        border: `1px solid rgba(240,185,11,0.3)`,
+                                    }}>
+                                        <p style={{ fontSize: '0.65rem', color: '#FCD535', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                            Theo dõi
+                                        </p>
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {data.summary.warning}
+                                        </p>
+                                    </div>
+
+                                    {/* Good Count */}
+                                    <div style={{
+                                        background: 'rgba(14,203,129,0.08)',
+                                        borderRadius: '8px',
+                                        padding: '14px 18px',
+                                        border: `1px solid rgba(14,203,129,0.3)`,
+                                    }}>
+                                        <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                            Đang tốt
+                                        </p>
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {data.summary.good}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 

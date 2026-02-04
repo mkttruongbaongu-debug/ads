@@ -69,12 +69,50 @@ const THRESHOLDS = {
 };
 
 /**
+ * Time Context - Xét ngày trong tháng/tuần để điều chỉnh đánh giá
+ */
+export interface TimeContext {
+    isEndOfMonth: boolean;  // Ngày 25-30/31
+    isWeekend: boolean;     // Thứ 7/CN
+    dayOfMonth: number;
+    dayOfWeek: number;      // 0 = CN, 6 = Thứ 7
+    contextNote: string;
+}
+
+export function getTimeContext(date?: Date): TimeContext {
+    const now = date || new Date();
+    const dayOfMonth = now.getDate();
+    const dayOfWeek = now.getDay();
+    const isEndOfMonth = dayOfMonth >= 25;
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    let contextNote = '';
+    if (isEndOfMonth) {
+        contextNote = '📅 Cuối tháng (người tiêu dùng hạn chế chi tiêu)';
+    }
+    if (isWeekend) {
+        contextNote = contextNote
+            ? contextNote + ' | 🎉 Weekend (F&B thường tăng đơn)'
+            : '🎉 Weekend (F&B thường tăng đơn)';
+    }
+
+    return {
+        isEndOfMonth,
+        isWeekend,
+        dayOfMonth,
+        dayOfWeek,
+        contextNote,
+    };
+}
+
+/**
  * Phát hiện tất cả issues của một campaign
  */
 export function detectIssues(campaign: CampaignData): Issue[] {
     const issues: Issue[] = [];
     const metrics = campaign.dailyMetrics;
     const totals = campaign.totals;
+    const timeContext = getTimeContext();
 
     if (metrics.length === 0) return issues;
 
@@ -90,7 +128,7 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         });
     }
 
-    // 2. CPP tăng liên tục
+    // 2. CPP tăng liên tục (điều chỉnh theo time context)
     if (metrics.length >= THRESHOLDS.CPP_INCREASE_DAYS) {
         const recentMetrics = metrics.slice(-THRESHOLDS.CPP_INCREASE_DAYS);
         const allIncreasing = recentMetrics.every((m, i) => {
@@ -104,12 +142,20 @@ export function detectIssues(campaign: CampaignData): Issue[] {
             const increase = ((lastCpp - firstCpp) / firstCpp) * 100;
 
             if (increase >= THRESHOLDS.CPP_INCREASE_PERCENT) {
+                // Giảm severity nếu cuối tháng
+                const severity = timeContext.isEndOfMonth ? 'info' : 'warning';
+                const contextNote = timeContext.isEndOfMonth
+                    ? ' [📅 Cuối tháng - có thể do hành vi tiêu dùng]'
+                    : '';
+
                 issues.push({
                     type: 'cpp_rising',
-                    severity: 'warning',
-                    message: 'CPP tăng liên tục',
-                    detail: `${THRESHOLDS.CPP_INCREASE_DAYS} ngày: ${formatMoney(firstCpp)} → ${formatMoney(lastCpp)} (+${increase.toFixed(0)}%)`,
-                    action: 'Thay content mới',
+                    severity,
+                    message: 'CPP tăng liên tục' + (timeContext.isEndOfMonth ? ' (cuối tháng)' : ''),
+                    detail: `${THRESHOLDS.CPP_INCREASE_DAYS} ngày: ${formatMoney(firstCpp)} → ${formatMoney(lastCpp)} (+${increase.toFixed(0)}%)${contextNote}`,
+                    action: timeContext.isEndOfMonth
+                        ? 'Theo dõi thêm, có thể ổn định đầu tháng sau'
+                        : 'Thay content mới',
                 });
             }
         }

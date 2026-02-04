@@ -530,33 +530,29 @@ export default function DashboardPage() {
                             )}
                         </button>
                     </div>
+
+                    {/* Campaign Filter - inline with other controls */}
+                    <div style={styles.controlGroup}>
+                        <span style={styles.controlLabel}>Lọc chiến dịch</span>
+                        <input
+                            type="text"
+                            placeholder="Tìm theo tên..."
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            style={{
+                                padding: '10px 14px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '10px',
+                                fontSize: '0.875rem',
+                                background: 'rgba(255,255,255,0.05)',
+                                color: 'white',
+                                outline: 'none',
+                                minWidth: '180px',
+                            }}
+                        />
+                    </div>
                 </div>
             </header>
-
-            {/* Filter Bar */}
-            <div style={{
-                background: 'rgba(255,255,255,0.02)',
-                padding: '16px 32px',
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-            }}>
-                <input
-                    type="text"
-                    placeholder="Lọc campaigns theo tên..."
-                    value={filterText}
-                    onChange={(e) => setFilterText(e.target.value)}
-                    style={{
-                        width: '100%',
-                        maxWidth: '400px',
-                        padding: '12px 18px',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '12px',
-                        fontSize: '0.875rem',
-                        background: 'rgba(255,255,255,0.05)',
-                        color: 'white',
-                        outline: 'none',
-                    }}
-                />
-            </div>
 
             {/* Main Content */}
             <main style={styles.main}>

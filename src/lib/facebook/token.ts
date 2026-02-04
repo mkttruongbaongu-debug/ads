@@ -26,11 +26,22 @@ export async function getValidAccessToken(userId?: string): Promise<TokenResult>
         // Use provided userId or 'first' to get first available user
         url.searchParams.set('fb_user_id', userId || 'first');
 
+        console.log('[TOKEN] Fetching from Apps Script:', url.toString().replace(/secret=[^&]+/, 'secret=***'));
+
         const response = await fetch(url.toString());
         const result = await response.json();
 
+        console.log('[TOKEN] Apps Script response:', JSON.stringify({
+            success: result.success,
+            found: result.found,
+            hasToken: !!result.data?.access_token,
+            isExpired: result.data?.is_token_expired,
+            error: result.error || result.message
+        }));
+
         // TaiKhoan returns: { success, found, data: { access_token, is_token_expired, ... } }
         if (result.success && result.found && result.data?.access_token && !result.data.is_token_expired) {
+            console.log('[TOKEN] Got valid token from Sheets');
             return {
                 accessToken: result.data.access_token,
                 source: 'sheets',

@@ -51,29 +51,14 @@ export async function getValidAccessToken(userId?: string): Promise<TokenResult>
         }
 
         // Sheets token expired or not found - fallback to .env
+        // Trust .env token without validation (to avoid slow Facebook API calls)
         if (FB_ACCESS_TOKEN_ENV) {
-            // Validate .env token with a simple API call
-            const validateRes = await fetch(
-                `https://graph.facebook.com/v19.0/me?access_token=${FB_ACCESS_TOKEN_ENV}`
-            );
-            const validateData = await validateRes.json();
-
-            if (!validateData.error) {
-                return {
-                    accessToken: FB_ACCESS_TOKEN_ENV,
-                    source: 'env',
-                    isExpired: false,
-                    expiresAt: null,
-                };
-            }
-
-            // .env token is also invalid
+            console.log('[TOKEN] Using .env token (fallback)');
             return {
-                accessToken: null,
-                source: 'none',
-                isExpired: true,
+                accessToken: FB_ACCESS_TOKEN_ENV,
+                source: 'env',
+                isExpired: false,
                 expiresAt: null,
-                error: validateData.error?.message || 'ENV token expired',
             };
         }
 

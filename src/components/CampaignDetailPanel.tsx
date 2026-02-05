@@ -117,7 +117,7 @@ function MiniBarChart({
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
             }}>
-                📊 {label} qua {data.length} ngày
+                {label} — {data.length} days
             </p>
             <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', height: `${chartHeight}px` }}>
                 {data.map((d, idx) => {
@@ -268,14 +268,19 @@ const styles = {
     },
     metricsGrid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '12px',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px',
     },
     metricCard: {
         background: colors.bgAlt,
         borderRadius: '8px',
-        padding: '12px',
+        padding: '16px',
         border: `1px solid ${colors.border}`,
+        transition: 'transform 0.2s ease, border-color 0.2s ease',
+    },
+    metricCardHover: {
+        transform: 'translateY(-2px)',
+        borderColor: colors.primary,
     },
     metricLabel: {
         fontSize: '0.75rem',
@@ -283,7 +288,7 @@ const styles = {
         margin: '0 0 4px',
     },
     metricValue: {
-        fontSize: '1.125rem',
+        fontSize: '1.25rem',
         fontWeight: 600,
         color: colors.text,
         margin: 0,
@@ -291,18 +296,23 @@ const styles = {
     },
     aiButton: {
         width: '100%',
-        padding: '14px',
+        padding: '12px',
         background: colors.primary,
         color: colors.bg,
         border: 'none',
         borderRadius: '6px',
-        fontSize: '0.9375rem',
+        fontSize: '0.875rem',
         fontWeight: 600,
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: '8px',
+        transition: 'background 0.2s ease, transform 0.1s ease',
+    },
+    aiButtonHover: {
+        background: colors.primaryHover,
+        transform: 'scale(1.02)',
     },
     aiResult: {
         background: colors.bgAlt,
@@ -314,8 +324,8 @@ const styles = {
         fontSize: '1rem',
         fontWeight: 600,
         color: colors.text,
-        margin: '0 0 12px',
-        lineHeight: 1.5,
+        margin: '0 0 16px',
+        lineHeight: 1.6,
     },
     aiBlock: {
         marginBottom: '16px',
@@ -337,8 +347,8 @@ const styles = {
         background: colors.bgAlt,
         border: `1px solid ${colors.border}`,
         borderRadius: '6px',
-        padding: '12px 14px',
-        marginBottom: '10px',
+        padding: '12px 16px',
+        marginBottom: '8px',
     },
     actionLabel: {
         fontSize: '0.6875rem',
@@ -437,6 +447,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     const [isLoadingAds, setIsLoadingAds] = useState(false);
     const [adsError, setAdsError] = useState<string | null>(null);
 
+    // Create proposal state
+    const [isCreatingProposal, setIsCreatingProposal] = useState(false);
+    const [proposalSuccess, setProposalSuccess] = useState<string | null>(null);
+
     // Fetch ads when tab changes
     useEffect(() => {
         if (activeTab === 'ads' && ads.length === 0 && !isLoadingAds) {
@@ -498,6 +512,42 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
+    // Create AI Proposal
+    const handleCreateProposal = async () => {
+        setIsCreatingProposal(true);
+        setProposalSuccess(null);
+
+        try {
+            const res = await fetch('/api/de-xuat/tao-moi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    campaignId: campaign.id,
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate,
+                    accountId: 'default', // TODO: Get from user context if needed
+                }),
+            });
+
+            const json = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error || 'Failed to create proposal');
+            }
+
+            setProposalSuccess('✅ Đề xuất đã được tạo thành công!');
+
+            // Auto-hide success message after 3s
+            setTimeout(() => setProposalSuccess(null), 3000);
+        } catch (error) {
+            console.error('Error creating proposal:', error);
+            alert(`❌ Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsCreatingProposal(false);
+        }
+    };
+
+
     const getConfidenceStyle = (confidence: string) => {
         switch (confidence) {
             case 'high':
@@ -532,8 +582,56 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 {dateRange.startDate} → {dateRange.endDate}
                             </p>
                         </div>
-                        <button style={styles.closeBtn} onClick={onClose}>×</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {/* Create Proposal Button */}
+                            <button
+                                onClick={handleCreateProposal}
+                                disabled={isCreatingProposal}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: isCreatingProposal ? colors.bgAlt : colors.primary,
+                                    color: colors.bg,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s',
+                                    opacity: isCreatingProposal ? 0.6 : 1,
+                                    whiteSpace: 'nowrap' as const,
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isCreatingProposal) {
+                                        e.currentTarget.style.background = colors.primaryHover;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isCreatingProposal) {
+                                        e.currentTarget.style.background = colors.primary;
+                                    }
+                                }}
+                            >
+                                {isCreatingProposal ? '⏳ Đang tạo...' : '🤖 Tạo đề xuất AI'}
+                            </button>
+                            <button style={styles.closeBtn} onClick={onClose}>×</button>
+                        </div>
                     </div>
+
+                    {/* Success Message */}
+                    {proposalSuccess && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '12px 16px',
+                            background: 'rgba(14, 203, 129, 0.1)',
+                            border: `1px solid ${colors.success}`,
+                            borderRadius: '6px',
+                            color: colors.success,
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                        }}>
+                            {proposalSuccess}
+                        </div>
+                    )}
 
                     {/* Tabs */}
                     <div style={styles.tabs}>
@@ -544,7 +642,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             }}
                             onClick={() => setActiveTab('overview')}
                         >
-                            📊 Tổng quan
+                            Tổng quan
                         </button>
                         <button
                             style={{
@@ -553,7 +651,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             }}
                             onClick={() => setActiveTab('ads')}
                         >
-                            🖼️ Ads ({ads.length || '...'})
+                            Ads ({ads.length || '...'})
                         </button>
                     </div>
                 </div>
@@ -597,39 +695,43 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             {campaign.issues.length > 0 && (
                                 <div style={styles.section}>
                                     <h3 style={styles.sectionTitle}>Vấn đề phát hiện</h3>
-                                    {campaign.issues.map((issue, idx) => (
-                                        <div
-                                            key={idx}
-                                            style={{
-                                                background: issue.severity === 'critical' ? 'rgba(246, 70, 93, 0.1)' : 'rgba(240, 185, 11, 0.1)',
-                                                border: `1px solid ${issue.severity === 'critical' ? 'rgba(246, 70, 93, 0.3)' : 'rgba(240, 185, 11, 0.3)'}`,
-                                                borderRadius: '8px',
-                                                padding: '12px',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            <p style={{
-                                                fontWeight: 600,
-                                                color: issue.severity === 'critical' ? colors.error : colors.warning,
-                                                margin: '0 0 4px',
-                                            }}>
-                                                {issue.message}
-                                            </p>
-                                            <p style={{ fontSize: '0.875rem', color: colors.textMuted, margin: '0 0 8px' }}>
-                                                {issue.detail}
-                                            </p>
-                                            <p style={{ fontSize: '0.875rem', fontWeight: 500, color: colors.success, margin: 0 }}>
-                                                → {issue.action}
-                                            </p>
-                                        </div>
-                                    ))}
+                                    <div style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+                                        {campaign.issues.map((issue, idx) => (
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    background: issue.severity === 'critical' ? colors.bgAlt : colors.bgAlt,
+                                                    border: `1px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
+                                                    borderLeft: `4px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
+                                                    borderRadius: '6px',
+                                                    padding: '8px 12px',
+                                                    marginBottom: '8px',
+                                                }}
+                                            >
+                                                <p style={{
+                                                    fontWeight: 600,
+                                                    fontSize: '0.875rem',
+                                                    color: issue.severity === 'critical' ? colors.error : colors.warning,
+                                                    margin: '0 0 4px',
+                                                }}>
+                                                    {issue.message}
+                                                </p>
+                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, margin: '0 0 8px', lineHeight: 1.5 }}>
+                                                    {issue.detail}
+                                                </p>
+                                                <p style={{ fontSize: '0.75rem', fontWeight: 500, color: colors.success, margin: 0 }}>
+                                                    → {issue.action}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
                             {/* Mini Bar Chart for Issue Metrics */}
                             {dailyTrend.length > 0 && campaign.issues.length > 0 && (
                                 <div style={styles.section}>
-                                    <h3 style={styles.sectionTitle}>📈 Biểu đồ chi tiết</h3>
+                                    <h3 style={styles.sectionTitle}>Biểu đồ chi tiết</h3>
                                     {campaign.issues.some(i => i.type.toLowerCase().includes('cpp')) && (
                                         <MiniBarChart
                                             data={dailyTrend}
@@ -653,20 +755,20 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                             {/* AI Analysis */}
                             <div style={styles.section}>
-                                <h3 style={styles.sectionTitle}>🧠 Phân tích AI</h3>
+                                <h3 style={styles.sectionTitle}>Phân tích AI</h3>
 
                                 {!aiAnalysis && !isLoadingAI && !aiError && (
                                     <button
                                         style={styles.aiButton}
                                         onClick={handleAnalyzeAI}
                                     >
-                                        🧠 Phân tích sâu với AI
+                                        Phân tích sâu với AI
                                     </button>
                                 )}
 
                                 {isLoadingAI && (
                                     <div style={styles.loader}>
-                                        <p>⏳ Đang phân tích...</p>
+                                        <p>Đang phân tích...</p>
                                         <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
                                             AI đang xem xét dữ liệu và đưa ra khuyến nghị
                                         </p>
@@ -675,7 +777,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                 {aiError && (
                                     <div style={{ textAlign: 'center', padding: '20px', color: '#dc2626' }}>
-                                        <p>❌ {aiError}</p>
+                                        <p>{aiError}</p>
                                         <button
                                             onClick={handleAnalyzeAI}
                                             style={{ ...styles.aiButton, marginTop: '12px', background: '#dc2626' }}
@@ -735,7 +837,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 fontSize: '12px',
                                                 color: '#8b8b8b',
                                             }}>
-                                                <span>📊 Cơ sở: {aiAnalysis.dataBasis.days} ngày</span>
+                                                <span>Cơ sở: {aiAnalysis.dataBasis.days} ngày</span>
                                                 <span>|</span>
                                                 <span>{aiAnalysis.dataBasis.orders} đơn</span>
                                                 <span>|</span>
@@ -747,20 +849,19 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         {aiAnalysis.dimensions && (
                                             <div style={{
                                                 display: 'grid',
-                                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                                                 gap: '12px',
-                                                marginBottom: '20px',
+                                                marginBottom: '16px',
                                             }}>
                                                 {/* Financial */}
                                                 <div style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
-                                                    background: '#1a1a1a',
-                                                    border: '1px solid #2a2a2a',
+                                                    background: colors.bgAlt,
+                                                    border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span>💰</span>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Tài chính</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Financial</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -783,12 +884,11 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 <div style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
-                                                    background: '#1a1a1a',
-                                                    border: '1px solid #2a2a2a',
+                                                    background: colors.bgAlt,
+                                                    border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span>🎯</span>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Content</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -811,12 +911,11 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 <div style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
-                                                    background: '#1a1a1a',
-                                                    border: '1px solid #2a2a2a',
+                                                    background: colors.bgAlt,
+                                                    border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span>👥</span>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Audience</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audience</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -839,12 +938,11 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 <div style={{
                                                     padding: '12px',
                                                     borderRadius: '8px',
-                                                    background: '#1a1a1a',
-                                                    border: '1px solid #2a2a2a',
+                                                    background: colors.bgAlt,
+                                                    border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span>📈</span>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0' }}>Trend</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trend</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -873,7 +971,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <p style={styles.aiBlockTitle}>Kế hoạch hành động</p>
 
                                             <div style={styles.actionBox}>
-                                                <p style={{ ...styles.actionLabel, color: colors.success }}>⚡ LÀM NGAY</p>
+                                                <p style={{ ...styles.actionLabel, color: colors.success }}>IMMEDIATE</p>
                                                 <p style={styles.actionContent}>
                                                     {typeof aiAnalysis.actionPlan.immediate === 'string'
                                                         ? aiAnalysis.actionPlan.immediate
@@ -881,14 +979,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 </p>
                                                 {typeof aiAnalysis.actionPlan.immediate === 'object' && aiAnalysis.actionPlan.immediate.reason && (
                                                     <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
-                                                        💡 {aiAnalysis.actionPlan.immediate.reason}
+                                                        {aiAnalysis.actionPlan.immediate.reason}
                                                     </p>
                                                 )}
                                             </div>
 
                                             {aiAnalysis.actionPlan.shortTerm && (
                                                 <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>📅 2-3 NGÀY TỚI</p>
+                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>SHORT-TERM</p>
                                                     <p style={styles.actionContent}>
                                                         {typeof aiAnalysis.actionPlan.shortTerm === 'string'
                                                             ? aiAnalysis.actionPlan.shortTerm
@@ -896,7 +994,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     </p>
                                                     {typeof aiAnalysis.actionPlan.shortTerm === 'object' && aiAnalysis.actionPlan.shortTerm.trigger && (
                                                         <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
-                                                            🎯 Trigger: {aiAnalysis.actionPlan.shortTerm.trigger}
+                                                            Trigger: {aiAnalysis.actionPlan.shortTerm.trigger}
                                                         </p>
                                                     )}
                                                 </div>
@@ -904,7 +1002,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                             {aiAnalysis.actionPlan.prevention && (
                                                 <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>🛡️ PHÒNG NGỪA</p>
+                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>PREVENTION</p>
                                                     <p style={styles.actionContent}>{aiAnalysis.actionPlan.prevention}</p>
                                                 </div>
                                             )}
@@ -935,13 +1033,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                             {isLoadingAds && (
                                 <div style={styles.loader}>
-                                    <p>⏳ Đang tải danh sách ads...</p>
+                                    <p>Đang tải danh sách ads...</p>
                                 </div>
                             )}
 
                             {adsError && (
                                 <div style={{ textAlign: 'center', padding: '20px', color: '#dc2626' }}>
-                                    <p>❌ {adsError}</p>
+                                    <p>{adsError}</p>
                                     <button
                                         onClick={fetchAds}
                                         style={{ ...styles.aiButton, marginTop: '12px', background: '#dc2626' }}
@@ -969,7 +1067,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 style={styles.adThumbnail as React.CSSProperties}
                                             />
                                         ) : (
-                                            <div style={styles.adThumbnail}>🖼️</div>
+                                            <div style={styles.adThumbnail}>
+                                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textMuted }}>AD</span>
+                                            </div>
                                         )}
 
                                         {/* Info */}
@@ -997,16 +1097,16 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             </p>
                                             <div style={styles.adMetrics}>
                                                 <span style={styles.adMetric}>
-                                                    💰 <strong>{formatMoney(ad.totals.spend)}</strong>
+                                                    Spend: <strong>{formatMoney(ad.totals.spend)}</strong>
                                                 </span>
                                                 <span style={styles.adMetric}>
-                                                    🛒 <strong>{ad.totals.purchases}</strong> đơn
+                                                    Orders: <strong>{ad.totals.purchases}</strong>
                                                 </span>
                                                 <span style={styles.adMetric}>
-                                                    📊 CPP: <strong>{formatMoney(ad.totals.cpp)}</strong>
+                                                    CPP: <strong>{formatMoney(ad.totals.cpp)}</strong>
                                                 </span>
                                                 <span style={styles.adMetric}>
-                                                    👆 CTR: <strong>{ad.totals.ctr.toFixed(2)}%</strong>
+                                                    CTR: <strong>{ad.totals.ctr.toFixed(2)}%</strong>
                                                 </span>
                                             </div>
                                         </div>

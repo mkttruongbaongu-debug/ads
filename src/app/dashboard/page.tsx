@@ -326,6 +326,9 @@ export default function DashboardPage() {
     } | null>(null);
     const [showUserMenu, setShowUserMenu] = useState(false);
 
+    // Pending proposals count for badge
+    const [pendingCount, setPendingCount] = useState(0);
+
     // Campaign filter
     const [filterText, setFilterText] = useState('');
 
@@ -445,16 +448,41 @@ export default function DashboardPage() {
         fetchData();
     }, [fetchData]);
 
+    // Fetch pending proposals count
+    const fetchPendingCount = useCallback(async () => {
+        try {
+            const res = await fetch('/api/de-xuat/danh-sach?status=CHO_DUYET');
+            const json = await res.json();
+            if (json.success) {
+                setPendingCount((json.data || []).length);
+            }
+        } catch (error) {
+            console.error('Error fetching pending count:', error);
+        }
+    }, []);
+
     // Load accounts and user profile on mount
     useEffect(() => {
         if (status === 'unauthenticated') {
             router.push('/');
-        } else if (status === 'authenticated') {
+        } else if (status === 'authenticated' && session?.user?.email) {
             fetchAccounts();
             fetchUserProfile();
+            fetchPendingCount();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, router]);
+    }, [status, session, router, fetchAccounts, fetchUserProfile, fetchPendingCount]);
+
+    useEffect(() => {
+        const handleClickOutside = () => setShowUserMenu(false);
+        if (showUserMenu) {
+            document.addEventListener('click', handleClickOutside);
+        } else {
+            document.removeEventListener('click', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [showUserMenu]);
 
     // NO auto-fetch - user must click "Tra cứu" button
 
@@ -478,9 +506,83 @@ export default function DashboardPage() {
             <header style={styles.header}>
                 {/* Top Row: Logo + Logout */}
                 <div style={styles.headerTop}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
-                        <span style={styles.logo}>QUÂN SƯ ADS</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                        {/* Logo */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
+                            <span style={styles.logo}>QUÂN SƯ ADS</span>
+                        </div>
+
+                        {/* Navigation Links */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                onClick={() => router.push('/dashboard/proposals')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'transparent',
+                                    border: `1px solid ${colors.border}`,
+                                    borderRadius: '6px',
+                                    color: colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    position: 'relative' as const,
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                    e.currentTarget.style.borderColor = colors.primary;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.borderColor = colors.border;
+                                }}
+                            >
+                                📋 Đề xuất
+                                {pendingCount > 0 && (
+                                    <span style={{
+                                        background: colors.primary,
+                                        color: colors.bg,
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                        padding: '2px 6px',
+                                        borderRadius: '10px',
+                                        minWidth: '18px',
+                                        textAlign: 'center',
+                                    }}>
+                                        {pendingCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => router.push('/dashboard/monitoring')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'transparent',
+                                    border: `1px solid ${colors.border}`,
+                                    borderRadius: '6px',
+                                    color: colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                    e.currentTarget.style.borderColor = colors.primary;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.borderColor = colors.border;
+                                }}
+                            >
+                                👁️ Giám sát
+                            </button>
+                        </div>
                     </div>
                     {/* User Profile Dropdown - CEX Style */}
                     <div style={{ position: 'relative' }}>

@@ -1,0 +1,156 @@
+# Google Sheets Headers Template
+
+Copy these headers vào row 1 của mỗi sheet.
+
+---
+
+## Sheet 1: DE_XUAT
+
+```
+id	thoiGian_Tao	campaignId	tenCampaign	userId	uuTien	trangThai	hanhDong_Loai	hanhDong_GiaTri	phanTich_ChuyenGia	metrics_TruocKhi	nguoiDuyet	thoiGian_Duyet	ghiChu_NguoiDung	thoiGian_ThucThi	ketQua_ThucThi	giamSat_DenNgay	ketQua_CuoiCung
+```
+
+**Column Details:**
+- A: `id` - UUID
+- B: `thoiGian_Tao` - ISO DateTime
+- C: `campaignId` - Facebook Campaign ID
+- D: `tenCampaign` - Campaign name
+- E: `userId` - User email
+- F: `uuTien` - Priority (NGUY_CAP/CAO/TRUNG_BINH/THAP)
+- G: `trangThai` - Status (CHO_DUYET/DA_DUYET/BI_TU_CHOI/DA_THUC_THI/DANG_GIAM_SAT/HOAN_THANH)
+- H: `hanhDong_Loai` - Action type (TAM_DUNG/THAY_DOI_NGAN_SACH/etc.)
+- I: `hanhDong_GiaTri` - JSON action details
+- J: `phanTich_ChuyenGia` - JSON array of AI insights
+- K: `metrics_TruocKhi` - JSON metrics snapshot
+- L: `nguoiDuyet` - Approver email
+- M: `thoiGian_Duyet` - Approval timestamp
+- N: `ghiChu_NguoiDung` - User notes
+- O: `thoiGian_ThucThi` - Execution timestamp
+- P: `ketQua_ThucThi` - JSON execution result
+- Q: `giamSat_DenNgay` - Monitoring end date (D+7)
+- R: `ketQua_CuoiCung` - Final evaluation (CAI_THIEN/TRUNG_TINH/XAU_DI)
+
+---
+
+## Sheet 2: QUAN_SAT
+
+```
+id	deXuatId	checkpoint_Ngay	thoiGian_QuanSat	campaignId	metrics_HienTai	metrics_TruocKhi	cpp_ThayDoi_Percent	roas_ThayDoi_Percent	danhGia	phanTich_AI	baiHoc
+```
+
+**Column Details:**
+- A: `id` - UUID
+- B: `deXuatId` - Foreign key to DE_XUAT
+- C: `checkpoint_Ngay` - Checkpoint day (1/3/7)
+- D: `thoiGian_QuanSat` - Observation timestamp
+- E: `campaignId` - Facebook Campaign ID
+- F: `metrics_HienTai` - JSON current metrics
+- G: `metrics_TruocKhi` - JSON before metrics
+- H: `cpp_ThayDoi_Percent` - CPP % change
+- I: `roas_ThayDoi_Percent` - ROAS % change
+- J: `danhGia` - Evaluation (CAI_THIEN/TRUNG_TINH/XAU_DI)
+- K: `phanTich_AI` - JSON QA Auditor analysis
+- L: `baiHoc` - Learnings text
+
+---
+
+## Sheet 3: MAU_HOC_DUOC
+
+```
+id	tenMau	dieuKien	hanhDong_KhuyenNghi	soLan_ApDung	soLan_ThanhCong	tyLe_ThanhCong	cpp_CaiThien_TB_Percent	roas_CaiThien_TB_Percent	doTinCay	capNhat_LanCuoi
+```
+
+**Column Details:**
+- A: `id` - UUID
+- B: `tenMau` - Pattern name
+- C: `dieuKien` - JSON matching conditions
+- D: `hanhDong_KhuyenNghi` - JSON recommended action
+- E: `soLan_ApDung` - Times applied (count)
+- F: `soLan_ThanhCong` - Success count
+- G: `tyLe_ThanhCong` - Success rate (0-1)
+- H: `cpp_CaiThien_TB_Percent` - Avg CPP improvement %
+- I: `roas_CaiThien_TB_Percent` - Avg ROAS improvement %
+- J: `doTinCay` - Confidence score (0-1)
+- K: `capNhat_LanCuoi` - Last updated timestamp
+
+---
+
+## Sheet 4: TAI_KHOAN
+
+```
+email	name	avatar	plan	facebook_accessToken	facebook_adAccountId	created_at	last_login
+```
+
+**Column Details:**
+- A: `email` - User email (unique)
+- B: `name` - Display name
+- C: `avatar` - Avatar URL
+- D: `plan` - Subscription plan (free/pro/enterprise)
+- E: `facebook_accessToken` - Facebook long-lived access token
+- F: `facebook_adAccountId` - Facebook Ad Account ID (act_xxx)
+- G: `created_at` - Account creation timestamp
+- H: `last_login` - Last login timestamp
+
+---
+
+## 📋 Setup Instructions
+
+### Method 1: Copy-Paste (Recommended)
+
+1. Open your Google Sheet
+2. Click on sheet tab (e.g., "DE_XUAT")
+3. Select cell **A1**
+4. Copy the header line above (tab-separated)
+5. Paste into A1
+6. Headers will auto-fill across columns
+
+### Method 2: Manual Entry
+
+1. Click cell A1, type: `id`
+2. Tab to B1, type: `thoiGian_Tao`
+3. Continue for all columns...
+
+### Method 3: Import CSV
+
+1. Create CSV file with headers
+2. File → Import → Upload
+3. Replace current sheet
+
+---
+
+## ✅ Verification
+
+After adding headers:
+
+**DE_XUAT should have:**
+- 18 columns (A through R)
+- Row 1 with headers
+- Row 2 empty (ready for data)
+
+**QUAN_SAT should have:**
+- 12 columns (A through L)
+
+**MAU_HOC_DUOC should have:**
+- 11 columns (A through K)
+
+**TAI_KHOAN should have:**
+- 8 columns (A through H)
+
+---
+
+## 🎨 Optional: Formatting
+
+Make headers stand out:
+1. Select row 1 (all headers)
+2. Format → **Bold**
+3. Background color: Light gray
+4. Text color: Dark gray
+5. Freeze row 1: View → Freeze → 1 row
+
+---
+
+## 🚀 Next Step
+
+After adding headers, deploy Apps Script code to connect to these sheets.
+
+See: [README.md](./README.md) for deployment instructions.

@@ -861,7 +861,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Financial</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tài chính</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -888,7 +888,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nội dung</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -915,7 +915,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audience</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Đối tượng</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -942,7 +942,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     border: `1px solid ${colors.border}`,
                                                 }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trend</span>
+                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Xu hướng</span>
                                                         <span style={{
                                                             marginLeft: 'auto',
                                                             fontSize: '11px',
@@ -971,7 +971,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <p style={styles.aiBlockTitle}>Kế hoạch hành động</p>
 
                                             <div style={styles.actionBox}>
-                                                <p style={{ ...styles.actionLabel, color: colors.success }}>IMMEDIATE</p>
+                                                <p style={{ ...styles.actionLabel, color: colors.success }}>NGAY LẬP TỨC</p>
                                                 <p style={styles.actionContent}>
                                                     {typeof aiAnalysis.actionPlan.immediate === 'string'
                                                         ? aiAnalysis.actionPlan.immediate
@@ -986,7 +986,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                             {aiAnalysis.actionPlan.shortTerm && (
                                                 <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>SHORT-TERM</p>
+                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>NGẮN HẠN</p>
                                                     <p style={styles.actionContent}>
                                                         {typeof aiAnalysis.actionPlan.shortTerm === 'string'
                                                             ? aiAnalysis.actionPlan.shortTerm
@@ -1002,7 +1002,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                             {aiAnalysis.actionPlan.prevention && (
                                                 <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>PREVENTION</p>
+                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>PHÒNG NGỪA</p>
                                                     <p style={styles.actionContent}>{aiAnalysis.actionPlan.prevention}</p>
                                                 </div>
                                             )}

@@ -91,8 +91,9 @@ export const authOptions: AuthOptions = {
                     ? new Date(account.expires_at * 1000).toISOString()
                     : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // Default 60 days
 
-                // Gộp user info + token vào 1 call duy nhất
-                await saveTaiKhoanToSheet({
+                // Fire-and-forget: KHÔNG block login flow
+                // Nếu Apps Script chậm/timeout, user vẫn login được
+                saveTaiKhoanToSheet({
                     fb_user_id: account.providerAccountId,
                     name: user.name || '',
                     email: user.email || '',
@@ -100,9 +101,11 @@ export const authOptions: AuthOptions = {
                     access_token: account.access_token,
                     token_type: account.token_type || 'bearer',
                     token_expires_at: tokenExpiresAt,
+                }).catch(err => {
+                    console.error('[NextAuth] Background save failed (non-blocking):', err);
                 });
 
-                console.log('[NextAuth] Saved TaiKhoan for:', user.name);
+                console.log('[NextAuth] Triggered background save for:', user.name);
             }
             return true;
         },

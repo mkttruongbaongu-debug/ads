@@ -471,26 +471,27 @@ export default function DashboardPage() {
 
     // Load accounts and user profile on mount
     useEffect(() => {
-        console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Session:', !!session, 'User:', session?.user);
+        // Only log and act on status change, ignore session object changes
+        if (initRef.current) {
+            return; // Already initialized, skip
+        }
+
+        console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Has session:', !!session);
+
         if (status === 'unauthenticated') {
             console.log('[DASHBOARD/MOUNT] ❌ Not authenticated, redirecting...');
             router.push('/');
-        } else if (status === 'authenticated' && session && !initRef.current) {
+        } else if (status === 'authenticated' && session) {
             console.log('[DASHBOARD/MOUNT] ✅ Authenticated, fetching data...');
             initRef.current = true;
             fetchAccounts();
             fetchUserProfile();
             fetchPendingCount();
-        } else {
-            console.log('[DASHBOARD/MOUNT] ⏳ Waiting for auth...', {
-                status,
-                hasSession: !!session,
-                hasUser: !!session?.user,
-                initDone: initRef.current
-            });
+        } else if (status === 'loading') {
+            console.log('[DASHBOARD/MOUNT] ⏳ Loading auth...');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, session, router]);
+    }, [status]); // ONLY depend on status, NOT session!
 
     useEffect(() => {
         const handleClickOutside = () => setShowUserMenu(false);

@@ -466,21 +466,26 @@ export default function DashboardPage() {
         }
     }, []);
 
+    // Track initialization to prevent re-fetch
+    const initRef = useRef(false);
+
     // Load accounts and user profile on mount
     useEffect(() => {
         console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Session:', !!session);
         if (status === 'unauthenticated') {
             console.log('[DASHBOARD/MOUNT] ❌ Not authenticated, redirecting...');
             router.push('/');
-        } else if (status === 'authenticated' && session?.user?.email) {
+        } else if (status === 'authenticated' && session?.user?.email && !initRef.current) {
             console.log('[DASHBOARD/MOUNT] ✅ Authenticated, fetching data...');
+            initRef.current = true;
             fetchAccounts();
             fetchUserProfile();
             fetchPendingCount();
         } else {
             console.log('[DASHBOARD/MOUNT] ⏳ Waiting for auth...', { status, hasSession: !!session, hasEmail: !!session?.user?.email });
         }
-    }, [status, session, router, fetchAccounts, fetchUserProfile, fetchPendingCount]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, session, router]);
 
     useEffect(() => {
         const handleClickOutside = () => setShowUserMenu(false);

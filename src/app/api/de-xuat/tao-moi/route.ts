@@ -72,14 +72,15 @@ export async function POST(request: NextRequest) {
         // ===================================================================
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session) {
+            console.log('[API:TAO_MOI_DE_XUAT] ❌ Unauthorized: No session');
             return NextResponse.json(
                 { success: false, error: 'Unauthorized' },
                 { status: 401 }
             );
         }
 
-        const userId = session.user.email; // Use email as user ID
+        const userId = session.user?.name || session.user?.email || 'unknown'; // Use name or email as user ID
         console.log(`[API:TAO_DE_XUAT] 👤 User: ${userId}`);
 
         // ===================================================================

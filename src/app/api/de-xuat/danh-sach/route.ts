@@ -44,14 +44,15 @@ export async function GET(request: NextRequest) {
         // ===================================================================
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session) {
+            console.log('[API:DANH_SACH_DE_XUAT] ❌ Unauthorized: No session');
             return NextResponse.json(
                 { success: false, error: 'Unauthorized' },
                 { status: 401 }
             );
         }
 
-        const userId = session.user.email;
+        const userId = session.user?.name || session.user?.email || 'unknown';
         console.log(`[API:DANH_SACH_DE_XUAT] 👤 User: ${userId}`);
 
         // ===================================================================

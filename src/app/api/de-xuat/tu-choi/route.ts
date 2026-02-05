@@ -53,14 +53,15 @@ export async function POST(request: NextRequest) {
         // ===================================================================
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.email) {
+        if (!session) {
+            console.log('[API:TU_CHOI_DE_XUAT] ❌ Unauthorized: No session');
             return NextResponse.json(
                 { success: false, error: 'Unauthorized' },
                 { status: 401 }
             );
         }
 
-        const userId = session.user.email;
+        const userId = session.user?.name || session.user?.email || 'unknown';
 
         // ===================================================================
         // STEP 2: Parse & Validate Request

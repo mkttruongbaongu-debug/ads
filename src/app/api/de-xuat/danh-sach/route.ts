@@ -27,6 +27,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { layDanhSachDeXuat } from '@/lib/sheets/de-xuat-sheet';
 import type { TrangThaiDeXuat, MucDoUuTien } from '@/lib/de-xuat/types';
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
         // ===================================================================
         // STEP 1: Authentication
         // ===================================================================
-        const session = await getServerSession();
+        const session = await getServerSession(authOptions);
 
         if (!session?.user?.email) {
             return NextResponse.json(

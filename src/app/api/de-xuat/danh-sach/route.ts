@@ -28,7 +28,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { layDanhSachDeXuat } from '@/lib/sheets/de-xuat-sheet';
 import type { TrangThaiDeXuat, MucDoUuTien } from '@/lib/de-xuat/types';
 
 // ===================================================================
@@ -85,11 +84,55 @@ export async function GET(request: NextRequest) {
         }
 
         // ===================================================================
-        // STEP 3: Fetch từ Google Sheets
+        // STEP 3: Fetch từ Google Sheets VIA APPS SCRIPT
         // ===================================================================
-        console.log('[API:DANH_SACH_DE_XUAT] 📚 Fetching from Google Sheets...');
+        console.log('[API:DANH_SACH_DE_XUAT] 📚 Fetching from Apps Script...');
 
-        const deXuats = await layDanhSachDeXuat(filter);
+        const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+
+        if (!scriptUrl) {
+            console.error('[API:DANH_SACH_DE_XUAT] Missing GOOGLE_APPS_SCRIPT_URL');
+            return NextResponse.json(
+                { success: false, error: 'Apps Script not configured' },
+                { status: 500 }
+            );
+        }
+
+        // Build Apps Script URL with params
+        const appsScriptUrl = new URL(scriptUrl);
+        appsScriptUrl.searchParams.set('secret', secret);
+        appsScriptUrl.searchParams.set('action', 'layDanhSachDeXuat');
+
+        // Add filter params
+        if (statusParam) {
+            appsScriptUrl.searchParams.set('status', statusParam);
+        }
+        if (uuTienParam) {
+            appsScriptUrl.searchParams.set('priority', uuTienParam);
+        }
+        if (campaignIdParam) {
+            appsScriptUrl.searchParams.set('campaignId', campaignIdParam);
+        }
+        // Always filter by userId
+        appsScriptUrl.searchParams.set('userId', userId);
+
+        console.log('[API:DANH_SACH_DE_XUAT] 📡 Calling Apps Script:', appsScriptUrl.toString());
+
+        const appsScriptResponse = await fetch(appsScriptUrl.toString());
+        const appsScriptData = await appsScriptResponse.json();
+
+        console.log('[API:DANH_SACH_DE_XUAT] 📦 Apps Script response:', appsScriptData.success ? 'OK' : 'FAIL');
+
+        if (!appsScriptData.success) {
+            console.error('[API:DANH_SACH_DE_XUAT] Apps Script error:', appsScriptData.error);
+            return NextResponse.json(
+                { success: false, error: appsScriptData.error || 'Apps Script returned error' },
+                { status: 500 }
+            );
+        }
+
+        const deXuats = appsScriptData.data || [];
 
         console.log(`[API:DANH_SACH_DE_XUAT] ✅ Tìm thấy ${deXuats.length} đề xuất`);
 

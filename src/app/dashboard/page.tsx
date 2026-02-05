@@ -345,18 +345,23 @@ export default function DashboardPage() {
 
     // Fetch user profile from TaiKhoan
     const fetchUserProfile = useCallback(async () => {
+        console.log('[DASHBOARD/PROFILE] 🔍 Fetching user profile...');
         try {
             const res = await fetch('/api/user/profile');
             const json = await res.json();
+            console.log('[DASHBOARD/PROFILE] 📦 API Response:', json);
             if (json.success && json.data) {
+                console.log('[DASHBOARD/PROFILE] ✅ Setting profile:', json.data.name, json.data.plan);
                 setUserProfile({
                     name: json.data.name || 'User',
                     avatar: json.data.avatar || '',
                     plan: json.data.plan || 'Free',
                 });
+            } else {
+                console.warn('[DASHBOARD/PROFILE] ⚠️ No profile data:', json);
             }
         } catch (err) {
-            console.error('Failed to fetch user profile:', err);
+            console.error('[DASHBOARD/PROFILE] ❌ Failed to fetch user profile:', err);
         }
     }, []);
 
@@ -463,12 +468,17 @@ export default function DashboardPage() {
 
     // Load accounts and user profile on mount
     useEffect(() => {
+        console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Session:', !!session);
         if (status === 'unauthenticated') {
+            console.log('[DASHBOARD/MOUNT] ❌ Not authenticated, redirecting...');
             router.push('/');
         } else if (status === 'authenticated' && session?.user?.email) {
+            console.log('[DASHBOARD/MOUNT] ✅ Authenticated, fetching data...');
             fetchAccounts();
             fetchUserProfile();
             fetchPendingCount();
+        } else {
+            console.log('[DASHBOARD/MOUNT] ⏳ Waiting for auth...', { status, hasSession: !!session, hasEmail: !!session?.user?.email });
         }
     }, [status, session, router, fetchAccounts, fetchUserProfile, fetchPendingCount]);
 

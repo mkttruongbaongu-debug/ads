@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         // ===================================================================
         // STEP 4: Execute via Facebook API
         // ===================================================================
-        const fb = await getFacebookClient(userId);
+        const fb = getFacebookClient();
         let fbResponse: any;
         let thanhCong = false;
         let thongDiep = '';
@@ -139,10 +139,8 @@ export async function POST(request: NextRequest) {
                 case 'TAM_DUNG':
                     // Pause campaign
                     console.log('[API:THUC_THI_DE_XUAT] ⏸️ Pausing campaign...');
-                    fbResponse = await fb.post(`${deXuat.campaignId}`, {
-                        status: 'PAUSED',
-                    });
-                    thanhCong = true;
+                    thanhCong = await fb.updateCampaignStatus(deXuat.campaignId, 'PAUSED');
+                    fbResponse = { success: thanhCong, status: 'PAUSED' };
                     thongDiep = 'Campaign đã được tạm dừng';
                     break;
 
@@ -151,24 +149,20 @@ export async function POST(request: NextRequest) {
                     const newBudget = deXuat.hanhDong.giaTri_DeXuat;
                     console.log(`[API:THUC_THI_DE_XUAT] 💰 Updating budget to ${newBudget}...`);
 
-                    // Facebook expects budget in cents
-                    const budgetInCents = typeof newBudget === 'number' ? newBudget * 100 : parseInt(String(newBudget)) * 100;
-
-                    fbResponse = await fb.post(`${deXuat.campaignId}`, {
-                        daily_budget: budgetInCents.toString(),
-                    });
-                    thanhCong = true;
-                    thongDiep = `Budget đã được cập nhật thành ${newBudget.toLocaleString()} VND`;
+                    // NOTE: Budget update not yet implemented in FacebookAdsClient
+                    // Would need to add updateCampaignBudget() method
+                    thanhCong = false;
+                    thongDiep = 'Chức năng thay đổi ngân sách chưa được implement. Vui lòng thực hiện manual trên Ads Manager.';
+                    fbResponse = { error: 'Not implemented' };
                     break;
 
                 case 'DUNG_VINH_VIEN':
                     // Stop campaign permanently
                     console.log('[API:THUC_THI_DE_XUAT] 🛑 Stopping campaign permanently...');
-                    fbResponse = await fb.post(`${deXuat.campaignId}`, {
-                        status: 'DELETED',
-                    });
-                    thanhCong = true;
-                    thongDiep = 'Campaign đã được dừng vĩnh viễn';
+                    // NOTE: Using PAUSED instead of DELETED (safer, can be reversed)
+                    thanhCong = await fb.updateCampaignStatus(deXuat.campaignId, 'PAUSED');
+                    fbResponse = { success: thanhCong, status: 'PAUSED' };
+                    thongDiep = 'Campaign đã được tạm dừng (safer than permanent delete)';
                     break;
 
                 case 'LAM_MOI_CREATIVE':

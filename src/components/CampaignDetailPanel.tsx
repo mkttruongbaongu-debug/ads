@@ -536,43 +536,58 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
     // Create AI Proposal
     const handleCreateProposal = async () => {
+        console.log('[HANDLE_CREATE_PROPOSAL] 🚀 Starting proposal creation...');
+        console.log('[HANDLE_CREATE_PROPOSAL] 📋 Campaign:', campaign.id, campaign.name);
+        console.log('[HANDLE_CREATE_PROPOSAL] 📅 Date range:', dateRange);
+        console.log('[HANDLE_CREATE_PROPOSAL] 🏦 Account:', accountId);
+
         setIsCreatingProposal(true);
         setProposalSuccess(null);
 
         try {
+            console.log('[HANDLE_CREATE_PROPOSAL] 📤 Calling API /api/de-xuat/tao-moi...');
+
+            const requestBody = {
+                campaignId: campaign.id,
+                startDate: dateRange.startDate,
+                endDate: dateRange.endDate,
+                accountId: accountId,
+                // Send cached campaign data to avoid re-fetching from Facebook
+                campaignData: {
+                    name: campaign.name,
+                    metrics_HienTai: {
+                        cpp: campaign.totals.cpp,
+                        roas: campaign.totals.roas,
+                        chiTieu: campaign.totals.spend,
+                        donHang: campaign.totals.purchases,
+                        ctr: campaign.totals.ctr,
+                        doanhThu: campaign.totals.revenue,
+                    },
+                    dailyMetrics: campaign.dailyMetrics || [],
+                },
+            };
+
+            console.log('[HANDLE_CREATE_PROPOSAL] 📦 Request body:', JSON.stringify(requestBody, null, 2));
+
             const res = await fetch('/api/de-xuat/tao-moi', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    campaignId: campaign.id,
-                    startDate: dateRange.startDate,
-                    endDate: dateRange.endDate,
-                    accountId: accountId,
-                    // Send cached campaign data to avoid re-fetching from Facebook
-                    campaignData: {
-                        name: campaign.name,
-                        metrics_HienTai: {
-                            cpp: campaign.totals.cpp,
-                            roas: campaign.totals.roas,
-                            chiTieu: campaign.totals.spend,
-                            donHang: campaign.totals.purchases,
-                            ctr: campaign.totals.ctr,
-                            doanhThu: campaign.totals.revenue,
-                        },
-                        dailyMetrics: campaign.dailyMetrics || [],
-                    },
-                }),
+                body: JSON.stringify(requestBody),
             });
 
+            console.log('[HANDLE_CREATE_PROPOSAL] 📥 Response status:', res.status, res.statusText);
+
             const json = await res.json();
+            console.log('[HANDLE_CREATE_PROPOSAL] 📥 Response data:', JSON.stringify(json, null, 2));
 
             if (!json.success) {
+                console.error('[HANDLE_CREATE_PROPOSAL] ❌ API returned error:', json.error);
                 throw new Error(json.error || 'Failed to create proposal');
             }
 
             // Proposal created successfully
             const proposal = json.data;
-            console.log('[PROPOSAL_CREATED]', proposal);
+            console.log('[PROPOSAL_CREATED] ✅ Success!', proposal);
 
             // Show detailed success message
             const priorityLabel = proposal.uuTien === 'NGUY_CAP' ? '🔴 NGUY CẤP'
@@ -589,9 +604,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             // Auto-hide after 8s
             setTimeout(() => setProposalSuccess(null), 8000);
         } catch (error) {
-            console.error('Error creating proposal:', error);
+            console.error('[HANDLE_CREATE_PROPOSAL] ❌ Error:', error);
+            console.error('[HANDLE_CREATE_PROPOSAL] ❌ Error details:', error instanceof Error ? error.message : error);
+            console.error('[HANDLE_CREATE_PROPOSAL] ❌ Error stack:', error instanceof Error ? error.stack : 'N/A');
             alert(`❌ Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
+            console.log('[HANDLE_CREATE_PROPOSAL] 🏁 Finished (success or error)');
             setIsCreatingProposal(false);
         }
     };

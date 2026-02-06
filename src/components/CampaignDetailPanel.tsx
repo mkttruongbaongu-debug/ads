@@ -457,11 +457,35 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
     // Auto-trigger AI analysis when campaign is selected
     useEffect(() => {
-        // Only auto-analyze if we don't have analysis yet and not already loading
-        if (!aiAnalysis && !isLoadingAI && !aiError) {
-            console.log('[CAMPAIGN_DETAIL] 🤖 Auto-triggering AI analysis...');
-            handleAnalyzeAI();
-        }
+        // CRITICAL: Reset ALL campaign-specific state when campaign changes
+        // This prevents stale data from previous campaign being used in proposals
+        console.log(`[CAMPAIGN_DETAIL] 🔄 Campaign changed to: ${campaign.id} (${campaign.name})`);
+        console.log('[CAMPAIGN_DETAIL] 🧹 Resetting all campaign-specific state...');
+
+        // Reset AI analysis state
+        setAiAnalysis(null);
+        setAiError(null);
+        setIsLoadingAI(false);
+
+        // Reset trend data  
+        setDailyTrend([]);
+
+        // Reset ads data
+        setAds([]);
+        setAdsError(null);
+
+        // Reset proposal state
+        setProposalSuccess(null);
+        setIsCreatingProposal(false);
+        setShowProposalPrompt(false);
+
+        // Reset tab to overview
+        setActiveTab('overview');
+
+        console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Starting fresh AI analysis...');
+
+        // Now trigger fresh AI analysis for the new campaign
+        handleAnalyzeAI();
     }, [campaign.id]); // Trigger when campaign changes
 
     // Fetch ads when tab changes

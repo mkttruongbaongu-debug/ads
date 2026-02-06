@@ -385,12 +385,34 @@ export async function POST(request: NextRequest) {
                         isReduce ? metrics_HienTai.chiTieu * 0.6 :
                             metrics_HienTai.chiTieu,
                 },
-                phanTich: aiAnalysis.experts?.map((exp: any) => ({
-                    tenChuyenGia: exp.role?.toUpperCase() || 'ANALYSIS',
-                    nhanDinh: exp.analysis || '',
-                    doTinCay: (exp.score || 85) / 100,
-                    trangThai: exp.status || 'normal',
-                })) || [],
+                // Map dimensions to expert analysis format
+                phanTich: aiAnalysis.dimensions ? [
+                    {
+                        tenChuyenGia: 'CHIEN_LUOC',
+                        nhanDinh: aiAnalysis.dimensions.financial?.summary || 'Phân tích tài chính',
+                        doTinCay: 0.85,
+                        trangThai: aiAnalysis.dimensions.financial?.status || 'good',
+                    },
+                    {
+                        tenChuyenGia: 'HIEU_SUAT',
+                        nhanDinh: aiAnalysis.dimensions.audience?.summary || 'Phân tích đối tượng',
+                        doTinCay: 0.90,
+                        trangThai: aiAnalysis.dimensions.audience?.status || 'good',
+                    },
+                    {
+                        tenChuyenGia: 'NOI_DUNG',
+                        nhanDinh: aiAnalysis.dimensions.content?.summary || 'Phân tích nội dung',
+                        doTinCay: 0.85,
+                        trangThai: aiAnalysis.dimensions.content?.status || 'good',
+                    },
+                    {
+                        tenChuyenGia: 'THUC_THI',
+                        nhanDinh: aiAnalysis.dimensions.trend?.summary || 'Phân tích xu hướng',
+                        doTinCay: 0.85,
+                        trangThai: aiAnalysis.dimensions.trend?.direction === 'improving' ? 'good' :
+                            aiAnalysis.dimensions.trend?.direction === 'declining' ? 'warning' : 'stable',
+                    },
+                ] : [],
                 summary: aiAnalysis.summary || aiAnalysis.verdict?.headline || '',
             };
 

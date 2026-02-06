@@ -537,7 +537,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 throw new Error(json.error);
             }
 
-            setAiAnalysis(json.data.aiAnalysis);
+            // Get the FRESH AI analysis from the response
+            const freshAiAnalysis = json.data.aiAnalysis;
+
+            setAiAnalysis(freshAiAnalysis);
             // Save daily trend for chart
             if (json.data.dailyTrend) {
                 setDailyTrend(json.data.dailyTrend);
@@ -548,9 +551,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             analyzedCampaigns[campaign.id] = true;
             localStorage.setItem('analyzedCampaigns', JSON.stringify(analyzedCampaigns));
 
-            // AUTO-CREATE PROPOSAL (no manual click needed!)
-            console.log('[AI_ANALYSIS] ✅ Complete! Auto-creating proposal...');
-            handleCreateProposal();
+            // AUTO-CREATE PROPOSAL - PASS FRESH DATA DIRECTLY!
+            // DO NOT use state (aiAnalysis) here because React state updates are async
+            // and the closure would capture the OLD value
+            console.log('[AI_ANALYSIS] ✅ Complete! Auto-creating proposal with FRESH data...');
+            console.log('[AI_ANALYSIS] 📋 Fresh recommendation:', freshAiAnalysis?.recommendation);
+            handleCreateProposal(freshAiAnalysis);
         } catch (error) {
             setAiError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
         } finally {
@@ -559,11 +565,16 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     };
 
     // Create AI Proposal
-    const handleCreateProposal = async () => {
+    // CRITICAL: Accept fresh AI analysis as parameter to avoid stale closure issue!
+    const handleCreateProposal = async (freshAiAnalysis?: AIAnalysis | null) => {
+        // Use the FRESH data passed as parameter, fallback to state only if not provided
+        const analysisToUse = freshAiAnalysis ?? aiAnalysis;
+
         console.log('[HANDLE_CREATE_PROPOSAL] 🚀 Starting proposal creation...');
         console.log('[HANDLE_CREATE_PROPOSAL] 📋 Campaign:', campaign.id, campaign.name);
         console.log('[HANDLE_CREATE_PROPOSAL] 📅 Date range:', dateRange);
         console.log('[HANDLE_CREATE_PROPOSAL] 🏦 Account:', accountId);
+        console.log('[HANDLE_CREATE_PROPOSAL] 🤖 Using AI analysis:', analysisToUse?.verdict?.action || 'NO DATA');
 
         setIsCreatingProposal(true);
         setProposalSuccess(null);
@@ -589,6 +600,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     },
                     dailyMetrics: campaign.dailyMetrics || [],
                 },
+                // CRITICAL: Send the FRESH AI analysis passed as parameter!
+                // This ensures the proposal matches what the user sees on screen
+                aiAnalysis: analysisToUse,
             };
 
             console.log('[HANDLE_CREATE_PROPOSAL] 📦 Request body:', JSON.stringify(requestBody, null, 2));
@@ -676,7 +690,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {/* Create Proposal Button */}
                             <button
-                                onClick={handleCreateProposal}
+                                onClick={() => handleCreateProposal()}
                                 disabled={isCreatingProposal}
                                 style={{
                                     padding: '10px 20px',

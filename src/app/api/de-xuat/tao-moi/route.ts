@@ -77,6 +77,32 @@ interface RequestBody {
             ctr: number;
         }>;
     };
+    // CRITICAL: Pre-computed AI analysis from frontend
+    // Use this instead of running AI again to ensure consistency
+    aiAnalysis?: {
+        // Verdict (main recommendation)
+        verdict?: {
+            action: 'SCALE' | 'MAINTAIN' | 'WATCH' | 'REDUCE' | 'STOP';
+            headline: string;
+            condition?: string;
+        };
+        // Analysis dimensions
+        dimensions?: {
+            financial: { status: string; summary: string };
+            content: { status: string; summary: string };
+            audience: { status: string; summary: string };
+            trend: { direction: string; summary: string };
+        };
+        // Other fields
+        summary?: string;
+        confidence?: number;
+        experts?: Array<{
+            role: string;
+            analysis: string;
+            score: number;
+            status: string;
+        }>;
+    };
 }
 
 // ===================================================================
@@ -130,7 +156,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { campaignId, startDate, endDate, accountId, campaignData } = body;
+        const { campaignId, startDate, endDate, accountId, campaignData, aiAnalysis } = body;
 
         // Validation
         if (!campaignId || !startDate || !endDate || !accountId) {
@@ -142,6 +168,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`[API:TAO_DE_XUAT] 🎯 Campaign: ${campaignId}`);
         console.log(`[API:TAO_DE_XUAT] 📅 Date range: ${startDate} → ${endDate}`);
+        console.log(`[API:TAO_DE_XUAT] 🤖 Pre-computed AI analysis: ${aiAnalysis ? 'YES (using existing)' : 'NO (will run fresh)'}`);
 
         // ===================================================================
         // STEP 3: Use Cached Data or Fetch from Facebook
@@ -307,9 +334,115 @@ export async function POST(request: NextRequest) {
         } // End of else block (Facebook API fallback)
 
         // ===================================================================
-        // STEP 8: Call taoDeXuat Logic
+        // STEP 8: Check if we have pre-computed AI analysis from frontend
         // ===================================================================
-        console.log('[API:TAO_DE_XUAT] 🤖 Gọi hệ thống tạo đề xuất...');
+        if (aiAnalysis && aiAnalysis.verdict) {
+            // FAST PATH: Use pre-computed analysis from frontend
+            // Save directly to Apps Script WITHOUT running AI again
+            console.log('[API:TAO_DE_XUAT] ⚡ Using PRE-COMPUTED analysis from frontend');
+            console.log('[API:TAO_DE_XUAT] 📋 Verdict:', aiAnalysis.verdict?.action);
+            console.log('[API:TAO_DE_XUAT] 📋 Headline:', aiAnalysis.verdict?.headline);
+
+            const deXuatId = `DX-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            const thoiGianTao = new Date().toISOString();
+
+            // Map frontend action to internal action type
+            const actionMap: Record<string, string> = {
+                'SCALE': 'THAY ĐỔI NGÂN SÁCH',
+                'MAINTAIN': 'GIỮ NGUYÊN',
+                'WATCH': 'THEO DÕI',
+                'REDUCE': 'THAY ĐỔI NGÂN SÁCH',
+                'STOP': 'TẮT CHIẾN DỊCH',
+            };
+
+            const priorityMap: Record<string, string> = {
+                'SCALE': 'TRUNG_BINH',
+                'MAINTAIN': 'THAP',
+                'WATCH': 'CAO',
+                'REDUCE': 'CAO',
+                'STOP': 'NGUY_CAP',
+            };
+
+            const actionType = actionMap[aiAnalysis.verdict?.action || 'MAINTAIN'] || 'GIỮ NGUYÊN';
+            const priority = priorityMap[aiAnalysis.verdict?.action || 'MAINTAIN'] || 'TRUNG_BINH';
+            const isScale = aiAnalysis.verdict?.action === 'SCALE';
+            const isReduce = aiAnalysis.verdict?.action === 'REDUCE' || aiAnalysis.verdict?.action === 'STOP';
+
+            // Build proposal data from frontend aiAnalysis
+            const deXuatData = {
+                id: deXuatId,
+                thoiGian_Tao: thoiGianTao,
+                campaignId,
+                tenCampaign,
+                userId,
+                uuTien: priority,
+                trangThai: 'CHO_DUYET',
+                hanhDong: {
+                    loai: actionType,
+                    moTa: aiAnalysis.verdict?.headline || 'Đề xuất từ AI',
+                    giaTri_HienTai: metrics_HienTai.chiTieu,
+                    giaTri_DeXuat: isScale ? metrics_HienTai.chiTieu * 1.3 :
+                        isReduce ? metrics_HienTai.chiTieu * 0.6 :
+                            metrics_HienTai.chiTieu,
+                },
+                phanTich: aiAnalysis.experts?.map((exp: any) => ({
+                    tenChuyenGia: exp.role?.toUpperCase() || 'ANALYSIS',
+                    nhanDinh: exp.analysis || '',
+                    doTinCay: (exp.score || 85) / 100,
+                    trangThai: exp.status || 'normal',
+                })) || [],
+                summary: aiAnalysis.summary || aiAnalysis.verdict?.headline || '',
+            };
+
+            // Save to Apps Script
+            const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+            const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
+            if (!scriptUrl) {
+                throw new Error('GOOGLE_APPS_SCRIPT_URL not configured');
+            }
+
+            console.log('[API:TAO_DE_XUAT] 📤 Saving to Apps Script...');
+
+            const saveResponse = await fetch(scriptUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'ghiDeXuat',
+                    secret: secret,
+                    ...deXuatData,
+                }),
+            });
+
+            const saveResult = await saveResponse.text();
+            console.log('[API:TAO_DE_XUAT] 📥 Apps Script response:', saveResult);
+
+            let parsedResult;
+            try {
+                parsedResult = JSON.parse(saveResult);
+            } catch (e) {
+                console.error('[API:TAO_DE_XUAT] ❌ Failed to parse response');
+                parsedResult = { success: true }; // Assume success if can't parse
+            }
+
+            console.log(`[API:TAO_DE_XUAT] ✅ Saved with pre-computed analysis! ID: ${deXuatId}`);
+
+            return NextResponse.json({
+                success: true,
+                data: {
+                    deXuatId,
+                    uuTien: priority,
+                    tomTat: aiAnalysis.verdict?.headline || 'Đề xuất từ AI',
+                    hanhDong: {
+                        loai: actionType,
+                        moTa: aiAnalysis.verdict?.headline || '',
+                    },
+                },
+            }, { status: 200 });
+        }
+
+        // SLOW PATH: No pre-computed analysis, run taoDeXuat which calls AI
+        console.log('[API:TAO_DE_XUAT] 🤖 No pre-computed analysis, running taoDeXuat (slow path)...');
 
         const input: TaoDeXuatInput = {
             userId,

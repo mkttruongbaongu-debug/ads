@@ -93,6 +93,11 @@ export interface TaoDeXuatOutput {
             loai: string;
             moTa: string;
         };
+        // Debug: track if save to Google Sheets worked
+        _saveStatus?: {
+            saved: boolean;
+            error?: string;
+        };
     };
     error?: string;
 }

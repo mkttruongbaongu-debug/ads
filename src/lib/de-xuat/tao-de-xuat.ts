@@ -242,9 +242,9 @@ export async function taoDeXuat(
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: 'ghiDeXuat',  // Backup: also in body in case URL params lost
-                        secret: apiSecret,
-                        ...deXuat,
+                        ...deXuat,  // Spread first
+                        action: 'ghiDeXuat',  // Then action (won't be overwritten)
+                        secret: apiSecret,    // Then secret
                     }),
                 });
 

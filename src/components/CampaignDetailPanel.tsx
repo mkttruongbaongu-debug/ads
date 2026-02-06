@@ -211,7 +211,7 @@ const styles = {
         boxShadow: '-4px 0 20px rgba(0,0,0,0.3)',
     },
     header: {
-        padding: '20px 24px 0',
+        padding: '32px 24px 0', // Increased top padding from 20px to 32px for breathing room
         borderBottom: `1px solid ${colors.border}`,
     },
     headerRow: {
@@ -221,10 +221,10 @@ const styles = {
         marginBottom: '16px',
     },
     title: {
-        fontSize: '1.25rem',
+        fontSize: '1.5rem', // Increased from 1.25rem for more prominence
         fontWeight: 700,
         color: colors.text,
-        margin: '0 0 4px',
+        margin: '0 0 6px', // Increased bottom margin for better spacing
     },
     closeBtn: {
         background: 'transparent',

@@ -66,6 +66,7 @@ interface KetQua_QuanLyThucThi {
         phan_tram_thay_doi?: number;
     };
     ly_do: string;
+    cac_buoc: string[]; // Step-by-step execution instructions
     ket_qua_ky_vong: string;
     tom_tat_executive: string; // Summary for decision maker
     do_tin_cay: number;
@@ -149,26 +150,34 @@ Tổng hợp 3 phân tích trên và đưa ra 1 HÀNH ĐỘNG CỤ THỂ duy nh�
    phan_tram_thay_doi: % thay đổi (VD: -40)
 
 4. LÝ DO:
-   - Tại sao recommend hành động này?
-   - Dựa trên insights nào từ 3 chuyên gia?
+   - Tại sao recommend hànhđộng này?
+   - Dựa trên metrics CỤ THỂ, số liệu THỰC TẾ
+   - VD: "CPP tăng 45% trong 3 ngày (82k → 119k), vượt ngưỡng cảnh báo 70%"
    - Rõ ràng, cụ thể (2-3 câu)
 
-5. KẾT QUẢ KỲ VỌNG:
+5. CÁC BƯỚC THỰC THI:
+   - Danh sách các bước CỤ THỂ để execute hành động
+   - Mỗi bước phải rõ ràng, actionable
+   - ❌ KHÔNG NÓI: "Theo dõi trong X ngày" (system tự monitor)
+   - ✅ VD: ["Giảm daily budget từ 500k → 300k", "Kiểm tra CPP sau 2 giờ", "Nếu CPP vẫn > 80k → Escalate to pause"]
+   
+6. KẾT QUẢ KỲ VỌNG:
    - Nếu làm theo hành động này, kết quả sẽ như thế nào?
    - VD: "CPP giảm 20-30%, ROAS cải thiện lên 2.2"
 
-6. TÓM TẮT EXECUTIVE:
+7. TÓM TẮT EXECUTIVE:
    - 1 câu ngắn gọn cho decision maker
-   - VD: "Giảm 40% budget để giảm CPP, campaign đang burn money"
+   - VD: "Giảm 40% budget để kiểm soát CPP tăng cao"
 
-7. ĐỘ TIN CẬY:
+8. ĐỘ TIN CẬY:
    - Average của 3 chuyên gia
 
 Quy tắc quan trọng:
 - ACTIONABLE: Hành động phải CỤ THỂ, có thể execute ngay qua Facebook API
+- CONCRETE STEPS: Mỗi bước phải rõ ràng, có số liệu
+- NO MONITORING TASKS: ❌ "Theo dõi daily" → System tự làm (D+1, D+3, D+7)
 - SAFE: Không recommend actions quá extreme (VD: giảm > 70% budget)
-- PRIORITIZE: Chọn action quan trọng NHẤT, không liệt kê nhiều
-- If budget change: Suggest specific % hoặc amount
+- PRIORITIZE: Chọn action quan trọng NHẤT
 
 Trả về JSON format:
 {
@@ -179,9 +188,14 @@ Trả về JSON format:
     "gia_tri_de_xuat": "300000" hoặc "Refresh creative ngay",
     "phan_tram_thay_doi": -40
   },
-  "ly_do": "...",
-  "ket_qua_ky_vong": "...",
-  "tom_tat_executive": "...",
+  "ly_do": "CPP tăng 37% trong 3 ngày (65k → 89k). Giảm budget để kiểm soát chi phí trong khi làm mới creative.",
+  "cac_buoc": [
+    "Giảm daily budget từ 500k → 300k qua Facebook Ads Manager",
+    "Kiểm tra CPP sau 2 giờ để verify thay đổi có effect",
+    "Nếu CPP vẫn > 80k sau 3 ngày → Escalate to pause campaign"
+  ],
+  "ket_qua_ky_vong": "CPP giảm 15-25%, giảm risk của overspending while maintaining delivery",
+  "tom_tat_executive": "Giảm 40% budget để kiểm soát CPP tăng cao (65k → 89k, +37%)",
   "do_tin_cay": 0.85
 }`;
 }
@@ -266,6 +280,7 @@ export async function quanLy_ThucThi(
             giaTri_DeXuat: ketQua.chi_tiet_hanh_dong.gia_tri_de_xuat,
             phanTram_ThayDoi: ketQua.chi_tiet_hanh_dong.phan_tram_thay_doi,
             lyDo: ketQua.ly_do,
+            cacBuoc: ketQua.cac_buoc || [],
             ketQua_KyVong: ketQua.ket_qua_ky_vong,
         };
 
@@ -297,6 +312,7 @@ export async function quanLy_ThucThi(
             loai: 'TAM_DUNG',
             giaTri_DeXuat: 'N/A',
             lyDo: 'Không thể phân tích do lỗi hệ thống. Đề xuất pause để check manual.',
+            cacBuoc: ['Pause campaign qua Facebook Ads Manager', 'Review chi tiết campaign metrics', 'Kiểm tra lại sau khi hệ thống ổn định'],
             ketQua_KyVong: 'N/A',
         };
 

@@ -132,6 +132,9 @@ export interface ChiTietHanhDong {
     /** Lý do cụ thể cho hành động này */
     lyDo: string;
 
+    /** Các bước thực thi cụ thể */
+    cacBuoc: string[];
+
     /** Kết quả kỳ vọng sau khi thực hiện */
     ketQua_KyVong: string;
 }

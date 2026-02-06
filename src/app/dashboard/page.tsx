@@ -577,7 +577,7 @@ export default function DashboardPage() {
                                     e.currentTarget.style.borderColor = colors.border;
                                 }}
                             >
-                                📋 Đề xuất
+                                ĐỀ XUẤT
                                 {pendingCount > 0 && (
                                     <span style={{
                                         background: colors.primary,
@@ -616,7 +616,7 @@ export default function DashboardPage() {
                                     e.currentTarget.style.borderColor = colors.border;
                                 }}
                             >
-                                👁️ Giám sát
+                                GIÁM SÁT
                             </button>
                         </div>
                     </div>

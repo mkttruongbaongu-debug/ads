@@ -845,26 +845,27 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         {/* PROMINENT CTA: Create Proposal Button */}
                                         <div style={{
                                             padding: '20px',
-                                            background: 'linear-gradient(135deg, ' + colors.primary + ', #6366f1)',
+                                            background: colors.bgAlt,
+                                            border: `1px solid ${colors.border}`,
                                             borderRadius: '8px',
                                             marginBottom: '16px',
                                             textAlign: 'center' as const,
                                         }}>
                                             <p style={{
-                                                color: 'white',
+                                                color: colors.text,
                                                 fontSize: '0.875rem',
                                                 fontWeight: 600,
                                                 margin: '0 0 12px',
                                             }}>
-                                                📊 Phân tích hoàn tất! Bước tiếp theo?
+                                                Phân tích hoàn tất! Bước tiếp theo?
                                             </p>
                                             <button
                                                 onClick={handleCreateProposal}
                                                 disabled={isCreatingProposal}
                                                 style={{
                                                     padding: '12px 32px',
-                                                    background: 'white',
-                                                    color: colors.primary,
+                                                    background: colors.primary,
+                                                    color: colors.bg,
                                                     border: 'none',
                                                     borderRadius: '6px',
                                                     fontSize: '0.9375rem',
@@ -872,13 +873,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
                                                     transition: 'all 0.2s',
                                                     opacity: isCreatingProposal ? 0.6 : 1,
-                                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                                                 }}
                                             >
-                                                {isCreatingProposal ? '⏳ Đang tạo...' : '🤖 TẠO ĐỀ XUẤT TỰ ĐỘNG'}
+                                                {isCreatingProposal ? 'ĐANG TẠO...' : 'TẠO ĐỀ XUẤT TỰ ĐỘNG'}
                                             </button>
                                             <p style={{
-                                                color: 'rgba(255, 255, 255, 0.9)',
+                                                color: colors.textMuted,
                                                 fontSize: '0.75rem',
                                                 margin: '8px 0 0',
                                             }}>
@@ -1201,7 +1201,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         border: `1px solid ${colors.border}`,
                     }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ textAlign: 'center' as const }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎉</div>
+
                             <h3 style={{
                                 fontSize: '1.5rem',
                                 fontWeight: 700,
@@ -1239,7 +1239,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         transition: 'all 0.2s',
                                     }}
                                 >
-                                    🤖 Tạo ngay
+                                    TẠO NGAY
                                 </button>
                                 <button
                                     onClick={() => setShowProposalPrompt(false)}

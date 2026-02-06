@@ -216,9 +216,9 @@ export async function taoDeXuat(
         console.log('[TAO_DE_XUAT] 💾 Lưu đề xuất vào Google Sheets...');
 
         try {
-            const appsScriptUrl = process.env.GOOGLE_SHEETS_API_URL;
+            const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
             if (!appsScriptUrl) {
-                console.warn('[TAO_DE_XUAT] ⚠️ Warning: GOOGLE_SHEETS_API_URL not configured, skipping save');
+                console.warn('[TAO_DE_XUAT] ⚠️ Warning: GOOGLE_APPS_SCRIPT_URL not configured, skipping save');
             } else {
                 const response = await fetch(`${appsScriptUrl}?action=ghiDeXuat`, {
                     method: 'POST',

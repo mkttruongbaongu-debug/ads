@@ -546,7 +546,20 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     campaignId: campaign.id,
                     startDate: dateRange.startDate,
                     endDate: dateRange.endDate,
-                    accountId: accountId, // Use passed accountId instead of hardcoded value
+                    accountId: accountId,
+                    // Send cached campaign data to avoid re-fetching from Facebook
+                    campaignData: {
+                        name: campaign.name,
+                        metrics_HienTai: {
+                            cpp: campaign.totals.cpp,
+                            roas: campaign.totals.roas,
+                            chiTieu: campaign.totals.spend,
+                            donHang: campaign.totals.purchases,
+                            ctr: campaign.totals.ctr,
+                            doanhThu: campaign.totals.revenue,
+                        },
+                        dailyMetrics: campaign.dailyMetrics || [],
+                    },
                 }),
             });
 

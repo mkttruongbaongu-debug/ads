@@ -57,6 +57,26 @@ interface RequestBody {
     startDate: string; // YYYY-MM-DD
     endDate: string;   // YYYY-MM-DD
     accountId: string;
+    // Optional: Cached campaign data from frontend to avoid re-fetching
+    campaignData?: {
+        name: string;
+        metrics_HienTai: {
+            cpp: number;
+            roas: number;
+            chiTieu: number;
+            donHang: number;
+            ctr: number;
+            doanhThu: number;
+        };
+        dailyMetrics?: Array<{
+            date: string;
+            spend: number;
+            purchases: number;
+            cpp: number;
+            roas: number;
+            ctr: number;
+        }>;
+    };
 }
 
 // ===================================================================
@@ -110,7 +130,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { campaignId, startDate, endDate, accountId } = body;
+        const { campaignId, startDate, endDate, accountId, campaignData } = body;
 
         // Validation
         if (!campaignId || !startDate || !endDate || !accountId) {
@@ -124,138 +144,167 @@ export async function POST(request: NextRequest) {
         console.log(`[API:TAO_DE_XUAT] 📅 Date range: ${startDate} → ${endDate}`);
 
         // ===================================================================
-        // STEP 3: Fetch Campaign Data từ Facebook API
+        // STEP 3: Use Cached Data or Fetch from Facebook
         // ===================================================================
-        console.log('[API:TAO_DE_XUAT] 🔍 Fetching campaign data from Facebook...');
+        let tenCampaign: string;
+        let status: string;
+        let metrics_HienTai: any;
+        let metrics_LichSu: any[] = [];
+        let soNgay_DaChay: number | undefined;
+        let ngan_sach_hien_tai: number | undefined;
+        // OPTIMIZATION: Use cached data if provided (avoid Facebook API calls)
+        if (campaignData) {
+            console.log('[API:TAO_DE_XUAT] ⚡ Using cached campaign data (fast path)');
 
-        // Create Facebook client with session token
-        const fb = new FacebookAdsClient(accessToken);
+            tenCampaign = campaignData.name;
+            status = 'ACTIVE'; // Default since status not in frontend data
+            metrics_HienTai = campaignData.metrics_HienTai;
 
-        // ===================================================================
-        // STEP 4: Fetch Metrics (Current Period)
-        // ===================================================================
-        console.log('[API:TAO_DE_XUAT] 📈 Fetching metrics...');
+            // Convert dailyMetrics to metrics_LichSu format
+            if (campaignData.dailyMetrics && campaignData.dailyMetrics.length > 0) {
+                metrics_LichSu = campaignData.dailyMetrics.map(day => ({
+                    ngay: day.date,
+                    cpp: day.cpp,
+                    roas: day.roas,
+                    chiTieu: day.spend,
+                    donHang: day.purchases,
+                    ctr: day.ctr,
+                }));
+            }
 
-        const insights = await fb.getInsights(
-            accountId,
-            {
-                startDate: startDate,
-                endDate: endDate
-            },
-            'campaign'
-        );
+            console.log(`[API:TAO_DE_XUAT] ✅ Cached data loaded: ${tenCampaign}, ${metrics_LichSu.length} days`);
+        } else {
+            // FALLBACK: Fetch from Facebook API if no cached data
+            console.log('[API:TAO_DE_XUAT] 🔍 No cached data, fetching from Facebook API (slow path)...');
 
-        // Filter insights for this specific campaign
-        const campaignInsights = insights.filter(i => i.campaign_id === campaignId);
+            // Create Facebook client with session token
+            const fb = new FacebookAdsClient(accessToken);
 
-        if (campaignInsights.length === 0) {
-            return NextResponse.json(
-                { success: false, error: 'Không có dữ liệu insights cho campaign này trong khoảng thời gian đã chọn' },
-                { status: 404 }
-            );
-        }
+            // ===================================================================
+            // STEP 4: Fetch Metrics (Current Period)
+            // ===================================================================
+            console.log('[API:TAO_DE_XUAT] 📈 Fetching metrics...');
 
-        // Aggregate metrics (sum across days if multiple)
-        const totalMetrics = campaignInsights.reduce((acc, insight) => {
-            // Extract purchases from actions array
-            const purchaseAction = insight.actions?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
-            const purchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
-
-            // Extract revenue from action_values array
-            const revenueAction = insight.action_values?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
-            const revenue = revenueAction ? parseFloat(revenueAction.value) : 0;
-
-            return {
-                spend: acc.spend + (parseFloat(insight.spend) || 0),
-                purchases: acc.purchases + purchases,
-                revenue: acc.revenue + revenue,
-                clicks: acc.clicks + (parseInt(insight.clicks) || 0),
-                impressions: acc.impressions + (parseInt(insight.impressions) || 0),
-            };
-        }, { spend: 0, purchases: 0, revenue: 0, clicks: 0, impressions: 0 });
-
-        // Calculate derived metrics
-        const cpp = totalMetrics.purchases > 0 ? totalMetrics.spend / totalMetrics.purchases : 0;
-        const roas = totalMetrics.spend > 0 ? totalMetrics.revenue / totalMetrics.spend : 0;
-        const ctr = totalMetrics.impressions > 0 ? (totalMetrics.clicks / totalMetrics.impressions) * 100 : 0;
-
-        const metrics_HienTai = {
-            cpp,
-            roas,
-            chiTieu: totalMetrics.spend,
-            donHang: totalMetrics.purchases,
-            ctr,
-            doanhThu: totalMetrics.revenue,
-        };
-
-        console.log(`[API:TAO_DE_XUAT] ✅ Metrics: CPP ${cpp.toLocaleString()}, ROAS ${roas.toFixed(2)}`);
-
-        // Get campaign name from insights (if available)
-        const tenCampaign = campaignInsights[0]?.campaign_name || `Campaign ${campaignId}`;
-        const status = 'ACTIVE'; // Default, can be fetched from getCampaigns if needed
-
-        // ===================================================================
-        // STEP 5: Fetch Historical Metrics (Optional - last 7 days before startDate)
-        // ===================================================================
-        let metrics_LichSu: any[] | undefined;
-
-        try {
-            const historyEndDate = new Date(startDate);
-            historyEndDate.setDate(historyEndDate.getDate() - 1);
-            const historyStartDate = new Date(historyEndDate);
-            historyStartDate.setDate(historyStartDate.getDate() - 6); // 7 days total
-
-            console.log('[API:TAO_DE_XUAT] 📚 Fetching historical data...');
-
-            const historyInsights = await fb.getInsights(
+            const insights = await fb.getInsights(
                 accountId,
                 {
-                    startDate: historyStartDate.toISOString().split('T')[0],
-                    endDate: historyEndDate.toISOString().split('T')[0]
+                    startDate: startDate,
+                    endDate: endDate
                 },
                 'campaign'
             );
 
-            const historyData = historyInsights.filter(i => i.campaign_id === campaignId);
+            // Filter insights for this specific campaign
+            const campaignInsights = insights.filter(i => i.campaign_id === campaignId);
 
-            if (historyData.length > 0) {
-                metrics_LichSu = historyData.map((day) => {
-                    const daySpend = parseFloat(day.spend) || 0;
-                    const purchaseAction = day.actions?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
-                    const dayPurchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
-                    const revenueAction = day.action_values?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
-                    const dayRevenue = revenueAction ? parseFloat(revenueAction.value) : 0;
-
-                    return {
-                        ngay: day.date_start,
-                        cpp: dayPurchases > 0 ? daySpend / dayPurchases : 0,
-                        roas: daySpend > 0 ? dayRevenue / daySpend : 0,
-                        chiTieu: daySpend,
-                    };
-                });
-
-                console.log(`[API:TAO_DE_XUAT] ✅ Lịch sử: ${metrics_LichSu.length} ngày`);
+            if (campaignInsights.length === 0) {
+                return NextResponse.json(
+                    { success: false, error: 'Không có dữ liệu insights cho campaign này trong khoảng thời gian đã chọn' },
+                    { status: 404 }
+                );
             }
-        } catch (error) {
-            console.warn('[API:TAO_DE_XUAT] ⚠️ Không lấy được lịch sử, tiếp tục without it');
-        }
 
-        // ===================================================================
-        // STEP 6: Calculate soNgay_DaChay (estimate from insights date_start)
-        // ===================================================================
-        let soNgay_DaChay: number | undefined;
+            // Aggregate metrics (sum across days if multiple)
+            const totalMetrics = campaignInsights.reduce((acc, insight) => {
+                // Extract purchases from actions array
+                const purchaseAction = insight.actions?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+                const purchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
 
-        if (campaignInsights[0]?.date_start) {
-            const createdDate = new Date(campaignInsights[0].date_start);
-            const now = new Date();
-            const diffMs = now.getTime() - createdDate.getTime();
-            soNgay_DaChay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        }
+                // Extract revenue from action_values array
+                const revenueAction = insight.action_values?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+                const revenue = revenueAction ? parseFloat(revenueAction.value) : 0;
 
-        // ===================================================================
-        // STEP 7: Get budget (if available from insights)
-        // ===================================================================
-        const ngan_sach_hien_tai = undefined; // Not available from insights API
+                return {
+                    spend: acc.spend + (parseFloat(insight.spend) || 0),
+                    purchases: acc.purchases + purchases,
+                    revenue: acc.revenue + revenue,
+                    clicks: acc.clicks + (parseInt(insight.clicks) || 0),
+                    impressions: acc.impressions + (parseInt(insight.impressions) || 0),
+                };
+            }, { spend: 0, purchases: 0, revenue: 0, clicks: 0, impressions: 0 });
+
+            // Calculate derived metrics
+            const cpp = totalMetrics.purchases > 0 ? totalMetrics.spend / totalMetrics.purchases : 0;
+            const roas = totalMetrics.spend > 0 ? totalMetrics.revenue / totalMetrics.spend : 0;
+            const ctr = totalMetrics.impressions > 0 ? (totalMetrics.clicks / totalMetrics.impressions) * 100 : 0;
+
+            metrics_HienTai = {
+                cpp,
+                roas,
+                chiTieu: totalMetrics.spend,
+                donHang: totalMetrics.purchases,
+                ctr,
+                doanhThu: totalMetrics.revenue,
+            };
+
+            console.log(`[API:TAO_DE_XUAT] ✅ Metrics: CPP ${cpp.toLocaleString()}, ROAS ${roas.toFixed(2)}`);
+
+            // Get campaign name from insights (if available)
+            tenCampaign = campaignInsights[0]?.campaign_name || `Campaign ${campaignId}`;
+            status = 'ACTIVE'; // Default, can be fetched from getCampaigns if needed
+
+            // ===================================================================
+            // STEP 5: Fetch Historical Metrics (Optional - last 7 days before startDate)
+            // ===================================================================
+
+
+            try {
+                const historyEndDate = new Date(startDate);
+                historyEndDate.setDate(historyEndDate.getDate() - 1);
+                const historyStartDate = new Date(historyEndDate);
+                historyStartDate.setDate(historyStartDate.getDate() - 6); // 7 days total
+
+                console.log('[API:TAO_DE_XUAT] 📚 Fetching historical data...');
+
+                const historyInsights = await fb.getInsights(
+                    accountId,
+                    {
+                        startDate: historyStartDate.toISOString().split('T')[0],
+                        endDate: historyEndDate.toISOString().split('T')[0]
+                    },
+                    'campaign'
+                );
+
+                const historyData = historyInsights.filter(i => i.campaign_id === campaignId);
+
+                if (historyData.length > 0) {
+                    metrics_LichSu = historyData.map((day) => {
+                        const daySpend = parseFloat(day.spend) || 0;
+                        const purchaseAction = day.actions?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+                        const dayPurchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
+                        const revenueAction = day.action_values?.find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+                        const dayRevenue = revenueAction ? parseFloat(revenueAction.value) : 0;
+
+                        return {
+                            ngay: day.date_start,
+                            cpp: dayPurchases > 0 ? daySpend / dayPurchases : 0,
+                            roas: daySpend > 0 ? dayRevenue / daySpend : 0,
+                            chiTieu: daySpend,
+                        };
+                    });
+
+                    console.log(`[API:TAO_DE_XUAT] ✅ Lịch sử: ${metrics_LichSu.length} ngày`);
+                }
+            } catch (error) {
+                console.warn('[API:TAO_DE_XUAT] ⚠️ Không lấy được lịch sử, tiếp tục without it');
+            }
+
+            // ===================================================================
+            // STEP 6: Calculate soNgay_DaChay (estimate from insights date_start)
+            // ===================================================================
+
+            if (campaignInsights[0]?.date_start) {
+                const createdDate = new Date(campaignInsights[0].date_start);
+                const now = new Date();
+                const diffMs = now.getTime() - createdDate.getTime();
+                soNgay_DaChay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            }
+
+            // ===================================================================
+            // STEP 7: Get budget (if available from insights)
+            // ===================================================================
+            ngan_sach_hien_tai = undefined; // Not available from insights API
+        } // End of else block (Facebook API fallback)
 
         // ===================================================================
         // STEP 8: Call taoDeXuat Logic

@@ -895,50 +895,74 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             </div>
                                         )}
 
-                                        {/* PROMINENT CTA: Create Proposal Button */}
-                                        <div style={{
-                                            padding: '20px',
-                                            background: colors.bgAlt,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            marginBottom: '16px',
-                                            textAlign: 'center' as const,
-                                        }}>
-                                            <p style={{
-                                                color: colors.text,
-                                                fontSize: '0.875rem',
-                                                fontWeight: 600,
-                                                margin: '0 0 12px',
+                                        {/* PROMINENT CTA: Create Proposal Status */}
+                                        {/* Only show this section during or after proposal creation */}
+                                        {(isCreatingProposal || proposalSuccess) && (
+                                            <div style={{
+                                                padding: '20px',
+                                                background: proposalSuccess ? colors.success + '15' : colors.bgAlt,
+                                                border: `1px solid ${proposalSuccess ? colors.success + '40' : colors.border}`,
+                                                borderRadius: '8px',
+                                                marginBottom: '16px',
+                                                textAlign: 'center' as const,
                                             }}>
-                                                Phân tích hoàn tất! Đang tự động tạo đề xuất...
-                                            </p>
+                                                {/* Show loading spinner while creating */}
+                                                {isCreatingProposal && !proposalSuccess && (
+                                                    <>
+                                                        <p style={{
+                                                            color: colors.text,
+                                                            fontSize: '0.875rem',
+                                                            fontWeight: 600,
+                                                            margin: '0 0 12px',
+                                                        }}>
+                                                            Phân tích hoàn tất! Đang tự động tạo đề xuất...
+                                                        </p>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '12px',
+                                                            padding: '16px',
+                                                            background: colors.primary + '10',
+                                                            borderRadius: '6px',
+                                                            border: `1px solid ${colors.primary}30`,
+                                                        }}>
+                                                            <div style={{
+                                                                width: '20px',
+                                                                height: '20px',
+                                                                border: `3px solid ${colors.primary}30`,
+                                                                borderTop: `3px solid ${colors.primary}`,
+                                                                borderRadius: '50%',
+                                                                animation: 'spin 1s linear infinite',
+                                                            }} />
+                                                            <span style={{ color: colors.primary, fontWeight: 600 }}>
+                                                                Đang tạo đề xuất hành động...
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                )}
 
-                                            {/* Button hidden - auto-create enabled */}
-                                            {/* Show loading spinner while creating */}
-                                            {isCreatingProposal && (
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '12px',
-                                                    padding: '16px',
-                                                    background: colors.primary + '10',
-                                                    borderRadius: '6px',
-                                                    border: `1px solid ${colors.primary}30`,
-                                                }}>
+                                                {/* Show success message after creation */}
+                                                {proposalSuccess && (
                                                     <div style={{
-                                                        width: '20px',
-                                                        height: '20px',
-                                                        border: `3px solid ${colors.primary}30`,
-                                                        borderTop: `3px solid ${colors.primary}`,
-                                                        borderRadius: '50%',
-                                                        animation: 'spin 1s linear infinite',
-                                                    }} />
-                                                    <span style={{ color: colors.primary, fontWeight: 600 }}>
-                                                        Đang tạo đề xuất hành động...
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '12px',
+                                                        padding: '16px',
+                                                    }}>
+                                                        <span style={{ fontSize: '1.5rem' }}>✅</span>
+                                                        <span style={{
+                                                            color: colors.success,
+                                                            fontWeight: 600,
+                                                            fontSize: '0.9375rem',
+                                                        }}>
+                                                            {proposalSuccess}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         <style jsx>{`
                                             @keyframes spin {

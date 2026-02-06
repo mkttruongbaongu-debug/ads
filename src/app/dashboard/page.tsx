@@ -884,16 +884,16 @@ export default function DashboardPage() {
                 {/* Pre-search Empty State */}
                 {!hasSearched && !isLoading && !error && (
                     <div style={styles.emptyState}>
-                        <p style={{ fontSize: '3rem', marginBottom: '16px' }}>📊</p>
-                        <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#374151' }}>Chọn tài khoản và khoảng thời gian</p>
-                        <p style={{ color: '#6b7280', marginTop: '8px' }}>Sau đó bấm <strong>🔍 Tra cứu</strong> để phân tích campaigns</p>
+                        <p style={{ fontSize: '3rem', marginBottom: '16px', color: '#F0B90B', fontWeight: 300 }}>─</p>
+                        <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#EAECEF' }}>Chọn tài khoản và khoảng thời gian</p>
+                        <p style={{ color: '#848E9C', marginTop: '8px' }}>Sau đó bấm <strong>Tra cứu</strong> để phân tích campaigns</p>
                     </div>
                 )}
 
                 {/* Loading State */}
                 {isLoading && !error && (
                     <div style={styles.loader}>
-                        <p>⏳ Đang phân tích campaigns...</p>
+                        <p style={{ color: '#F0B90B' }}>● Đang phân tích campaigns...</p>
                     </div>
                 )}
 

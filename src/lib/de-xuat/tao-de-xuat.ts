@@ -211,13 +211,15 @@ export async function taoDeXuat(
         };
 
         // ===================================================================
-        // STEP 4: Lưu vào Google Sheets
+        // STEP 4: Lưu vào Google Sheets via Apps Script
         // ===================================================================
-        console.log('[TAO_DE_XUAT] 💾 Lưu đề xuất vào Google Sheets...');
+        // TODO: Implement Apps Script endpoint for saving proposals
+        // For now, skip saving to avoid Service Account error on Netlify
+        console.log('[TAO_DE_XUAT] ⚠️ Skipping Sheets save (not yet implemented via Apps Script)');
 
-        await themDeXuat(deXuat);
+        // await themDeXuat(deXuat); // DISABLED: Requires Service Account credentials
 
-        console.log('[TAO_DE_XUAT] ✅ Đã lưu đề xuất thành công');
+        console.log('[TAO_DE_XUAT] ✅ Proposal created (in-memory only)');
 
         // ===================================================================
         // STEP 5: Return success response

@@ -892,34 +892,42 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 fontWeight: 600,
                                                 margin: '0 0 12px',
                                             }}>
-                                                Phân tích hoàn tất! Bước tiếp theo?
+                                                Phân tích hoàn tất! Đang tự động tạo đề xuất...
                                             </p>
-                                            <button
-                                                onClick={handleCreateProposal}
-                                                disabled={isCreatingProposal}
-                                                style={{
-                                                    padding: '12px 32px',
-                                                    background: colors.primary,
-                                                    color: colors.bg,
-                                                    border: 'none',
+
+                                            {/* Button hidden - auto-create enabled */}
+                                            {/* Show loading spinner while creating */}
+                                            {isCreatingProposal && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    padding: '16px',
+                                                    background: colors.primary + '10',
                                                     borderRadius: '6px',
-                                                    fontSize: '0.9375rem',
-                                                    fontWeight: 700,
-                                                    cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
-                                                    transition: 'all 0.2s',
-                                                    opacity: isCreatingProposal ? 0.6 : 1,
-                                                }}
-                                            >
-                                                {isCreatingProposal ? 'ĐANG TẠO...' : 'TẠO ĐỀ XUẤT TỰ ĐỘNG'}
-                                            </button>
-                                            <p style={{
-                                                color: colors.textMuted,
-                                                fontSize: '0.75rem',
-                                                margin: '8px 0 0',
-                                            }}>
-                                                Hoặc xem kế hoạch hành động chi tiết bên dưới ↓
-                                            </p>
+                                                    border: `1px solid ${colors.primary}30`,
+                                                }}>
+                                                    <div style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        border: `3px solid ${colors.primary}30`,
+                                                        borderTop: `3px solid ${colors.primary}`,
+                                                        borderRadius: '50%',
+                                                        animation: 'spin 1s linear infinite',
+                                                    }} />
+                                                    <span style={{ color: colors.primary, fontWeight: 600 }}>
+                                                        Đang tạo đề xuất hành động...
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
+
+                                        <style jsx>{`
+                                            @keyframes spin {
+                                                0% { transform: rotate(0deg); }
+                                                100% { transform: rotate(360deg); }
+                                            }
+                                        `}</style>
 
 
                                         {/* NEW: Data Basis (thay thế Độ tin cậy) */}

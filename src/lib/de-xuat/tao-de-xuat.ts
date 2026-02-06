@@ -216,12 +216,15 @@ export async function taoDeXuat(
         console.log('[TAO_DE_XUAT] 💾 Lưu đề xuất vào Google Sheets...');
         console.log('[TAO_DE_XUAT] 📋 Proposal data:', JSON.stringify(deXuat, null, 2));
 
+        let saveStatus: { saved: boolean; error?: string } = { saved: false };
+
         try {
             const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
             console.log('[TAO_DE_XUAT] 🔗 Apps Script URL:', appsScriptUrl ? 'SET ✅' : 'NOT SET ❌');
 
             if (!appsScriptUrl) {
                 console.warn('[TAO_DE_XUAT] ⚠️ Warning: GOOGLE_APPS_SCRIPT_URL not configured, skipping save');
+                saveStatus = { saved: false, error: 'GOOGLE_APPS_SCRIPT_URL not configured' };
             } else {
                 const fullUrl = `${appsScriptUrl}?action=ghiDeXuat`;
                 console.log('[TAO_DE_XUAT] 📤 Calling:', fullUrl);
@@ -240,15 +243,16 @@ export async function taoDeXuat(
 
                 if (!result.success) {
                     console.error('[TAO_DE_XUAT] ❌ Lỗi khi lưu:', result.error);
-                    // Don't throw - proposal still valid, just not persisted
+                    saveStatus = { saved: false, error: result.error || 'Unknown error from Apps Script' };
                 } else {
                     console.log('[TAO_DE_XUAT] ✅ Đã lưu đề xuất vào Sheets thành công');
+                    saveStatus = { saved: true };
                 }
             }
         } catch (saveError) {
             console.error('[TAO_DE_XUAT] ❌ Lỗi khi gọi Apps Script:', saveError);
             console.error('[TAO_DE_XUAT] ❌ Error details:', saveError instanceof Error ? saveError.message : saveError);
-            // Don't throw - proposal still valid, just not persisted
+            saveStatus = { saved: false, error: saveError instanceof Error ? saveError.message : 'Network error' };
         }
 
         // ===================================================================
@@ -266,6 +270,8 @@ export async function taoDeXuat(
                     loai: ketQuaAI.hanhDong_DeXuat.loai,
                     moTa: moTaHanhDong,
                 },
+                // Include save status so client knows if DB save worked
+                _saveStatus: saveStatus,
             },
         };
     } catch (error) {

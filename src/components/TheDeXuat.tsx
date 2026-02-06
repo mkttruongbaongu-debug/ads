@@ -77,6 +77,26 @@ const statusConfig: Record<TrangThaiDeXuat, { label: string; color: string }> = 
     HOAN_THANH: { label: 'HOÀN THÀNH', color: colors.success },
 };
 
+// Vietnamese display names with diacritics
+const actionTypeLabels: Record<string, string> = {
+    TAM_DUNG: 'TẠM DỪNG',
+    THAY_DOI_NGAN_SACH: 'THAY ĐỔI NGÂN SÁCH',
+    LAM_MOI_CREATIVE: 'LÀM MỚI CREATIVE',
+    DIEU_CHINH_DOI_TUONG: 'ĐIỀU CHỈNH ĐỐI TƯỢNG',
+    DUNG_VINH_VIEN: 'DỪNG VĨNH VIỄN',
+    TANG_NGAN_SACH: 'TĂNG NGÂN SÁCH',
+    GIAM_NGAN_SACH: 'GIẢM NGÂN SÁCH',
+    TIEP_TUC: 'TIẾP TỤC',
+    THEO_DOI: 'THEO DÕI',
+};
+
+const agentNameLabels: Record<string, string> = {
+    CHIEN_LUOC: 'CHIẾN LƯỢC',
+    HIEU_SUAT: 'HIỆU SUẤT',
+    NOI_DUNG: 'NỘI DUNG',
+    THUC_THI: 'THỰC THI',
+};
+
 // ===================================================================
 // STYLES
 // ===================================================================
@@ -375,7 +395,7 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
             {/* Proposed Action */}
             <div style={styles.actionSection}>
                 <p style={styles.actionTitle}>Hành động đề xuất</p>
-                <p style={styles.actionType}>{deXuat.hanhDong.loai.replace(/_/g, ' ')}</p>
+                <p style={styles.actionType}>{actionTypeLabels[deXuat.hanhDong.loai] || deXuat.hanhDong.loai.replace(/_/g, ' ')}</p>
                 <p style={styles.actionDesc}>{deXuat.hanhDong.lyDo}</p>
                 <div style={styles.actionMeta}>
                     {deXuat.hanhDong.giaTri_HienTai && (
@@ -406,7 +426,7 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                 {expandedAgents && deXuat.phanTich_ChuyenGia.map((agent, idx) => (
                     <div key={idx} style={styles.agentItem}>
                         <div style={styles.agentHeader}>
-                            <span style={styles.agentName}>{agent.tenChuyenGia.replace(/_/g, ' ')}</span>
+                            <span style={styles.agentName}>{agentNameLabels[agent.tenChuyenGia] || agent.tenChuyenGia.replace(/_/g, ' ')}</span>
                             <span style={styles.agentConfidence(agent.doTinCay)}>
                                 {Math.round(agent.doTinCay * 100)}% tin cậy
                             </span>

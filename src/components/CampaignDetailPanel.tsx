@@ -454,6 +454,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     // Auto-prompt modal state
     const [showProposalPrompt, setShowProposalPrompt] = useState(false);
 
+    // Auto-trigger AI analysis when campaign is selected
+    useEffect(() => {
+        // Only auto-analyze if we don't have analysis yet and not already loading
+        if (!aiAnalysis && !isLoadingAI && !aiError) {
+            console.log('[CAMPAIGN_DETAIL] 🤖 Auto-triggering AI analysis...');
+            handleAnalyzeAI();
+        }
+    }, [campaign.id]); // Trigger when campaign changes
+
     // Fetch ads when tab changes
     useEffect(() => {
         if (activeTab === 'ads' && ads.length === 0 && !isLoadingAds) {

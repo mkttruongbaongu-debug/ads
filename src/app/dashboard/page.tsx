@@ -1152,7 +1152,7 @@ export default function DashboardPage() {
                                                                             }}
                                                                             title="Campaign đã được AI phân tích"
                                                                         >
-                                                                            🤖
+                                                                            AI
                                                                         </span>
                                                                     )}
                                                                 </div>

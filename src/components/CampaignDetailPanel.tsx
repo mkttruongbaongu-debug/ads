@@ -524,8 +524,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             analyzedCampaigns[campaign.id] = true;
             localStorage.setItem('analyzedCampaigns', JSON.stringify(analyzedCampaigns));
 
-            // Show auto-prompt modal
-            setShowProposalPrompt(true);
+            // AUTO-CREATE PROPOSAL (no manual click needed!)
+            console.log('[AI_ANALYSIS] ✅ Complete! Auto-creating proposal...');
+            handleCreateProposal();
         } catch (error) {
             setAiError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
         } finally {
@@ -569,26 +570,24 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 throw new Error(json.error || 'Failed to create proposal');
             }
 
-            // Display AI analysis results in console (detailed)
+            // Proposal created successfully
             const proposal = json.data;
-            console.log('[PROPOSAL_CREATED]', {
-                id: proposal.deXuatId,
-                priority: proposal.uuTien,
-                summary: proposal.tomTat,
-                action: proposal.hanhDong
-            });
+            console.log('[PROPOSAL_CREATED]', proposal);
 
-            // Show simple success message for now
-            // TODO: Replace with professional modal showing full AI analysis
+            // Show detailed success message
+            const priorityLabel = proposal.uuTien === 'NGUY_CAP' ? '🔴 NGUY CẤP'
+                : proposal.uuTien === 'CAO' ? '🟡 CAO'
+                    : proposal.uuTien === 'TRUNG_BINH' ? '🟢 TRUNG BÌNH' : '⚪ THẤP';
+
             setProposalSuccess(
-                `✅ Đề xuất đã tạo! Priority: ${proposal.uuTien} | Action: ${proposal.hanhDong.loai}`
+                `✅ Đã tạo đề xuất! ${priorityLabel} | ${proposal.hanhDong.loai} | Vào tab ĐỀ XUẤT để duyệt`
             );
 
-            // Close prompt modal if open
+            // Close prompt modal
             setShowProposalPrompt(false);
 
-            // Auto-hide success message after 5s
-            setTimeout(() => setProposalSuccess(null), 5000);
+            // Auto-hide after 8s
+            setTimeout(() => setProposalSuccess(null), 8000);
         } catch (error) {
             console.error('Error creating proposal:', error);
             alert(`❌ Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1061,47 +1060,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
                                         )}
 
-                                        {/* Action Plan */}
-                                        <div style={{ ...styles.aiBlock, marginTop: '16px' }}>
-                                            <p style={styles.aiBlockTitle}>Kế hoạch hành động</p>
-
-                                            <div style={styles.actionBox}>
-                                                <p style={{ ...styles.actionLabel, color: colors.success }}>NGAY LẬP TỨC</p>
-                                                <p style={styles.actionContent}>
-                                                    {typeof aiAnalysis.actionPlan.immediate === 'string'
-                                                        ? aiAnalysis.actionPlan.immediate
-                                                        : aiAnalysis.actionPlan.immediate.action}
-                                                </p>
-                                                {typeof aiAnalysis.actionPlan.immediate === 'object' && aiAnalysis.actionPlan.immediate.reason && (
-                                                    <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
-                                                        {aiAnalysis.actionPlan.immediate.reason}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {aiAnalysis.actionPlan.shortTerm && (
-                                                <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#38bdf8' }}>NGẮN HẠN</p>
-                                                    <p style={styles.actionContent}>
-                                                        {typeof aiAnalysis.actionPlan.shortTerm === 'string'
-                                                            ? aiAnalysis.actionPlan.shortTerm
-                                                            : aiAnalysis.actionPlan.shortTerm.action}
-                                                    </p>
-                                                    {typeof aiAnalysis.actionPlan.shortTerm === 'object' && aiAnalysis.actionPlan.shortTerm.trigger && (
-                                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '6px' }}>
-                                                            Trigger: {aiAnalysis.actionPlan.shortTerm.trigger}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {aiAnalysis.actionPlan.prevention && (
-                                                <div style={styles.actionBox}>
-                                                    <p style={{ ...styles.actionLabel, color: '#a78bfa' }}>PHÒNG NGỪA</p>
-                                                    <p style={styles.actionContent}>{aiAnalysis.actionPlan.prevention}</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        {/* Action plans removed - now handled by Execution Manager with concrete steps */}
 
                                         {/* Reasoning */}
                                         {aiAnalysis.reasoning && (

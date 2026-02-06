@@ -214,19 +214,29 @@ export async function taoDeXuat(
         // STEP 4: Lưu vào Google Sheets via Apps Script
         // ===================================================================
         console.log('[TAO_DE_XUAT] 💾 Lưu đề xuất vào Google Sheets...');
+        console.log('[TAO_DE_XUAT] 📋 Proposal data:', JSON.stringify(deXuat, null, 2));
 
         try {
             const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+            console.log('[TAO_DE_XUAT] 🔗 Apps Script URL:', appsScriptUrl ? 'SET ✅' : 'NOT SET ❌');
+
             if (!appsScriptUrl) {
                 console.warn('[TAO_DE_XUAT] ⚠️ Warning: GOOGLE_APPS_SCRIPT_URL not configured, skipping save');
             } else {
-                const response = await fetch(`${appsScriptUrl}?action=ghiDeXuat`, {
+                const fullUrl = `${appsScriptUrl}?action=ghiDeXuat`;
+                console.log('[TAO_DE_XUAT] 📤 Calling:', fullUrl);
+                console.log('[TAO_DE_XUAT] 📦 Request body:', JSON.stringify(deXuat, null, 2));
+
+                const response = await fetch(fullUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(deXuat),
                 });
 
+                console.log('[TAO_DE_XUAT] 📥 Response status:', response.status, response.statusText);
+
                 const result = await response.json();
+                console.log('[TAO_DE_XUAT] 📥 Response data:', JSON.stringify(result, null, 2));
 
                 if (!result.success) {
                     console.error('[TAO_DE_XUAT] ❌ Lỗi khi lưu:', result.error);
@@ -237,6 +247,7 @@ export async function taoDeXuat(
             }
         } catch (saveError) {
             console.error('[TAO_DE_XUAT] ❌ Lỗi khi gọi Apps Script:', saveError);
+            console.error('[TAO_DE_XUAT] ❌ Error details:', saveError instanceof Error ? saveError.message : saveError);
             // Don't throw - proposal still valid, just not persisted
         }
 

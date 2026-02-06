@@ -342,6 +342,8 @@ export async function POST(request: NextRequest) {
             console.log('[API:TAO_DE_XUAT] ⚡ Using PRE-COMPUTED analysis from frontend');
             console.log('[API:TAO_DE_XUAT] 📋 Verdict:', aiAnalysis.verdict?.action);
             console.log('[API:TAO_DE_XUAT] 📋 Headline:', aiAnalysis.verdict?.headline);
+            console.log('[API:TAO_DE_XUAT] 📋 Has dimensions?', !!aiAnalysis.dimensions);
+            console.log('[API:TAO_DE_XUAT] 📋 Dimensions:', JSON.stringify(aiAnalysis.dimensions, null, 2));
 
             const deXuatId = `DX-${Date.now()}-${Math.random().toString(36).substring(7)}`;
             const thoiGianTao = new Date().toISOString();
@@ -386,7 +388,7 @@ export async function POST(request: NextRequest) {
                             metrics_HienTai.chiTieu,
                 },
                 // Map dimensions to expert analysis format
-                phanTich: aiAnalysis.dimensions ? [
+                phanTich_ChuyenGia: aiAnalysis.dimensions ? [
                     {
                         tenChuyenGia: 'CHIEN_LUOC',
                         nhanDinh: aiAnalysis.dimensions.financial?.summary || 'Phân tích tài chính',

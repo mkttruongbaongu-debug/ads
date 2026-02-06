@@ -451,6 +451,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     const [isCreatingProposal, setIsCreatingProposal] = useState(false);
     const [proposalSuccess, setProposalSuccess] = useState<string | null>(null);
 
+    // Auto-prompt modal state
+    const [showProposalPrompt, setShowProposalPrompt] = useState(false);
+
     // Fetch ads when tab changes
     useEffect(() => {
         if (activeTab === 'ads' && ads.length === 0 && !isLoadingAds) {
@@ -505,6 +508,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             if (json.data.dailyTrend) {
                 setDailyTrend(json.data.dailyTrend);
             }
+
+            // Mark campaign as analyzed in localStorage
+            const analyzedCampaigns = JSON.parse(localStorage.getItem('analyzedCampaigns') || '{}');
+            analyzedCampaigns[campaign.id] = true;
+            localStorage.setItem('analyzedCampaigns', JSON.stringify(analyzedCampaigns));
+
+            // Show auto-prompt modal
+            setShowProposalPrompt(true);
         } catch (error) {
             setAiError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
         } finally {
@@ -536,6 +547,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             }
 
             setProposalSuccess('✅ Đề xuất đã được tạo thành công!');
+
+            // Close prompt modal if open
+            setShowProposalPrompt(false);
 
             // Auto-hide success message after 3s
             setTimeout(() => setProposalSuccess(null), 3000);
@@ -828,6 +842,51 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             </div>
                                         )}
 
+                                        {/* PROMINENT CTA: Create Proposal Button */}
+                                        <div style={{
+                                            padding: '20px',
+                                            background: 'linear-gradient(135deg, ' + colors.primary + ', #6366f1)',
+                                            borderRadius: '8px',
+                                            marginBottom: '16px',
+                                            textAlign: 'center' as const,
+                                        }}>
+                                            <p style={{
+                                                color: 'white',
+                                                fontSize: '0.875rem',
+                                                fontWeight: 600,
+                                                margin: '0 0 12px',
+                                            }}>
+                                                📊 Phân tích hoàn tất! Bước tiếp theo?
+                                            </p>
+                                            <button
+                                                onClick={handleCreateProposal}
+                                                disabled={isCreatingProposal}
+                                                style={{
+                                                    padding: '12px 32px',
+                                                    background: 'white',
+                                                    color: colors.primary,
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.9375rem',
+                                                    fontWeight: 700,
+                                                    cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    opacity: isCreatingProposal ? 0.6 : 1,
+                                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                                }}
+                                            >
+                                                {isCreatingProposal ? '⏳ Đang tạo...' : '🤖 TẠO ĐỀ XUẤT TỰ ĐỘNG'}
+                                            </button>
+                                            <p style={{
+                                                color: 'rgba(255, 255, 255, 0.9)',
+                                                fontSize: '0.75rem',
+                                                margin: '8px 0 0',
+                                            }}>
+                                                Hoặc xem kế hoạch hành động chi tiết bên dưới ↓
+                                            </p>
+                                        </div>
+
+
                                         {/* NEW: Data Basis (thay thế Độ tin cậy) */}
                                         {aiAnalysis.dataBasis && (
                                             <div style={{
@@ -1117,6 +1176,93 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     )}
                 </div>
             </div>
+
+            {/* Auto-Prompt Modal */}
+            {showProposalPrompt && (
+                <div style={{
+                    position: 'fixed' as const,
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000,
+                }} onClick={() => setShowProposalPrompt(false)}>
+                    <div style={{
+                        background: colors.bgCard,
+                        borderRadius: '12px',
+                        padding: '32px',
+                        maxWidth: '480px',
+                        width: '90%',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                        border: `1px solid ${colors.border}`,
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ textAlign: 'center' as const }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎉</div>
+                            <h3 style={{
+                                fontSize: '1.5rem',
+                                fontWeight: 700,
+                                color: colors.text,
+                                margin: '0 0 12px',
+                            }}>
+                                Phân tích hoàn tất!
+                            </h3>
+                            <p style={{
+                                fontSize: '0.9375rem',
+                                color: colors.textMuted,
+                                margin: '0 0 24px',
+                                lineHeight: 1.6,
+                            }}>
+                                AI đã phát hiện <strong>{aiAnalysis?.verdict ? 1 : 0}</strong> khuyến nghị quan trọng.
+                                <br />
+                                Bạn muốn tạo đề xuất tự động không?
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                <button
+                                    onClick={() => {
+                                        setShowProposalPrompt(false);
+                                        handleCreateProposal();
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px 24px',
+                                        background: colors.primary,
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '0.9375rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    🤖 Tạo ngay
+                                </button>
+                                <button
+                                    onClick={() => setShowProposalPrompt(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px 24px',
+                                        background: colors.bgAlt,
+                                        color: colors.text,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        fontSize: '0.9375rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    Xem chi tiết
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

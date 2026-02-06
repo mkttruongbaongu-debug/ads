@@ -329,6 +329,9 @@ export default function DashboardPage() {
     // Pending proposals count for badge
     const [pendingCount, setPendingCount] = useState(0);
 
+    // Track which campaigns have been analyzed
+    const [analyzedCampaigns, setAnalyzedCampaigns] = useState<Record<string, boolean>>({});
+
     // Campaign filter
     const [filterText, setFilterText] = useState('');
 
@@ -492,6 +495,18 @@ export default function DashboardPage() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status]); // ONLY depend on status, NOT session!
+
+    // Load analyzed campaigns from localStorage on mount
+    useEffect(() => {
+        const stored = localStorage.getItem('analyzedCampaigns');
+        if (stored) {
+            try {
+                setAnalyzedCampaigns(JSON.parse(stored));
+            } catch (e) {
+                console.error('[DASHBOARD] Failed to parse analyzedCampaigns:', e);
+            }
+        }
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = () => setShowUserMenu(false);
@@ -1116,8 +1131,28 @@ export default function DashboardPage() {
                                                                 {statusIcon}
                                                             </div>
                                                             <div>
-                                                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem' }}>
-                                                                    {campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}
+                                                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
+                                                                    {analyzedCampaigns[campaign.id] && (
+                                                                        <span
+                                                                            style={{
+                                                                                display: 'inline-flex',
+                                                                                alignItems: 'center',
+                                                                                gap: '4px',
+                                                                                padding: '2px 8px',
+                                                                                borderRadius: '4px',
+                                                                                fontSize: '0.65rem',
+                                                                                fontWeight: 600,
+                                                                                background: colors.primary + '20',
+                                                                                color: colors.primary,
+                                                                                border: `1px solid ${colors.primary}40`,
+                                                                                whiteSpace: 'nowrap' as const,
+                                                                            }}
+                                                                            title="Campaign đã được AI phân tích"
+                                                                        >
+                                                                            🤖
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                                 <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
                                                                     {campaign.id}
@@ -1194,11 +1229,13 @@ function CampaignCard({
     borderColor,
     formatMoney,
     onSelect,
+    hasAIAnalysis,
 }: {
     campaign: CampaignWithIssues;
     borderColor: string;
     formatMoney: (n: number) => string;
     onSelect: () => void;
+    hasAIAnalysis?: boolean;
 }) {
     return (
         <div
@@ -1206,28 +1243,50 @@ function CampaignCard({
             onClick={onSelect}
         >
             {/* Header with name and action badge */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <h3 style={{ ...styles.campaignName, marginBottom: 0 }}>{campaign.name}</h3>
-                {campaign.actionRecommendation && (
-                    <span
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                            background: campaign.actionRecommendation.color + '20',
-                            color: campaign.actionRecommendation.color,
-                            border: `1px solid ${campaign.actionRecommendation.color}40`,
-                            whiteSpace: 'nowrap',
-                        }}
-                        title={campaign.actionRecommendation.reason}
-                    >
-                        {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : 'THEO DÕI'}
-                    </span>
-                )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
+                <h3 style={{ ...styles.campaignName, marginBottom: 0, flex: 1 }}>{campaign.name}</h3>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    {hasAIAnalysis && (
+                        <span
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                background: colors.primary + '20',
+                                color: colors.primary,
+                                border: `1px solid ${colors.primary}40`,
+                                whiteSpace: 'nowrap',
+                            }}
+                            title="Campaign đã được AI phân tích"
+                        >
+                            🤖 Đã phân tích
+                        </span>
+                    )}
+                    {campaign.actionRecommendation && (
+                        <span
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                background: campaign.actionRecommendation.color + '20',
+                                color: campaign.actionRecommendation.color,
+                                border: `1px solid ${campaign.actionRecommendation.color}40`,
+                                whiteSpace: 'nowrap',
+                            }}
+                            title={campaign.actionRecommendation.reason}
+                        >
+                            {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : 'THEO DÕI'}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* Issues */}

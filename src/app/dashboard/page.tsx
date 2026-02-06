@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 import HopThuDeXuat from '@/components/HopThuDeXuat';
+import BangGiamSat from '@/components/BangGiamSat';
 
 interface Issue {
     type: string;
@@ -337,7 +338,7 @@ export default function DashboardPage() {
     const [filterText, setFilterText] = useState('');
 
     // Tab navigation - keeps state when switching views
-    const [activeView, setActiveView] = useState<'campaigns' | 'proposals'>('campaigns');
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'monitoring'>('campaigns');
 
     // Date range - last 7 days
     const [endDate, setEndDate] = useState(() => {
@@ -547,18 +548,46 @@ export default function DashboardPage() {
                 {/* Top Row: Logo + Logout */}
                 <div style={styles.headerTop}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                        {/* Logo - click to go back to campaigns */}
-                        <div
-                            style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-                            onClick={() => setActiveView('campaigns')}
-                            title="Về trang phân tích chiến dịch"
-                        >
+                        {/* Logo */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
                             <span style={styles.logo}>QUÂN SƯ ADS</span>
                         </div>
 
-                        {/* Navigation Tabs */}
+                        {/* Navigation Tabs - 3 clear buttons */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* CAMPAIGNS Tab */}
+                            <button
+                                onClick={() => setActiveView('campaigns')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: activeView === 'campaigns' ? 'rgba(240, 185, 11, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'campaigns' ? colors.primary : colors.border}`,
+                                    borderRadius: '6px',
+                                    color: activeView === 'campaigns' ? colors.primary : colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                title="Phân tích và quản lý chiến dịch quảng cáo"
+                                onMouseEnter={(e) => {
+                                    if (activeView !== 'campaigns') {
+                                        e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.primary;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeView !== 'campaigns') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
+                                }}
+                            >
+                                CAMPAIGNS
+                            </button>
+
+                            {/* ĐỀ XUẤT Tab */}
                             <button
                                 onClick={() => setActiveView('proposals')}
                                 style={{
@@ -574,7 +603,6 @@ export default function DashboardPage() {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    position: 'relative' as const,
                                 }}
                                 title="Xem danh sách đề xuất tối ưu do AI tạo - Duyệt hoặc từ chối các khuyến nghị"
                                 onMouseEnter={(e) => {
@@ -607,28 +635,33 @@ export default function DashboardPage() {
                                 )}
                             </button>
 
+                            {/* GIÁM SÁT Tab */}
                             <button
-                                onClick={() => router.push('/dashboard/monitoring')}
+                                onClick={() => setActiveView('monitoring')}
                                 style={{
                                     padding: '8px 16px',
-                                    background: 'transparent',
-                                    border: `1px solid ${colors.border}`,
+                                    background: activeView === 'monitoring' ? 'rgba(240, 185, 11, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'monitoring' ? colors.primary : colors.border}`,
                                     borderRadius: '6px',
-                                    color: colors.text,
+                                    color: activeView === 'monitoring' ? colors.primary : colors.text,
                                     fontSize: '0.875rem',
                                     fontWeight: 600,
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                 }}
+                                title="Xem lịch sử giám sát campaigns - Theo dõi các thay đổi và cảnh báo"
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
-                                    e.currentTarget.style.borderColor = colors.primary;
+                                    if (activeView !== 'monitoring') {
+                                        e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.primary;
+                                    }
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'transparent';
-                                    e.currentTarget.style.borderColor = colors.border;
+                                    if (activeView !== 'monitoring') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
                                 }}
-                                title="Xem lịch sử giám sát campaigns - Theo dõi các thay đổi và cảnh báo"
                             >
                                 GIÁM SÁT
                             </button>
@@ -885,6 +918,11 @@ export default function DashboardPage() {
                 {/* TAB: PROPOSALS - Show HopThuDeXuat inline */}
                 {activeView === 'proposals' && (
                     <HopThuDeXuat />
+                )}
+
+                {/* TAB: MONITORING - Show BangGiamSat inline */}
+                {activeView === 'monitoring' && (
+                    <BangGiamSat userId={session?.user?.email || ''} />
                 )}
 
                 {/* TAB: CAMPAIGNS - Show campaign analysis */}

@@ -569,29 +569,26 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 throw new Error(json.error || 'Failed to create proposal');
             }
 
-            // Display AI analysis results
+            // Display AI analysis results in console (detailed)
             const proposal = json.data;
-            const priorityEmoji = proposal.uuTien === 'CAO' ? '🔴' : proposal.uuTien === 'TRUNG_BINH' ? '🟡' : '🟢';
+            console.log('[PROPOSAL_CREATED]', {
+                id: proposal.deXuatId,
+                priority: proposal.uuTien,
+                summary: proposal.tomTat,
+                action: proposal.hanhDong
+            });
 
-            const resultMessage = `
-✅ ĐỀ XUẤT ĐÃ TẠO THÀNH CÔNG!
-
-${priorityEmoji} ƯU TIÊN: ${proposal.uuTien}
-
-📋 TÓM TẮT:
-${proposal.tomTat}
-
-⚡ HÀNH ĐỘNG ĐỀ XUẤT:
-${proposal.hanhDong.loai}
-${proposal.hanhDong.moTa}
-
-ID: ${proposal.deXuatId}
-            `.trim();
-
-            alert(resultMessage);
+            // Show simple success message for now
+            // TODO: Replace with professional modal showing full AI analysis
+            setProposalSuccess(
+                `✅ Đề xuất đã tạo! Priority: ${proposal.uuTien} | Action: ${proposal.hanhDong.loai}`
+            );
 
             // Close prompt modal if open
             setShowProposalPrompt(false);
+
+            // Auto-hide success message after 5s
+            setTimeout(() => setProposalSuccess(null), 5000);
         } catch (error) {
             console.error('Error creating proposal:', error);
             alert(`❌ Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);

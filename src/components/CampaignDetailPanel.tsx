@@ -81,6 +81,7 @@ interface Props {
     dateRange: { startDate: string; endDate: string };
     onClose: () => void;
     formatMoney: (n: number) => string;
+    accountId: string; // Facebook Ad Account ID
 }
 
 // Mini Bar Chart Component for issue visualization
@@ -429,7 +430,7 @@ const styles = {
     },
 };
 
-export default function CampaignDetailPanel({ campaign, dateRange, onClose, formatMoney }: Props) {
+export default function CampaignDetailPanel({ campaign, dateRange, onClose, formatMoney, accountId }: Props) {
     const [activeTab, setActiveTab] = useState<'overview' | 'ads'>('overview');
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -545,7 +546,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     campaignId: campaign.id,
                     startDate: dateRange.startDate,
                     endDate: dateRange.endDate,
-                    accountId: 'default', // TODO: Get from user context if needed
+                    accountId: accountId, // Use passed accountId instead of hardcoded value
                 }),
             });
 

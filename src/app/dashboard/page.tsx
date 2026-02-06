@@ -1218,6 +1218,7 @@ export default function DashboardPage() {
                     dateRange={{ startDate, endDate }}
                     onClose={() => setSelectedCampaign(null)}
                     formatMoney={formatMoney}
+                    accountId={selectedAccountId}
                 />
             )}
         </div>

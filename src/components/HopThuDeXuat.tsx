@@ -35,7 +35,7 @@ import type { DeXuat, TrangThaiDeXuat, MucDoUuTien } from '@/lib/de-xuat/types';
 // ===================================================================
 
 interface Props {
-    userId: string;
+    userId?: string;  // Optional - not currently used but kept for future use
 }
 
 // ===================================================================

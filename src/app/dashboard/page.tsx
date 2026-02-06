@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import CampaignDetailPanel from '@/components/CampaignDetailPanel';
+import HopThuDeXuat from '@/components/HopThuDeXuat';
 
 interface Issue {
     type: string;
@@ -335,6 +336,9 @@ export default function DashboardPage() {
     // Campaign filter
     const [filterText, setFilterText] = useState('');
 
+    // Tab navigation - keeps state when switching views
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals'>('campaigns');
+
     // Date range - last 7 days
     const [endDate, setEndDate] = useState(() => {
         const today = new Date();
@@ -543,22 +547,26 @@ export default function DashboardPage() {
                 {/* Top Row: Logo + Logout */}
                 <div style={styles.headerTop}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                        {/* Logo */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Logo - click to go back to campaigns */}
+                        <div
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                            onClick={() => setActiveView('campaigns')}
+                            title="Về trang phân tích chiến dịch"
+                        >
                             <Image src="/logo.png" alt="QUÂN SƯ ADS" width={36} height={36} style={{ borderRadius: '8px' }} />
                             <span style={styles.logo}>QUÂN SƯ ADS</span>
                         </div>
 
-                        {/* Navigation Links */}
+                        {/* Navigation Tabs */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
-                                onClick={() => router.push('/dashboard/proposals')}
+                                onClick={() => setActiveView('proposals')}
                                 style={{
                                     padding: '8px 16px',
-                                    background: 'transparent',
-                                    border: `1px solid ${colors.border}`,
+                                    background: activeView === 'proposals' ? 'rgba(240, 185, 11, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'proposals' ? colors.primary : colors.border}`,
                                     borderRadius: '6px',
-                                    color: colors.text,
+                                    color: activeView === 'proposals' ? colors.primary : colors.text,
                                     fontSize: '0.875rem',
                                     fontWeight: 600,
                                     cursor: 'pointer',
@@ -570,12 +578,16 @@ export default function DashboardPage() {
                                 }}
                                 title="Xem danh sách đề xuất tối ưu do AI tạo - Duyệt hoặc từ chối các khuyến nghị"
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
-                                    e.currentTarget.style.borderColor = colors.primary;
+                                    if (activeView !== 'proposals') {
+                                        e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.primary;
+                                    }
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'transparent';
-                                    e.currentTarget.style.borderColor = colors.border;
+                                    if (activeView !== 'proposals') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
                                 }}
                             >
                                 ĐỀ XUẤT
@@ -870,347 +882,357 @@ export default function DashboardPage() {
 
             {/* Main Content */}
             <main style={styles.main}>
-                {/* Error State */}
-                {error && (
-                    <div style={styles.error}>
-                        <p>❌ {error}</p>
-                        <button
-                            onClick={handleSearch}
-                            style={{ ...styles.searchBtn, marginTop: '16px' }}
-                        >
-                            Thử lại
-                        </button>
-                    </div>
+                {/* TAB: PROPOSALS - Show HopThuDeXuat inline */}
+                {activeView === 'proposals' && (
+                    <HopThuDeXuat />
                 )}
 
-                {/* Pre-search Empty State */}
-                {!hasSearched && !isLoading && !error && (
-                    <div style={styles.emptyState}>
-                        <p style={{ fontSize: '3rem', marginBottom: '16px', color: '#F0B90B', fontWeight: 300 }}>─</p>
-                        <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#EAECEF' }}>Chọn tài khoản và khoảng thời gian</p>
-                        <p style={{ color: '#848E9C', marginTop: '8px' }}>Sau đó bấm <strong>Tra cứu</strong> để phân tích campaigns</p>
-                    </div>
-                )}
-
-                {/* Loading State */}
-                {isLoading && !error && (
-                    <div style={styles.loader}>
-                        <p style={{ color: '#F0B90B' }}>● Đang phân tích campaigns...</p>
-                    </div>
-                )}
-
-                {/* Data */}
-                {hasSearched && data && !isLoading && (() => {
-                    // Filter campaigns by name
-                    const filterLower = filterText.toLowerCase();
-                    const filteredCritical = filterText
-                        ? data.critical.filter(c => c.name.toLowerCase().includes(filterLower))
-                        : data.critical;
-                    const filteredWarning = filterText
-                        ? data.warning.filter(c => c.name.toLowerCase().includes(filterLower))
-                        : data.warning;
-                    const filteredGood = filterText
-                        ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
-                        : data.good;
-
-                    // Calculate aggregate metrics
-                    const allCampaigns = [...data.critical, ...data.warning, ...data.good];
-                    const totalPurchases = allCampaigns.reduce((sum, c) => sum + c.totals.purchases, 0);
-                    const totalClicks = allCampaigns.reduce((sum, c) => sum + (c.totals.ctr > 0 ? c.totals.purchases / (c.totals.ctr / 100) : 0), 0);
-                    const avgRoas = data.summary.totalSpend > 0
-                        ? data.summary.totalRevenue / data.summary.totalSpend
-                        : 0;
-                    const avgAov = totalPurchases > 0
-                        ? data.summary.totalRevenue / totalPurchases
-                        : 0;
-                    const avgCvr = totalClicks > 0
-                        ? (totalPurchases / totalClicks) * 100
-                        : 0;
-
-                    return (
-                        <>
-                            {/* CEX Trading Stats Panel */}
-                            <div style={{ marginBottom: '24px' }}>
-                                {/* Primary Row: Financial Metrics */}
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(3, 1fr)',
-                                    gap: '16px',
-                                    marginBottom: '12px',
-                                }}>
-                                    {/* Spend Card */}
-                                    <div style={{
-                                        background: colors.bgCard,
-                                        borderRadius: '8px',
-                                        padding: '20px 24px',
-                                        border: `1px solid ${colors.border}`,
-                                    }}>
-                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
-                                            Tổng chi tiêu
-                                        </p>
-                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {formatMoney(data.summary.totalSpend)}
-                                        </p>
-                                    </div>
-
-                                    {/* Revenue Card */}
-                                    <div style={{
-                                        background: colors.bgCard,
-                                        borderRadius: '8px',
-                                        padding: '20px 24px',
-                                        border: `1px solid ${colors.border}`,
-                                    }}>
-                                        <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
-                                            Doanh thu
-                                        </p>
-                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {formatMoney(data.summary.totalRevenue)}
-                                        </p>
-                                    </div>
-
-                                    {/* ROAS Card - Highlighted */}
-                                    <div style={{
-                                        background: `linear-gradient(135deg, ${colors.bgCard} 0%, rgba(240,185,11,0.1) 100%)`,
-                                        borderRadius: '8px',
-                                        padding: '20px 24px',
-                                        border: `1px solid ${colors.primary}40`,
-                                    }}>
-                                        <p style={{ fontSize: '0.75rem', color: colors.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px', fontWeight: 600 }}>
-                                            ROAS
-                                        </p>
-                                        <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.primary, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {avgRoas.toFixed(2)}x
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Secondary Row: Performance + Campaign Counts */}
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(5, 1fr)',
-                                    gap: '12px',
-                                }}>
-                                    {/* CVR */}
-                                    <div style={{
-                                        background: 'rgba(255,255,255,0.02)',
-                                        borderRadius: '8px',
-                                        padding: '14px 18px',
-                                        border: `1px solid ${colors.border}`,
-                                    }}>
-                                        <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                            Tỷ lệ chốt
-                                        </p>
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {avgCvr.toFixed(2)}%
-                                        </p>
-                                    </div>
-
-                                    {/* AOV */}
-                                    <div style={{
-                                        background: 'rgba(255,255,255,0.02)',
-                                        borderRadius: '8px',
-                                        padding: '14px 18px',
-                                        border: `1px solid ${colors.border}`,
-                                    }}>
-                                        <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                            AOV
-                                        </p>
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {formatMoney(avgAov)}
-                                        </p>
-                                    </div>
-
-                                    {/* Critical Count */}
-                                    <div style={{
-                                        background: 'rgba(248,113,113,0.08)',
-                                        borderRadius: '8px',
-                                        padding: '14px 18px',
-                                        border: `1px solid rgba(248,113,113,0.3)`,
-                                    }}>
-                                        <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                            Cần xử lý
-                                        </p>
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {data.summary.critical}
-                                        </p>
-                                    </div>
-
-                                    {/* Warning Count */}
-                                    <div style={{
-                                        background: `rgba(240,185,11,0.08)`,
-                                        borderRadius: '8px',
-                                        padding: '14px 18px',
-                                        border: `1px solid rgba(240,185,11,0.3)`,
-                                    }}>
-                                        <p style={{ fontSize: '0.65rem', color: '#FCD535', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                            Theo dõi
-                                        </p>
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {data.summary.warning}
-                                        </p>
-                                    </div>
-
-                                    {/* Good Count */}
-                                    <div style={{
-                                        background: 'rgba(14,203,129,0.08)',
-                                        borderRadius: '8px',
-                                        padding: '14px 18px',
-                                        border: `1px solid rgba(14,203,129,0.3)`,
-                                    }}>
-                                        <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                            Đang tốt
-                                        </p>
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                            {data.summary.good}
-                                        </p>
-                                    </div>
-                                </div>
+                {/* TAB: CAMPAIGNS - Show campaign analysis */}
+                {activeView === 'campaigns' && (
+                    <>
+                        {/* Error State */}
+                        {error && (
+                            <div style={styles.error}>
+                                <p>❌ {error}</p>
+                                <button
+                                    onClick={handleSearch}
+                                    style={{ ...styles.searchBtn, marginTop: '16px' }}
+                                >
+                                    Thử lại
+                                </button>
                             </div>
+                        )}
 
-                            {/* Campaign Table View (like landing demo) */}
-                            <div style={{
-                                background: colors.bgCard,
-                                borderRadius: '8px',
-                                border: `1px solid ${colors.border}`,
-                                marginBottom: '28px',
-                                overflow: 'hidden',
-                            }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                    <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
-                                        <tr>
-                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                Chiến dịch
-                                            </th>
-                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                Chi tiêu
-                                            </th>
-                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                ROAS
-                                            </th>
-                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                CTR
-                                            </th>
-                                            <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                Đề xuất AI
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
-                                            const action = campaign.actionRecommendation?.action || 'WATCH';
-                                            const actionLabel = action === 'STOP' ? 'Dừng' : action === 'WATCH' ? 'Tối ưu' : 'Scale';
-                                            const actionColor = action === 'STOP' ? colors.error : action === 'WATCH' ? colors.warning : colors.success;
-                                            const statusIcon = action === 'SCALE' ? '✓' : action === 'WATCH' ? '!' : '✕';
-                                            const roasValue = campaign.totals.roas;
-                                            const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
+                        {/* Pre-search Empty State */}
+                        {!hasSearched && !isLoading && !error && (
+                            <div style={styles.emptyState}>
+                                <p style={{ fontSize: '3rem', marginBottom: '16px', color: '#F0B90B', fontWeight: 300 }}>─</p>
+                                <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#EAECEF' }}>Chọn tài khoản và khoảng thời gian</p>
+                                <p style={{ color: '#848E9C', marginTop: '8px' }}>Sau đó bấm <strong>Tra cứu</strong> để phân tích campaigns</p>
+                            </div>
+                        )}
 
-                                            return (
-                                                <tr
-                                                    key={campaign.id}
-                                                    onClick={() => setSelectedCampaign(campaign)}
-                                                    style={{
-                                                        borderBottom: `1px solid ${colors.border}`,
-                                                        cursor: 'pointer',
-                                                        transition: 'background 0.15s',
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                >
-                                                    <td style={{ padding: '16px 20px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <div style={{
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                borderRadius: '50%',
-                                                                background: actionColor,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                fontSize: '0.85rem',
-                                                                fontWeight: 700,
-                                                                color: colors.bg,
-                                                            }}>
-                                                                {statusIcon}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                    <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
-                                                                    {analyzedCampaigns[campaign.id] && (
-                                                                        <span
-                                                                            style={{
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px',
-                                                                                padding: '2px 8px',
-                                                                                borderRadius: '4px',
-                                                                                fontSize: '0.65rem',
-                                                                                fontWeight: 600,
-                                                                                background: colors.primary + '20',
-                                                                                color: colors.primary,
-                                                                                border: `1px solid ${colors.primary}40`,
-                                                                                whiteSpace: 'nowrap' as const,
-                                                                            }}
-                                                                            title="Campaign đã được AI phân tích"
-                                                                        >
-                                                                            AI
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
-                                                                    {campaign.id}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
-                                                            {formatMoney(campaign.totals.spend)}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
-                                                            {roasValue.toFixed(1)}x
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
-                                                            {campaign.totals.ctr.toFixed(2)}%
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                        <button style={{
-                                                            background: actionColor,
-                                                            color: action === 'WATCH' ? colors.bg : '#fff',
-                                                            border: 'none',
-                                                            padding: '6px 16px',
-                                                            borderRadius: '4px',
-                                                            fontWeight: 600,
-                                                            fontSize: '0.8rem',
-                                                            cursor: 'pointer',
-                                                            transition: 'opacity 0.15s',
-                                                        }}>
-                                                            {actionLabel}
-                                                        </button>
-                                                    </td>
+                        {/* Loading State */}
+                        {isLoading && !error && (
+                            <div style={styles.loader}>
+                                <p style={{ color: '#F0B90B' }}>● Đang phân tích campaigns...</p>
+                            </div>
+                        )}
+
+                        {/* Data */}
+                        {hasSearched && data && !isLoading && (() => {
+                            // Filter campaigns by name
+                            const filterLower = filterText.toLowerCase();
+                            const filteredCritical = filterText
+                                ? data.critical.filter(c => c.name.toLowerCase().includes(filterLower))
+                                : data.critical;
+                            const filteredWarning = filterText
+                                ? data.warning.filter(c => c.name.toLowerCase().includes(filterLower))
+                                : data.warning;
+                            const filteredGood = filterText
+                                ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
+                                : data.good;
+
+                            // Calculate aggregate metrics
+                            const allCampaigns = [...data.critical, ...data.warning, ...data.good];
+                            const totalPurchases = allCampaigns.reduce((sum, c) => sum + c.totals.purchases, 0);
+                            const totalClicks = allCampaigns.reduce((sum, c) => sum + (c.totals.ctr > 0 ? c.totals.purchases / (c.totals.ctr / 100) : 0), 0);
+                            const avgRoas = data.summary.totalSpend > 0
+                                ? data.summary.totalRevenue / data.summary.totalSpend
+                                : 0;
+                            const avgAov = totalPurchases > 0
+                                ? data.summary.totalRevenue / totalPurchases
+                                : 0;
+                            const avgCvr = totalClicks > 0
+                                ? (totalPurchases / totalClicks) * 100
+                                : 0;
+
+                            return (
+                                <>
+                                    {/* CEX Trading Stats Panel */}
+                                    <div style={{ marginBottom: '24px' }}>
+                                        {/* Primary Row: Financial Metrics */}
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(3, 1fr)',
+                                            gap: '16px',
+                                            marginBottom: '12px',
+                                        }}>
+                                            {/* Spend Card */}
+                                            <div style={{
+                                                background: colors.bgCard,
+                                                borderRadius: '8px',
+                                                padding: '20px 24px',
+                                                border: `1px solid ${colors.border}`,
+                                            }}>
+                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                                    Tổng chi tiêu
+                                                </p>
+                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {formatMoney(data.summary.totalSpend)}
+                                                </p>
+                                            </div>
+
+                                            {/* Revenue Card */}
+                                            <div style={{
+                                                background: colors.bgCard,
+                                                borderRadius: '8px',
+                                                padding: '20px 24px',
+                                                border: `1px solid ${colors.border}`,
+                                            }}>
+                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                                    Doanh thu
+                                                </p>
+                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {formatMoney(data.summary.totalRevenue)}
+                                                </p>
+                                            </div>
+
+                                            {/* ROAS Card - Highlighted */}
+                                            <div style={{
+                                                background: `linear-gradient(135deg, ${colors.bgCard} 0%, rgba(240,185,11,0.1) 100%)`,
+                                                borderRadius: '8px',
+                                                padding: '20px 24px',
+                                                border: `1px solid ${colors.primary}40`,
+                                            }}>
+                                                <p style={{ fontSize: '0.75rem', color: colors.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px', fontWeight: 600 }}>
+                                                    ROAS
+                                                </p>
+                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.primary, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {avgRoas.toFixed(2)}x
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Secondary Row: Performance + Campaign Counts */}
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(5, 1fr)',
+                                            gap: '12px',
+                                        }}>
+                                            {/* CVR */}
+                                            <div style={{
+                                                background: 'rgba(255,255,255,0.02)',
+                                                borderRadius: '8px',
+                                                padding: '14px 18px',
+                                                border: `1px solid ${colors.border}`,
+                                            }}>
+                                                <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                    Tỷ lệ chốt
+                                                </p>
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {avgCvr.toFixed(2)}%
+                                                </p>
+                                            </div>
+
+                                            {/* AOV */}
+                                            <div style={{
+                                                background: 'rgba(255,255,255,0.02)',
+                                                borderRadius: '8px',
+                                                padding: '14px 18px',
+                                                border: `1px solid ${colors.border}`,
+                                            }}>
+                                                <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                    AOV
+                                                </p>
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {formatMoney(avgAov)}
+                                                </p>
+                                            </div>
+
+                                            {/* Critical Count */}
+                                            <div style={{
+                                                background: 'rgba(248,113,113,0.08)',
+                                                borderRadius: '8px',
+                                                padding: '14px 18px',
+                                                border: `1px solid rgba(248,113,113,0.3)`,
+                                            }}>
+                                                <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                    Cần xử lý
+                                                </p>
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {data.summary.critical}
+                                                </p>
+                                            </div>
+
+                                            {/* Warning Count */}
+                                            <div style={{
+                                                background: `rgba(240,185,11,0.08)`,
+                                                borderRadius: '8px',
+                                                padding: '14px 18px',
+                                                border: `1px solid rgba(240,185,11,0.3)`,
+                                            }}>
+                                                <p style={{ fontSize: '0.65rem', color: '#FCD535', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                    Theo dõi
+                                                </p>
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {data.summary.warning}
+                                                </p>
+                                            </div>
+
+                                            {/* Good Count */}
+                                            <div style={{
+                                                background: 'rgba(14,203,129,0.08)',
+                                                borderRadius: '8px',
+                                                padding: '14px 18px',
+                                                border: `1px solid rgba(14,203,129,0.3)`,
+                                            }}>
+                                                <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                    Đang tốt
+                                                </p>
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                    {data.summary.good}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Campaign Table View (like landing demo) */}
+                                    <div style={{
+                                        background: colors.bgCard,
+                                        borderRadius: '8px',
+                                        border: `1px solid ${colors.border}`,
+                                        marginBottom: '28px',
+                                        overflow: 'hidden',
+                                    }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                                <tr>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        Chiến dịch
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        Chi tiêu
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        ROAS
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        CTR
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        Đề xuất AI
+                                                    </th>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                            </thead>
+                                            <tbody>
+                                                {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
+                                                    const action = campaign.actionRecommendation?.action || 'WATCH';
+                                                    const actionLabel = action === 'STOP' ? 'Dừng' : action === 'WATCH' ? 'Tối ưu' : 'Scale';
+                                                    const actionColor = action === 'STOP' ? colors.error : action === 'WATCH' ? colors.warning : colors.success;
+                                                    const statusIcon = action === 'SCALE' ? '✓' : action === 'WATCH' ? '!' : '✕';
+                                                    const roasValue = campaign.totals.roas;
+                                                    const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
 
-                            {/* Campaign sections removed - Table View above shows all info */}
+                                                    return (
+                                                        <tr
+                                                            key={campaign.id}
+                                                            onClick={() => setSelectedCampaign(campaign)}
+                                                            style={{
+                                                                borderBottom: `1px solid ${colors.border}`,
+                                                                cursor: 'pointer',
+                                                                transition: 'background 0.15s',
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                        >
+                                                            <td style={{ padding: '16px 20px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                    <div style={{
+                                                                        width: '32px',
+                                                                        height: '32px',
+                                                                        borderRadius: '50%',
+                                                                        background: actionColor,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        fontSize: '0.85rem',
+                                                                        fontWeight: 700,
+                                                                        color: colors.bg,
+                                                                    }}>
+                                                                        {statusIcon}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
+                                                                            {analyzedCampaigns[campaign.id] && (
+                                                                                <span
+                                                                                    style={{
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '4px',
+                                                                                        padding: '2px 8px',
+                                                                                        borderRadius: '4px',
+                                                                                        fontSize: '0.65rem',
+                                                                                        fontWeight: 600,
+                                                                                        background: colors.primary + '20',
+                                                                                        color: colors.primary,
+                                                                                        border: `1px solid ${colors.primary}40`,
+                                                                                        whiteSpace: 'nowrap' as const,
+                                                                                    }}
+                                                                                    title="Campaign đã được AI phân tích"
+                                                                                >
+                                                                                    AI
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                                            {campaign.id}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
+                                                                    {formatMoney(campaign.totals.spend)}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
+                                                                    {roasValue.toFixed(1)}x
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
+                                                                    {campaign.totals.ctr.toFixed(2)}%
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <button style={{
+                                                                    background: actionColor,
+                                                                    color: action === 'WATCH' ? colors.bg : '#fff',
+                                                                    border: 'none',
+                                                                    padding: '6px 16px',
+                                                                    borderRadius: '4px',
+                                                                    fontWeight: 600,
+                                                                    fontSize: '0.8rem',
+                                                                    cursor: 'pointer',
+                                                                    transition: 'opacity 0.15s',
+                                                                }}>
+                                                                    {actionLabel}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                            {/* Empty State */}
-                            {data.summary.total === 0 && (
-                                <div style={styles.emptyState}>
-                                    <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
-                                    <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
-                                </div>
-                            )}
-                        </>
-                    );
-                })()}
+                                    {/* Campaign sections removed - Table View above shows all info */}
+
+                                    {/* Empty State */}
+                                    {data.summary.total === 0 && (
+                                        <div style={styles.emptyState}>
+                                            <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
+                                            <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </>
+                )}
             </main>
 
             {/* Campaign Detail Panel */}

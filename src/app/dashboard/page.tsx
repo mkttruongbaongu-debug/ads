@@ -568,6 +568,7 @@ export default function DashboardPage() {
                                     gap: '6px',
                                     position: 'relative' as const,
                                 }}
+                                title="Xem danh sách đề xuất tối ưu do AI tạo - Duyệt hoặc từ chối các khuyến nghị"
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
                                     e.currentTarget.style.borderColor = colors.primary;
@@ -615,6 +616,7 @@ export default function DashboardPage() {
                                     e.currentTarget.style.background = 'transparent';
                                     e.currentTarget.style.borderColor = colors.border;
                                 }}
+                                title="Xem lịch sử giám sát campaigns - Theo dõi các thay đổi và cảnh báo"
                             >
                                 GIÁM SÁT
                             </button>

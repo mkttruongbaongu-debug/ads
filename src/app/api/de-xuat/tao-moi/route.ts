@@ -45,7 +45,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { taoDeXuat, type TaoDeXuatInput } from '@/lib/de-xuat/tao-de-xuat';
-import { getFacebookClient } from '@/lib/facebook/client';
+import { FacebookAdsClient } from '@/lib/facebook/client';
 import { calculateDerivedMetrics } from '@/lib/facebook/metrics';
 
 // ===================================================================
@@ -83,6 +83,19 @@ export async function POST(request: NextRequest) {
         const userId = session.user?.name || session.user?.email || 'unknown'; // Use name or email as user ID
         console.log(`[API:TAO_DE_XUAT] 👤 User: ${userId}`);
 
+        // Get access token from session
+        const accessToken = (session as any).accessToken;
+
+        if (!accessToken) {
+            console.log('[API:TAO_DE_XUAT] ❌ No access token in session');
+            return NextResponse.json(
+                { success: false, error: 'Không tìm thấy access token. Vui lòng đăng nhập lại.' },
+                { status: 401 }
+            );
+        }
+
+        console.log(`[API:TAO_DE_XUAT] 🔑 Access token found`);
+
         // ===================================================================
         // STEP 2: Parse & Validate Request
         // ===================================================================
@@ -115,7 +128,8 @@ export async function POST(request: NextRequest) {
         // ===================================================================
         console.log('[API:TAO_DE_XUAT] 🔍 Fetching campaign data from Facebook...');
 
-        const fb = getFacebookClient();
+        // Create Facebook client with session token
+        const fb = new FacebookAdsClient(accessToken);
 
         // ===================================================================
         // STEP 4: Fetch Metrics (Current Period)

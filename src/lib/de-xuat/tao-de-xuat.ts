@@ -232,13 +232,19 @@ export async function taoDeXuat(
                 saveStatus = { saved: false, error: 'GOOGLE_APPS_SCRIPT_URL not configured' };
             } else {
                 const fullUrl = `${appsScriptUrl}?action=ghiDeXuat`;
+                const apiSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+
                 console.log('[TAO_DE_XUAT] 📤 Calling:', fullUrl);
+                console.log('[TAO_DE_XUAT] 🔑 API Secret:', apiSecret ? 'SET ✅' : 'NOT SET ❌');
                 console.log('[TAO_DE_XUAT] 📦 Request body:', JSON.stringify(deXuat, null, 2));
 
                 const response = await fetch(fullUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(deXuat),
+                    body: JSON.stringify({
+                        secret: apiSecret,
+                        ...deXuat,
+                    }),
                 });
 
                 console.log('[TAO_DE_XUAT] 📥 Response status:', response.status, response.statusText);

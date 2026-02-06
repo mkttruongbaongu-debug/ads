@@ -8,6 +8,9 @@
  * User reject một proposal.
  * Update status từ CHO_DUYET → BI_TU_CHOI.
  * 
+ * Uses Apps Script Proxy instead of direct Google Sheets API
+ * to avoid Service Account credential issues.
+ * 
  * Request Body:
  * {
  *   deXuatId: string,
@@ -23,13 +26,13 @@
  * 
  * Tác giả: AI Campaign Guardian System
  * Ngày tạo: 2026-02-05
+ * Updated: 2026-02-06 - Switch to Apps Script Proxy
  * ===================================================================
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { capNhatThongTinDuyet, layDeXuatTheoId } from '@/lib/sheets/de-xuat-sheet';
 
 // ===================================================================
 // TYPES
@@ -95,53 +98,70 @@ export async function POST(request: NextRequest) {
 
         console.log(`[API:TU_CHOI_DE_XUAT] 🎯 Proposal ID: ${deXuatId}`);
         console.log(`[API:TU_CHOI_DE_XUAT] 📝 Reason: ${ghiChu}`);
+        console.log(`[API:TU_CHOI_DE_XUAT] 👤 User: ${userId}`);
 
         // ===================================================================
-        // STEP 3: Verify proposal exists & belongs to user
+        // STEP 3: Call Apps Script to update proposal
         // ===================================================================
-        const deXuat = await layDeXuatTheoId(deXuatId);
+        const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        const apiSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
 
-        if (!deXuat) {
+        if (!appsScriptUrl || !apiSecret) {
+            console.error('[API:TU_CHOI_DE_XUAT] ❌ Missing Apps Script config');
             return NextResponse.json(
-                { success: false, error: 'Proposal not found' },
-                { status: 404 }
+                { success: false, error: 'Server configuration error' },
+                { status: 500 }
             );
         }
 
-        if (deXuat.userId !== userId) {
+        console.log('[API:TU_CHOI_DE_XUAT] 📤 Calling Apps Script capNhatDeXuat...');
+
+        const updatePayload = {
+            action: 'capNhatDeXuat',
+            secret: apiSecret,
+            id: deXuatId,
+            trangThai: 'BI_TU_CHOI',
+            nguoiDuyet: userId,
+            thoiGian_Duyet: new Date().toISOString(),
+            ghiChu_NguoiDung: ghiChu,
+        };
+
+        console.log('[API:TU_CHOI_DE_XUAT] 📦 Payload:', JSON.stringify(updatePayload, null, 2));
+
+        const response = await fetch(`${appsScriptUrl}?action=capNhatDeXuat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatePayload),
+        });
+
+        const responseText = await response.text();
+        console.log('[API:TU_CHOI_DE_XUAT] 📥 Response text:', responseText);
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error('[API:TU_CHOI_DE_XUAT] ❌ Failed to parse response:', e);
             return NextResponse.json(
-                { success: false, error: 'Unauthorized: Proposal belongs to another user' },
-                { status: 403 }
+                { success: false, error: 'Invalid response from Apps Script' },
+                { status: 500 }
             );
         }
 
-        // Check current status
-        if (deXuat.trangThai !== 'CHO_DUYET') {
+        if (!result.success) {
+            console.error('[API:TU_CHOI_DE_XUAT] ❌ Apps Script error:', result.error);
             return NextResponse.json(
-                {
-                    success: false,
-                    error: `Cannot reject proposal with status: ${deXuat.trangThai}. Only CHO_DUYET proposals can be rejected.`,
-                },
-                { status: 400 }
+                { success: false, error: result.error || 'Apps Script error' },
+                { status: 500 }
             );
         }
-
-        // ===================================================================
-        // STEP 4: Update proposal
-        // ===================================================================
-        console.log('[API:TU_CHOI_DE_XUAT] 🚫 Updating proposal to BI_TU_CHOI...');
-
-        await capNhatThongTinDuyet(
-            deXuatId,
-            userId,
-            'BI_TU_CHOI',
-            ghiChu
-        );
 
         console.log('[API:TU_CHOI_DE_XUAT] ✅ Proposal rejected successfully');
 
         // ===================================================================
-        // STEP 5: Return Response
+        // STEP 4: Return Response
         // ===================================================================
         return NextResponse.json(
             {
@@ -149,7 +169,6 @@ export async function POST(request: NextRequest) {
                 data: {
                     message: 'Đề xuất đã bị từ chối',
                     deXuatId,
-                    campaign: deXuat.tenCampaign,
                     reason: ghiChu,
                 },
             },

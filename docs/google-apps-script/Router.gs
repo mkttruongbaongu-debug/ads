@@ -22,7 +22,6 @@ function handleRequest(e) {
   try {
     // Parse parameters
     const params = e.parameter || {};
-    const action = params.action;
     
     // Parse POST body if exists
     let body = {};
@@ -35,6 +34,18 @@ function handleRequest(e) {
           error: 'Invalid JSON in request body' 
         }, 400);
       }
+    }
+    
+    // Get action from URL params OR body (fallback)
+    const action = params.action || body.action;
+    
+    // Validate secret
+    const secret = body.secret;
+    if (secret !== CONFIG.API_SECRET) {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Invalid API secret' 
+      }, 401);
     }
     
     // Log request (for debugging)

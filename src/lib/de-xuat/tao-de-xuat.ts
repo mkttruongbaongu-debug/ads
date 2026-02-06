@@ -213,13 +213,32 @@ export async function taoDeXuat(
         // ===================================================================
         // STEP 4: Lưu vào Google Sheets via Apps Script
         // ===================================================================
-        // TODO: Implement Apps Script endpoint for saving proposals
-        // For now, skip saving to avoid Service Account error on Netlify
-        console.log('[TAO_DE_XUAT] ⚠️ Skipping Sheets save (not yet implemented via Apps Script)');
+        console.log('[TAO_DE_XUAT] 💾 Lưu đề xuất vào Google Sheets...');
 
-        // await themDeXuat(deXuat); // DISABLED: Requires Service Account credentials
+        try {
+            const appsScriptUrl = process.env.GOOGLE_SHEETS_API_URL;
+            if (!appsScriptUrl) {
+                console.warn('[TAO_DE_XUAT] ⚠️ Warning: GOOGLE_SHEETS_API_URL not configured, skipping save');
+            } else {
+                const response = await fetch(`${appsScriptUrl}?action=ghiDeXuat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(deXuat),
+                });
 
-        console.log('[TAO_DE_XUAT] ✅ Proposal created (in-memory only)');
+                const result = await response.json();
+
+                if (!result.success) {
+                    console.error('[TAO_DE_XUAT] ❌ Lỗi khi lưu:', result.error);
+                    // Don't throw - proposal still valid, just not persisted
+                } else {
+                    console.log('[TAO_DE_XUAT] ✅ Đã lưu đề xuất vào Sheets thành công');
+                }
+            }
+        } catch (saveError) {
+            console.error('[TAO_DE_XUAT] ❌ Lỗi khi gọi Apps Script:', saveError);
+            // Don't throw - proposal still valid, just not persisted
+        }
 
         // ===================================================================
         // STEP 5: Return success response

@@ -364,6 +364,12 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
         return value.toLocaleString('de-DE') + ' ₫';
     };
 
+    // Round budget to nearest 100K for realistic display
+    const roundBudget = (value: number): number => {
+        if (value <= 0) return 0;
+        return Math.round(value / 100000) * 100000;
+    };
+
     // ===================================================================
     // RENDER
     // ===================================================================
@@ -396,20 +402,110 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
             <div style={styles.actionSection}>
                 <p style={styles.actionTitle}>Hành động đề xuất</p>
                 <p style={styles.actionType}>{actionTypeLabels[deXuat.hanhDong.loai] || deXuat.hanhDong.loai.replace(/_/g, ' ')}</p>
-                <p style={styles.actionDesc}>{deXuat.hanhDong.lyDo}</p>
+
+                {/* Lý do chi tiết */}
+                {deXuat.hanhDong.lyDo && (
+                    <p style={{ ...styles.actionDesc, background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '6px', border: `1px solid ${colors.border}` }}>
+                        {deXuat.hanhDong.lyDo}
+                    </p>
+                )}
+
+                {/* Budget values - round to nearest 100K */}
                 <div style={styles.actionMeta}>
                     {deXuat.hanhDong.giaTri_HienTai && (
-                        <span>Hiện tại: {formatCurrency(Number(deXuat.hanhDong.giaTri_HienTai))} → </span>
+                        <span>Hiện tại: {formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_HienTai)))} → </span>
                     )}
                     <span>Đề xuất: {typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
-                        ? formatCurrency(deXuat.hanhDong.giaTri_DeXuat)
-                        : deXuat.hanhDong.giaTri_DeXuat
+                        ? formatCurrency(roundBudget(deXuat.hanhDong.giaTri_DeXuat))
+                        : typeof deXuat.hanhDong.giaTri_DeXuat === 'string' && !isNaN(Number(deXuat.hanhDong.giaTri_DeXuat))
+                            ? formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_DeXuat)))
+                            : deXuat.hanhDong.giaTri_DeXuat
                     }</span>
                     {deXuat.hanhDong.phanTram_ThayDoi && (
                         <span> ({deXuat.hanhDong.phanTram_ThayDoi > 0 ? '+' : ''}{deXuat.hanhDong.phanTram_ThayDoi}%)</span>
                     )}
                 </div>
+
+                {/* Các bước thực thi */}
+                {deXuat.hanhDong.cacBuoc && deXuat.hanhDong.cacBuoc.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                        <p style={{ ...styles.actionTitle, marginBottom: '8px' }}>Các bước thực thi</p>
+                        <ol style={{
+                            margin: 0,
+                            paddingLeft: '20px',
+                            color: colors.text,
+                            fontSize: '0.875rem',
+                            lineHeight: 1.8,
+                        }}>
+                            {deXuat.hanhDong.cacBuoc.map((buoc, idx) => (
+                                <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
+                            ))}
+                        </ol>
+                    </div>
+                )}
+
+                {/* Kết quả kỳ vọng */}
+                {deXuat.hanhDong.ketQua_KyVong && (
+                    <div style={{
+                        marginTop: '16px',
+                        padding: '12px 16px',
+                        background: 'rgba(14, 203, 129, 0.08)',
+                        borderRadius: '6px',
+                        border: `1px solid rgba(14, 203, 129, 0.2)`,
+                    }}>
+                        <p style={{ ...styles.actionTitle, color: colors.success, marginBottom: '4px' }}>Kết quả kỳ vọng</p>
+                        <p style={{ ...styles.agentText, fontSize: '0.875rem' }}>{deXuat.hanhDong.ketQua_KyVong}</p>
+                    </div>
+                )}
             </div>
+
+            {/* Metrics Snapshot */}
+            {deXuat.metrics_TruocKhi && (
+                <div style={{
+                    padding: '16px 24px',
+                    borderBottom: `1px solid ${colors.border}`,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '12px',
+                }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ROAS</p>
+                        <p style={{ color: deXuat.metrics_TruocKhi.roas >= 2 ? colors.success : colors.error, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                            {deXuat.metrics_TruocKhi.roas.toFixed(2)}x
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CPP</p>
+                        <p style={{ color: colors.text, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                            {formatCurrency(deXuat.metrics_TruocKhi.cpp)}
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ĐƠN HÀNG</p>
+                        <p style={{ color: colors.text, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                            {deXuat.metrics_TruocKhi.donHang}
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CHI TIÊU</p>
+                        <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
+                            {formatCurrency(deXuat.metrics_TruocKhi.chiTieu)}
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>DOANH THU</p>
+                        <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
+                            {formatCurrency(deXuat.metrics_TruocKhi.doanhThu)}
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CTR</p>
+                        <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
+                            {deXuat.metrics_TruocKhi.ctr.toFixed(2)}%
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* AI Agents Analysis */}
             <div style={styles.agentsSection}>

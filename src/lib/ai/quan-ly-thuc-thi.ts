@@ -179,6 +179,18 @@ Quy tắc quan trọng:
 - SAFE: Không recommend actions quá extreme (VD: giảm > 70% budget)
 - PRIORITIZE: Chọn action quan trọng NHẤT
 
+QUY TẮC ƯU TIÊN HÀNH ĐỘNG:
+- Nếu ROAS >= 2 VÀ CTR đang giảm → ƯU TIÊN "LAM_MOI_CREATIVE" (creative mệt, không phải vấn đề budget)
+- Nếu ROAS >= 2 VÀ Frequency > 2.5 → ƯU TIÊN "DIEU_CHINH_DOI_TUONG" (audience bão hòa)
+- CHỈ recommend "THAY_DOI_NGAN_SACH" khi ROAS < 2 hoặc CPP đang tăng rất mạnh
+- ROAS >= 4 = campaign rất tốt. ❌ TUYỆT ĐỐI KHÔNG giảm budget khi ROAS >= 4
+
+LƯU Ý VỀ SỐ LIỆU:
+- "Chi tiêu" trong metrics là TỔNG CHI TIÊU cả kỳ, KHÔNG phải daily budget
+- Nếu không biết daily budget → KHÔNG đề xuất con số budget cụ thể, thay vào đó nói "Giảm 30% daily budget"
+- Budget đề xuất phải là số tròn (bội số 100.000 VND), VD: 300.000, 500.000, 1.000.000
+- ❌ KHÔNG BAO GIỜ đề xuất số lẻ như 2.659.852
+
 Trả về JSON format:
 {
   "loai_hanh_dong": "TAM_DUNG | THAY_DOI_NGAN_SACH | LAM_MOI_CREATIVE | DIEU_CHINH_DOI_TUONG | DUNG_VINH_VIEN",

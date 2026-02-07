@@ -351,59 +351,89 @@ export default function DashboardPage() {
         return date.toISOString().split('T')[0];
     });
 
-    // Fetch user profile from TaiKhoan
-    const fetchUserProfile = useCallback(async () => {
-        console.log('[DASHBOARD/PROFILE] 🔍 Fetching user profile...');
-        try {
-            const res = await fetch('/api/user/profile');
-            const json = await res.json();
-            console.log('[DASHBOARD/PROFILE] 📦 API Response:', json);
-            if (json.success && json.data) {
-                console.log('[DASHBOARD/PROFILE] ✅ Setting profile:', json.data.name, json.data.plan);
-                setUserProfile({
-                    name: json.data.name || 'User',
-                    avatar: json.data.avatar || '',
-                    plan: json.data.plan || 'Free',
-                });
-            } else {
-                console.warn('[DASHBOARD/PROFILE] ⚠️ No profile data:', json);
-            }
-        } catch (err) {
-            console.error('[DASHBOARD/PROFILE] ❌ Failed to fetch user profile:', err);
-        }
-    }, []);
+    // Track if init already done
+    const initDoneRef = useRef(false);
 
-    // Track if accounts already fetched
-    const accountsFetchedRef = useRef(false);
+    // UNIFIED INIT: 1 API call replaces 3 separate calls
+    // Uses localStorage cache (10 min TTL) for instant load on revisit
+    const INIT_CACHE_KEY = 'dashboard_init_cache';
+    const INIT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-    // Fetch ad accounts - ONLY ONCE
-    const fetchAccounts = useCallback(async () => {
-        if (accountsFetchedRef.current) {
-            console.log('[DASHBOARD] ⏭️ Accounts already fetched, skip');
-            return;
-        }
-        accountsFetchedRef.current = true;
-        console.log('[DASHBOARD] 🔍 Fetching accounts...');
+    const fetchInit = useCallback(async () => {
+        if (initDoneRef.current) return;
+        initDoneRef.current = true;
+
+        const startTime = Date.now();
+        console.log('[DASHBOARD/INIT] 🚀 Starting...');
         setIsLoadingAccounts(true);
+
+        // CHECK CACHE FIRST
         try {
-            const res = await fetch('/api/facebook/accounts');
-            const json = await res.json();
-            console.log('[DASHBOARD] 📦 Accounts response:', json);
-            if (json.success && json.data) {
-                setAccounts(json.data);
-                console.log('[DASHBOARD] ✅ Loaded', json.data.length, 'accounts, source:', json.source);
-                // Auto-select first active account
-                const firstActive = json.data.find((a: AdAccount) => a.isActive);
-                if (firstActive) {
-                    setSelectedAccountId(firstActive.id);
-                    console.log('[DASHBOARD] 🎯 Auto-selected account:', firstActive.name);
+            const cached = localStorage.getItem(INIT_CACHE_KEY);
+            if (cached) {
+                const { data: cachedData, timestamp } = JSON.parse(cached);
+                const age = Date.now() - timestamp;
+                if (age < INIT_CACHE_TTL) {
+                    console.log(`[DASHBOARD/INIT] ⚡ Cache hit (${Math.round(age / 1000)}s old)`);
+                    // Apply cached data immediately
+                    if (cachedData.profile) {
+                        setUserProfile(cachedData.profile);
+                    }
+                    if (cachedData.accounts?.length > 0) {
+                        setAccounts(cachedData.accounts);
+                        const firstActive = cachedData.accounts.find((a: AdAccount) => a.isActive);
+                        if (firstActive) setSelectedAccountId(firstActive.id);
+                    }
+                    setPendingCount(cachedData.pendingCount || 0);
+                    setIsLoadingAccounts(false);
+                    console.log(`[DASHBOARD/INIT] ✅ From cache in ${Date.now() - startTime}ms`);
+                    return;
                 }
+                console.log('[DASHBOARD/INIT] ⏰ Cache expired, fetching fresh...');
+            }
+        } catch { /* ignore cache errors */ }
+
+        // FETCH FROM API
+        try {
+            const res = await fetch('/api/init');
+            const json = await res.json();
+
+            if (json.success && json.data) {
+                const { profile, accounts: accs, pendingCount: pending } = json.data;
+
+                // Apply profile
+                if (profile) {
+                    setUserProfile(profile);
+                    console.log('[DASHBOARD/INIT] ✅ Profile:', profile.name, profile.plan);
+                }
+
+                // Apply accounts
+                if (accs?.length > 0) {
+                    setAccounts(accs);
+                    const firstActive = accs.find((a: AdAccount) => a.isActive);
+                    if (firstActive) {
+                        setSelectedAccountId(firstActive.id);
+                        console.log('[DASHBOARD/INIT] 🎯 Auto-selected:', firstActive.name);
+                    }
+                    console.log('[DASHBOARD/INIT] ✅ Loaded', accs.length, 'accounts');
+                }
+
+                // Apply pending count
+                setPendingCount(pending || 0);
+
+                // SAVE TO CACHE
+                localStorage.setItem(INIT_CACHE_KEY, JSON.stringify({
+                    data: json.data,
+                    timestamp: Date.now(),
+                }));
+
+                console.log(`[DASHBOARD/INIT] ✅ Complete in ${Date.now() - startTime}ms (API: ${json.elapsed}ms)`);
             } else {
-                console.warn('[DASHBOARD] ⚠️ No accounts data:', json);
+                console.warn('[DASHBOARD/INIT] ⚠️ No data:', json);
             }
         } catch (err) {
-            console.error('[DASHBOARD] ❌ Failed to fetch accounts:', err);
-            accountsFetchedRef.current = false; // Allow retry on error
+            console.error('[DASHBOARD/INIT] ❌ Failed:', err);
+            initDoneRef.current = false; // Allow retry
         } finally {
             setIsLoadingAccounts(false);
         }
@@ -461,40 +491,16 @@ export default function DashboardPage() {
         fetchData();
     }, [fetchData]);
 
-    // Fetch pending proposals count
-    const fetchPendingCount = useCallback(async () => {
-        try {
-            const res = await fetch('/api/de-xuat/danh-sach?status=CHO_DUYET');
-            const json = await res.json();
-            if (json.success) {
-                setPendingCount((json.data || []).length);
-            }
-        } catch (error) {
-            console.error('Error fetching pending count:', error);
-        }
-    }, []);
-
-    // Track initialization to prevent re-fetch
-    const initRef = useRef(false);
-
-    // Load accounts and user profile on mount
+    // Load everything on mount via unified init
     useEffect(() => {
-        // Only log and act on status change, ignore session object changes
-        if (initRef.current) {
-            return; // Already initialized, skip
-        }
-
         console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Has session:', !!session);
 
         if (status === 'unauthenticated') {
             console.log('[DASHBOARD/MOUNT] ❌ Not authenticated, redirecting...');
             router.push('/');
         } else if (status === 'authenticated' && session) {
-            console.log('[DASHBOARD/MOUNT] ✅ Authenticated, fetching data...');
-            initRef.current = true;
-            fetchAccounts();
-            fetchUserProfile();
-            fetchPendingCount();
+            console.log('[DASHBOARD/MOUNT] ✅ Authenticated, init...');
+            fetchInit();
         } else if (status === 'loading') {
             console.log('[DASHBOARD/MOUNT] ⏳ Loading auth...');
         }

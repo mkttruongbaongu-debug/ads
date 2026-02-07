@@ -30,10 +30,12 @@ interface CampaignWithIssues {
     };
     issues: Issue[];
     actionRecommendation?: {
-        action: 'STOP' | 'WATCH' | 'SCALE';
+        action: 'STOP' | 'ADJUST' | 'WATCH' | 'GOOD' | 'SCALE';
         reason: string;
         emoji: string;
         color: string;
+        healthScore?: number;
+        windowAlert?: string;
     };
 }
 
@@ -1162,9 +1164,9 @@ export default function DashboardPage() {
                                             <tbody>
                                                 {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
                                                     const action = campaign.actionRecommendation?.action || 'WATCH';
-                                                    const actionLabel = action === 'STOP' ? 'Dừng' : action === 'WATCH' ? 'Tối ưu' : 'Scale';
-                                                    const actionColor = action === 'STOP' ? colors.error : action === 'WATCH' ? colors.warning : colors.success;
-                                                    const statusIcon = action === 'SCALE' ? '✓' : action === 'WATCH' ? '!' : '✕';
+                                                    const actionLabel = action === 'STOP' ? 'Dừng' : action === 'ADJUST' ? 'Điều chỉnh' : action === 'WATCH' ? 'Theo dõi' : 'Scale';
+                                                    const actionColor = action === 'STOP' ? colors.error : action === 'ADJUST' ? '#FF8C00' : action === 'WATCH' ? colors.warning : colors.success;
+                                                    const statusIcon = action === 'SCALE' ? '✓' : action === 'GOOD' ? '✓' : action === 'ADJUST' ? '⚡' : action === 'WATCH' ? '!' : '✕';
                                                     const roasValue = campaign.totals.roas;
                                                     const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
 
@@ -1352,7 +1354,7 @@ function CampaignCard({
                             }}
                             title={campaign.actionRecommendation.reason}
                         >
-                            {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : 'THEO DÕI'}
+                            {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : campaign.actionRecommendation.action === 'ADJUST' ? 'ĐIỀU CHỈNH' : campaign.actionRecommendation.action === 'GOOD' ? 'TỐT' : 'THEO DÕI'}
                         </span>
                     )}
                 </div>

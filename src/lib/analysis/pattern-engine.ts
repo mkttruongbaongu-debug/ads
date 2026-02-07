@@ -407,115 +407,266 @@ export function classifyCampaign(issues: Issue[]): 'critical' | 'warning' | 'goo
 }
 
 /**
- * Action Recommendation Types - v2
- * STOP: Chắc chắn lỗ (ROAS < 2)
- * WATCH: Còn lời nhưng trend xấu
+ * Action Recommendation Types - v3 (Health Score Based)
+ * STOP: Chắc chắn lỗ
+ * ADJUST: Metrics tổng đẹp nhưng gần đây đang suy giảm - Cần can thiệp
+ * WATCH: Đang theo dõi, chưa rõ xu hướng
  * GOOD: Ổn định, sinh lời
- * SCALE: Xuất sắc, có thể tăng budget
+ * SCALE: Xuất sắc CẢ tổng thể LẪN gần đây
  */
-export type ActionType = 'STOP' | 'WATCH' | 'GOOD' | 'SCALE';
+export type ActionType = 'STOP' | 'ADJUST' | 'WATCH' | 'GOOD' | 'SCALE';
 
 export interface ActionRecommendation {
     action: ActionType;
     reason: string;
     emoji: string;
     color: string;
-    trendInfo?: string; // Thông tin trend chi tiết
+    trendInfo?: string;
+    healthScore?: number;      // 0-100 campaign health
+    windowAlert?: string;      // Cảnh báo khi gần đây khác quá khứ
 }
 
 /**
- * Xác định action recommendation cho campaign - v2 (Profit-based)
+ * ===================================================================
+ * HEALTH SCORE SYSTEM - v3
+ * ===================================================================
  * 
- * NGUYÊN TẮC MỚI:
- * - STOP CHỈ KHI chắc chắn lỗ: ROAS < 2 hoặc đốt tiền không ra đơn
- * - ROAS >= 2 = KHÔNG BAO GIỜ STOP, phân loại dựa trên TREND của chính campaign đó
+ * NGUYÊN TẮC CỐT LÕI:
+ * Chỉ số TỔNG đẹp không có nghĩa campaign đang khoẻ.
+ * Phải so sánh WINDOW (3 ngày gần) vs TỔNG để phát hiện suy giảm ngầm.
+ * 
+ * Health Score = Tài chính gần đây (30%) + Trend (30%) + Creative/CTR (25%) + Stability (15%)
+ * 
+ * VÍ DỤ:
+ * Campaign ROAS tổng 10x nhưng 3 ngày gần ROAS 2x:
+ *   Tài chính gần đây: 40/100 (ROAS gần đây thấp)
+ *   Trend: 20/100 (ROAS sụt giảm mạnh)
+ *   Creative: 50/100
+ *   Stability: 30/100
+ *   → Health Score = 40×0.3 + 20×0.3 + 50×0.25 + 30×0.15 = 35 → ADJUST!
+ * ===================================================================
  */
+
+interface HealthScoreBreakdown {
+    financial: number;      // 0-100: Dựa trên ROAS 3 ngày gần (không phải tổng!)
+    trend: number;          // 0-100: Xu hướng ROAS/CPP đang lên hay xuống
+    creative: number;       // 0-100: CTR trend + frequency
+    stability: number;      // 0-100: Biến động ít = ổn định
+    total: number;          // 0-100: weighted average
+    windowAlert: string;    // Cảnh báo cụ thể nếu có
+}
+
+function calculateHealthScore(dailyMetrics: DailyMetric[], totals: CampaignData['totals']): HealthScoreBreakdown {
+    const noData: HealthScoreBreakdown = {
+        financial: 50, trend: 50, creative: 50, stability: 50, total: 50,
+        windowAlert: '',
+    };
+
+    if (dailyMetrics.length < 3) {
+        return { ...noData, windowAlert: 'Chưa đủ dữ liệu (cần ≥ 3 ngày)' };
+    }
+
+    // ============================================
+    // 1. FINANCIAL (30%): Dựa trên ROAS 3 NGÀY GẦN NHẤT
+    // ============================================
+    const recent3 = dailyMetrics.slice(-3);
+    const recent3Spend = recent3.reduce((s, d) => s + d.spend, 0);
+    const recent3Revenue = recent3.reduce((s, d) => s + d.revenue, 0);
+    const recent3Roas = recent3Spend > 0 ? recent3Revenue / recent3Spend : 0;
+    const recent3Purchases = recent3.reduce((s, d) => s + d.purchases, 0);
+    const recent3Cpp = recent3Purchases > 0 ? recent3Spend / recent3Purchases : 0;
+
+    let financial = 50;
+    if (recent3Roas >= 5) financial = 100;
+    else if (recent3Roas >= 4) financial = 90;
+    else if (recent3Roas >= 3) financial = 80;
+    else if (recent3Roas >= 2.5) financial = 70;
+    else if (recent3Roas >= 2) financial = 55;
+    else if (recent3Roas >= 1.5) financial = 35;
+    else if (recent3Roas >= 1) financial = 20;
+    else if (recent3Purchases === 0 && recent3Spend > 200000) financial = 5;
+    else financial = 10;
+
+    // ============================================
+    // 2. TREND (30%): So sánh 3 ngày gần vs tổng
+    // ============================================
+    let trend = 50;
+    let windowAlert = '';
+
+    // ROAS window comparison
+    const roasRatio = totals.roas > 0 ? recent3Roas / totals.roas : 1;
+    if (roasRatio < 0.3) {
+        // ROAS 3 ngày < 30% ROAS tổng → Sụt giảm NGHIÊM TRỌNG
+        trend = 5;
+        windowAlert = `ROAS 3 ngày gần (${recent3Roas.toFixed(1)}x) chỉ bằng ${(roasRatio * 100).toFixed(0)}% ROAS tổng (${totals.roas.toFixed(1)}x)`;
+    } else if (roasRatio < 0.5) {
+        trend = 15;
+        windowAlert = `ROAS 3 ngày gần (${recent3Roas.toFixed(1)}x) sụt ${((1 - roasRatio) * 100).toFixed(0)}% so với tổng (${totals.roas.toFixed(1)}x)`;
+    } else if (roasRatio < 0.7) {
+        trend = 30;
+        windowAlert = `ROAS đang giảm: 3 ngày gần ${recent3Roas.toFixed(1)}x vs tổng ${totals.roas.toFixed(1)}x`;
+    } else if (roasRatio < 0.9) {
+        trend = 50;
+    } else if (roasRatio <= 1.1) {
+        trend = 70; // Ổn định
+    } else if (roasRatio <= 1.3) {
+        trend = 85; // Đang cải thiện
+    } else {
+        trend = 95; // Bùng nổ
+    }
+
+    // CPP window comparison (bổ sung)
+    if (totals.cpp > 0 && recent3Cpp > 0) {
+        const cppRatio = recent3Cpp / totals.cpp;
+        if (cppRatio > 2) {
+            trend = Math.min(trend, 15); // CPP gấp đôi = rất xấu
+            if (!windowAlert) windowAlert = `CPP 3 ngày gần (${formatMoney(recent3Cpp)}) gấp đôi TB (${formatMoney(totals.cpp)})`;
+        } else if (cppRatio > 1.5) {
+            trend = Math.min(trend, 30);
+            if (!windowAlert) windowAlert = `CPP 3 ngày gần tăng ${((cppRatio - 1) * 100).toFixed(0)}%`;
+        }
+    }
+
+    // ============================================
+    // 3. CREATIVE/CTR (25%): CTR trend
+    // ============================================
+    let creative = 50;
+
+    // So sánh CTR 3 ngày gần vs 7 ngày hoặc tổng
+    const recent3Ctr = recent3.reduce((s, d) => s + d.ctr, 0) / 3;
+    const totalCtr = dailyMetrics.reduce((s, d) => s + d.ctr, 0) / dailyMetrics.length;
+
+    if (totalCtr > 0) {
+        const ctrRatio = recent3Ctr / totalCtr;
+        if (ctrRatio >= 1.1) creative = 90;        // CTR tăng
+        else if (ctrRatio >= 0.95) creative = 75;   // CTR ổn định
+        else if (ctrRatio >= 0.85) creative = 55;   // CTR giảm nhẹ
+        else if (ctrRatio >= 0.75) creative = 35;   // CTR giảm rõ
+        else creative = 15;                          // CTR sụt mạnh
+    }
+
+    // Frequency check (nếu có)
+    const lastDay = dailyMetrics[dailyMetrics.length - 1];
+    if (lastDay.frequency) {
+        if (lastDay.frequency > 3) creative = Math.min(creative, 10);
+        else if (lastDay.frequency > 2.5) creative = Math.min(creative, 30);
+        else if (lastDay.frequency > 2) creative = Math.min(creative, 50);
+    }
+
+    // ============================================
+    // 4. STABILITY (15%): Biến động CPP
+    // ============================================
+    let stability = 50;
+
+    const cppValues = dailyMetrics.filter(d => d.cpp > 0).map(d => d.cpp);
+    if (cppValues.length >= 3) {
+        const avgCpp = cppValues.reduce((s, v) => s + v, 0) / cppValues.length;
+        const variance = cppValues.reduce((s, v) => s + Math.pow(v - avgCpp, 2), 0) / cppValues.length;
+        const cv = avgCpp > 0 ? Math.sqrt(variance) / avgCpp : 0; // Coefficient of variation
+
+        if (cv < 0.15) stability = 90;       // Rất ổn định
+        else if (cv < 0.3) stability = 70;    // Ổn định
+        else if (cv < 0.5) stability = 50;    // Dao động vừa
+        else if (cv < 0.7) stability = 30;    // Bất ổn
+        else stability = 10;                   // Rất bất ổn
+    }
+
+    // ============================================
+    // TÍNH TỔNG
+    // ============================================
+    const total = Math.round(
+        financial * 0.30 +
+        trend * 0.30 +
+        creative * 0.25 +
+        stability * 0.15
+    );
+
+    return { financial, trend, creative, stability, total, windowAlert };
+}
+
 export function getRecommendedAction(
     campaign: CampaignData,
     issues: Issue[]
 ): ActionRecommendation {
     const { totals, dailyMetrics } = campaign;
 
-    // Tính trend so với TB của chính campaign
+    // Tính Health Score
+    const health = calculateHealthScore(dailyMetrics, totals);
     const trend = calculateTrendVsAverage(dailyMetrics);
 
     // ============================================
     // 🔴 STOP: CHỈ KHI CHẮC CHẮN LỖ
     // ============================================
-
-    // Điều kiện 1: ROAS < 2 VÀ đã chi đủ tiền để đánh giá
     const isLosing = totals.roas < THRESHOLDS.ROAS_LOSS &&
         totals.spend >= THRESHOLDS.MIN_SPEND_FOR_ANALYSIS;
-
-    // Điều kiện 2: Đốt tiền không ra đơn (chi > 1tr mà 0 đơn)
     const isBurningMoney = totals.spend > 1000000 && totals.purchases === 0;
 
     if (isLosing || isBurningMoney) {
-        let reason = '';
-        if (isBurningMoney) {
-            reason = `Chi ${formatMoney(totals.spend)} không ra đơn - Dừng ngay!`;
-        } else {
-            reason = `ROAS ${totals.roas.toFixed(2)}x < 2 = Lỗ (Cost SP ~50% + ADS)`;
-        }
-
         return {
             action: 'STOP',
-            reason,
+            reason: isBurningMoney
+                ? `Chi ${formatMoney(totals.spend)} không ra đơn`
+                : `ROAS ${totals.roas.toFixed(2)}x < 2 = Lỗ`,
             emoji: '🔴',
             color: '#F6465D',
             trendInfo: trend.summary,
+            healthScore: health.total,
         };
     }
 
     // ============================================
-    // ROAS >= 2: KHÔNG BAO GIỜ STOP
-    // Phân loại dựa trên TREND của chính campaign
+    // HEALTH SCORE → ACTION MAPPING
     // ============================================
 
-    // 🔥 SCALE: ROAS xuất sắc + trend tốt/ổn định
-    if (totals.roas >= THRESHOLDS.ROAS_EXCELLENT &&
-        trend.trendDirection !== 'worsening' &&
+    // 🔥 SCALE (Health >= 75): Khoẻ CẢ tổng LẪN gần đây
+    if (health.total >= 75 && totals.roas >= THRESHOLDS.ROAS_EXCELLENT &&
         totals.spend >= THRESHOLDS.MIN_SPEND_FOR_ANALYSIS) {
         return {
             action: 'SCALE',
-            reason: `ROAS ${totals.roas.toFixed(2)}x xuất sắc, ${trend.summary} - Tăng budget 20-30%`,
+            reason: `Health ${health.total}/100 | ROAS 3 ngày gần vẫn mạnh | ${trend.summary}`,
             emoji: '🔥',
-            color: '#1E90FF', // Dodger Blue
+            color: '#1E90FF',
             trendInfo: trend.summary,
+            healthScore: health.total,
         };
     }
 
-    // 🟡 WATCH: Còn lời nhưng trend đang xấu đi
-    if (trend.trendDirection === 'worsening') {
-        const cppChange = Math.max(trend.cppVsTotal, trend.cppVsRecent7);
-        return {
-            action: 'WATCH',
-            reason: `${trend.summary}. Theo dõi thêm 2-3 ngày.`,
-            emoji: '🟡',
-            color: '#F0B90B',
-            trendInfo: `CPP tăng ${cppChange.toFixed(0)}% so với TB`,
-        };
-    }
-
-    // 🟢 GOOD: ROAS tốt + trend ổn định/improving
-    if (totals.roas >= THRESHOLDS.ROAS_GOOD || trend.trendDirection === 'improving') {
+    // 🟢 GOOD (Health >= 60): Đang tốt
+    if (health.total >= 60 && totals.roas >= THRESHOLDS.ROAS_GOOD) {
         return {
             action: 'GOOD',
-            reason: `ROAS ${totals.roas.toFixed(2)}x, ${trend.summary}`,
+            reason: `Health ${health.total}/100 | ROAS ${totals.roas.toFixed(2)}x | ${trend.summary}`,
             emoji: '🟢',
             color: '#0ECB81',
             trendInfo: trend.summary,
+            healthScore: health.total,
         };
     }
 
-    // 🟡 WATCH: Default cho các trường hợp khác (chưa đủ data, ROAS trung bình)
-    let watchReason = 'Đang theo dõi';
+    // 🟠 ADJUST (Health 35-59): Metrics tổng có vẻ OK nhưng gần đây đang suy giảm
+    // Đây là case quan trọng nhất: ROAS tổng đẹp nhưng 3 ngày gần xấu
+    if (health.total >= 35 || totals.roas >= THRESHOLDS.ROAS_GOOD) {
+        return {
+            action: 'ADJUST',
+            reason: health.windowAlert
+                ? `Health ${health.total}/100 | ${health.windowAlert}`
+                : `Health ${health.total}/100 | Hiệu suất gần đây giảm, cần điều chỉnh`,
+            emoji: '🟠',
+            color: '#FF8C00', // Dark Orange
+            trendInfo: trend.summary,
+            healthScore: health.total,
+            windowAlert: health.windowAlert,
+        };
+    }
+
+    // 🟡 WATCH (Health < 35): Yếu nhưng chưa đến mức STOP
+    let watchReason = `Health ${health.total}/100`;
     if (!trend.hasEnoughData) {
-        watchReason = 'Chưa đủ dữ liệu để phân tích trend';
+        watchReason += ' | Chưa đủ data để phân tích trend';
     } else if (totals.purchases < 5) {
-        watchReason = `Chỉ ${totals.purchases} đơn - Cần thêm data`;
-    } else if (totals.roas < THRESHOLDS.ROAS_GOOD) {
-        watchReason = `ROAS ${totals.roas.toFixed(2)}x - Cần cải thiện`;
+        watchReason += ` | Chỉ ${totals.purchases} đơn - Cần thêm data`;
+    } else if (health.windowAlert) {
+        watchReason += ` | ${health.windowAlert}`;
     }
 
     return {
@@ -524,6 +675,8 @@ export function getRecommendedAction(
         emoji: '🟡',
         color: '#F0B90B',
         trendInfo: trend.summary,
+        healthScore: health.total,
+        windowAlert: health.windowAlert,
     };
 }
 
@@ -558,9 +711,12 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
     });
 
     // Use actionRecommendation for classification (matches the badge)
-    // STOP → critical, WATCH → warning, GOOD + SCALE → good
+    // STOP → critical, ADJUST + WATCH → warning, GOOD + SCALE → good
     const critical = results.filter(c => c.actionRecommendation.action === 'STOP');
-    const warning = results.filter(c => c.actionRecommendation.action === 'WATCH');
+    const warning = results.filter(c =>
+        c.actionRecommendation.action === 'WATCH' ||
+        c.actionRecommendation.action === 'ADJUST'
+    );
     const good = results.filter(c =>
         c.actionRecommendation.action === 'GOOD' ||
         c.actionRecommendation.action === 'SCALE'

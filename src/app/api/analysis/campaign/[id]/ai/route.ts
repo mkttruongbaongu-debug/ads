@@ -147,6 +147,7 @@ export async function POST(
             })),
             issues: issues.map(i => ({
                 type: i.type,
+                severity: i.severity || 'info',
                 message: i.message,
                 detail: i.detail,
             })),

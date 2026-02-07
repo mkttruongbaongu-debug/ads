@@ -1,13 +1,12 @@
 /**
  * ===================================================================
- * AI DEEP ANALYZER v3 - QUÂN SƯ ADS
+ * AI DEEP ANALYZER v4 - QUÂN SƯ ADS
  * ===================================================================
- * Phân tích SÂU, KẾT LUẬN ĐỨKHOÁT, HÀNH ĐỘNG CỤ THỂ
- * 
- * Changes from v2:
- * - Uses preprocessed data with peak/trough, day-of-week patterns
- * - Focuses on ROOT CAUSE analysis
- * - Outputs actionable predictions
+ * Model: o4-mini (reasoning model)
+ * Changes from v3:
+ * - Switched from gpt-4o-mini → o4-mini for better numerical reasoning
+ * - Added BENCHMARK rules to prevent hallucination
+ * - Added post-AI guardrails to validate verdict vs actual metrics
  * ===================================================================
  */
 
@@ -17,6 +16,10 @@ import { preprocessCampaignData, PreprocessedInsights, DailyMetric } from './dat
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
+
+// ===================================================================
+// TYPES
+// ===================================================================
 
 export interface CampaignContext {
     campaign: {
@@ -43,6 +46,7 @@ export interface CampaignContext {
     }>;
     issues: Array<{
         type: string;
+        severity: string;
         message: string;
         detail: string;
     }>;
@@ -54,23 +58,17 @@ export interface CampaignContext {
     };
 }
 
-// =========================================
-// NEW: AI Analysis Result v3
-// =========================================
 export interface AIAnalysisResult {
-    // Cơ sở phân tích
     dataBasis: {
         days: number;
         orders: number;
         spend: number;
     };
-
-    // Phân tích 4 chiều - DEEPER
     dimensions: {
         financial: {
             status: 'excellent' | 'good' | 'warning' | 'critical';
             summary: string;
-            detail: string;  // NEW: deeper explanation
+            detail: string;
         };
         content: {
             status: 'excellent' | 'good' | 'warning' | 'critical';
@@ -88,16 +86,12 @@ export interface AIAnalysisResult {
             detail: string;
         };
     };
-
-    // Pattern analysis - NEW
     patterns: {
-        peakInsight: string;       // "Ngày tốt nhất: T6 với CPP 28K (thấp hơn TB 35%)"
-        troughInsight: string;     // "Ngày yếu nhất: T2 với CPP 52K (cao hơn TB 20%)"
-        dayOfWeekPattern: string;  // "Pattern F&B: Cuối tuần mạnh, đầu tuần yếu"
+        peakInsight: string;
+        troughInsight: string;
+        dayOfWeekPattern: string;
         volatilityAssessment: string;
     };
-
-    // Creative health - NEW
     creativeHealth: {
         status: 'healthy' | 'early_warning' | 'fatigued' | 'critical';
         ctrTrend: string;
@@ -105,20 +99,16 @@ export interface AIAnalysisResult {
         diagnosis: string;
         urgency: 'none' | 'low' | 'medium' | 'high' | 'critical';
     };
-
-    // Kết luận dứt khoát
     verdict: {
         action: 'SCALE' | 'MAINTAIN' | 'WATCH' | 'REDUCE' | 'STOP';
         headline: string;
         condition?: string;
     };
-
-    // Action plan chi tiết
     actionPlan: {
         immediate: {
             action: string;
             reason: string;
-            metric_to_watch: string;  // NEW
+            metric_to_watch: string;
         };
         shortTerm?: {
             action: string;
@@ -126,24 +116,17 @@ export interface AIAnalysisResult {
         };
         prevention?: string;
     };
-
-    // Prediction - NEW
     prediction: {
-        noAction: string;    // "Nếu không làm gì: CPP sẽ tăng 15% trong 3 ngày"
-        withAction: string;  // "Nếu làm đúng: CPP giữ ổn định, có thể giảm 10%"
+        noAction: string;
+        withAction: string;
     };
-
-    // Lý do chi tiết
     reasoning: string;
-
-    // Warning signals - NEW
     warningSignals: Array<{
         type: string;
         severity: string;
         evidence: string;
     }>;
-
-    // Legacy fields for backward compatibility
+    // Legacy
     summary?: string;
     diagnosis?: string;
     marketContext?: string;
@@ -151,36 +134,67 @@ export interface AIAnalysisResult {
 }
 
 // ===================================================================
-// ENHANCED SYSTEM PROMPT
+// SYSTEM PROMPT v4 - WITH BENCHMARKS
 // ===================================================================
 const SYSTEM_PROMPT = `Bạn là QUÂN SƯ ADS - chuyên gia tối ưu quảng cáo Facebook cho ngành F&B Việt Nam.
 
-BẠN KHÁC BIỆT VÌ:
-1. PHÂN TÍCH PATTERN - Không chỉ xem tổng, mà xem TỪNG NGÀY để tìm peak/trough
-2. TÌM ROOT CAUSE - Không nói "CTR giảm", mà giải thích TẠI SAO giảm
-3. DỰ ĐOÁN - Nói rõ sẽ xảy ra gì nếu HÀNH ĐỘNG vs KHÔNG HÀNH ĐỘNG
-4. HÀNH ĐỘNG CỤ THỂ - "Tăng budget 200K" thay vì "Nên tối ưu"
+═══════════════════════════════════════════
+QUY TẮC SỐNG CÒN (TUYỆT ĐỐI KHÔNG VI PHẠM)
+═══════════════════════════════════════════
 
-NGUYÊN TẮC PHÂN TÍCH:
+BENCHMARK ROAS (Ngành F&B Việt Nam):
+- ROAS >= 4    → XUẤT SẮC → verdict.action PHẢI là SCALE hoặc MAINTAIN
+- ROAS 2 - 4   → TỐT     → verdict.action PHẢI là MAINTAIN hoặc WATCH
+- ROAS 1 - 2   → HÒA VỐN → verdict.action nên là WATCH hoặc REDUCE
+- ROAS < 1     → LỖ      → verdict.action PHẢI là REDUCE hoặc STOP
+
+BENCHMARK CPP (Ngành F&B Việt Nam):
+- CPP < 30.000đ   → RẤT TỐT
+- CPP 30-60K       → TỐT
+- CPP 60-100K      → TRUNG BÌNH
+- CPP > 100K       → CAO, cần xem xét
+
+BENCHMARK CTR:
+- CTR > 3%    → TỐT
+- CTR 1-3%    → TRUNG BÌNH
+- CTR < 1%    → YẾU
+
+KIỂM TRA LOGIC (BẮT BUỘC trước khi output):
+✅ Nếu ROAS >= 4 → bạn KHÔNG ĐƯỢC nói "ROAS thấp" hay recommend STOP/REDUCE
+✅ Nếu ROAS < 1  → bạn KHÔNG ĐƯỢC recommend SCALE
+✅ verdict.headline PHẢI nhất quán với data thực tế
+✅ dimensions.financial.status PHẢI match với verdict.action
+
+VÍ DỤ SAI (KHÔNG ĐƯỢC LÀM):
+❌ ROAS 10x → "ROAS thấp, cần cắt lỗ" (SAI VÌ 10x = xuất sắc)
+❌ ROAS 0.5x → "SCALE UP ngay" (SAI VÌ đang lỗ)
+❌ financial.status = "excellent" + verdict.action = "STOP" (MÂU THUẪN)
+
+═══════════════════════════════════════════
+NGUYÊN TẮC PHÂN TÍCH
+═══════════════════════════════════════════
 
 1. PEAK/TROUGH ANALYSIS:
-- Ngày CPP thấp nhất = Peak (tìm nguyên nhân: day-of-week? creative mới? audience segment?)
-- Ngày CPP cao nhất = Trough (tìm nguyên nhân: đầu tuần? audience exhaustion? technical issue?)
+- Ngày CPP thấp nhất = Peak → tìm nguyên nhân
+- Ngày CPP cao nhất = Trough → tìm nguyên nhân
 
-2. DAY-OF-WEEK PATTERN (Rất quan trọng với F&B):
-- T6-T7-CN thường peak (người ta order đồ ăn cuối tuần)
+2. DAY-OF-WEEK PATTERN (F&B):
+- T6-T7-CN thường peak (order đồ ăn cuối tuần)
 - T2-T3 thường trough
-- NẾU campaign peak vào T2-T3 = có vấn đề hoặc target đặc biệt
 
-3. CREATIVE FATIGUE DETECTION:
-- CTR giảm + Frequency thấp (<2) = Content yếu từ đầu
-- CTR giảm + Frequency cao (>2.5) = Audience mệt với creative
-- CTR ổn + Frequency cao = Vẫn OK nhưng cần chuẩn bị
+3. CREATIVE FATIGUE:
+- CTR giảm + Frequency < 2 = Content yếu từ đầu
+- CTR giảm + Frequency > 2.5 = Audience mệt với creative
+- CTR ổn + Frequency cao = OK nhưng cần chuẩn bị
 
-4. TREND không chỉ là "tăng/giảm":
-- So sánh 3 ngày gần vs 7 ngày
-- Xem có đột biến không (sudden spike/drop)
-- Xem độ volatility (dao động mạnh = khó dự đoán)
+4. TREND:
+- So sánh 3 ngày gần vs tổng
+- Có đột biến không?
+- Volatility cao = khó dự đoán
+
+5. CHI TIÊU vs DAILY BUDGET:
+- Số "chi tiêu" trong data là TỔNG CHI TIÊU cả kỳ, KHÔNG phải daily budget
+- Đừng nhầm lẫn 2 con số này
 
 OUTPUT FORMAT (JSON):
 {
@@ -188,58 +202,58 @@ OUTPUT FORMAT (JSON):
   "dimensions": {
     "financial": {
       "status": "good",
-      "summary": "ROAS 2.8x - Có lãi nhưng chưa xuất sắc",
-      "detail": "CPP 189K ổn định, margin ~15%. Có room để scale nếu giữ được CPP."
+      "summary": "ROAS 2.8x - Có lãi, đạt mức TỐT theo benchmark F&B",
+      "detail": "Chi tiết..."
     },
     "content": {
       "status": "warning",
       "summary": "CTR giảm 25% trong 7 ngày",
-      "detail": "CTR từ 3.2% xuống 2.4%. Correlation với Frequency tăng từ 1.8 lên 2.3 - dấu hiệu fatigue."
+      "detail": "Chi tiết..."
     },
     "audience": {
       "status": "good",
-      "summary": "Frequency 2.3 - Còn room nhưng đang cận ngưỡng",
-      "detail": "Chưa bão hòa nhưng cần theo dõi. Không nên scale mạnh lúc này."
+      "summary": "Frequency 2.3 - Còn room",
+      "detail": "Chi tiết..."
     },
     "trend": {
       "direction": "declining",
-      "summary": "CPP tăng 18% trong 5 ngày gần",
-      "detail": "Moving avg 3 ngày: 210K vs 7 ngày: 178K. Trend xấu dần."
+      "summary": "CPP tăng 18% trong 5 ngày",
+      "detail": "Chi tiết..."
     }
   },
   "patterns": {
-    "peakInsight": "Peak ngày 12/01 (T6): CPP 145K, ROAS 3.5x. Cuối tuần hiệu suất tốt nhất.",
-    "troughInsight": "Trough ngày 15/01 (T2): CPP 245K, ROAS 2.1x. Đầu tuần yếu như pattern F&B.",
-    "dayOfWeekPattern": "Pattern F&B chuẩn: T6-T7-CN mạnh (+25% ROAS), T2-T3 yếu.",
-    "volatilityAssessment": "Dao động TRUNG BÌNH (±22%). Có thể dự đoán được."
+    "peakInsight": "...",
+    "troughInsight": "...",
+    "dayOfWeekPattern": "...",
+    "volatilityAssessment": "..."
   },
   "creativeHealth": {
     "status": "early_warning",
-    "ctrTrend": "Giảm 25% trong 7 ngày (3.2% → 2.4%)",
-    "frequencyStatus": "2.3 - Cận ngưỡng 2.5",
-    "diagnosis": "Creative đang bắt đầu mệt. CTR giảm song song với Frequency tăng = audience exhaustion.",
+    "ctrTrend": "...",
+    "frequencyStatus": "...",
+    "diagnosis": "...",
     "urgency": "medium"
   },
   "verdict": {
     "action": "WATCH",
-    "headline": "⚠️ THEO DÕI - Chuẩn bị creative mới trong 48h",
-    "condition": "Chuyển sang REDUCE nếu CTR < 2% hoặc Frequency > 2.5"
+    "headline": "Campaign đang tốt nhưng creative cần refresh trong 48h",
+    "condition": "Chuyển REDUCE nếu CTR < 2%"
   },
   "actionPlan": {
     "immediate": {
-      "action": "Giữ nguyên budget. Bắt đầu làm creative mới ngay hôm nay.",
-      "reason": "Scale lúc này sẽ đẩy nhanh fatigue. Cần creative mới trước.",
+      "action": "Giữ budget, bắt đầu làm creative mới",
+      "reason": "Creative đang fatigue, scale lúc này sẽ tăng CPP",
       "metric_to_watch": "CTR và Frequency hàng ngày"
     },
     "shortTerm": {
-      "action": "Test creative mới với 20% budget",
-      "trigger": "Khi creative mới ready (mục tiêu 24-48h)"
+      "action": "Test creative mới",
+      "trigger": "Khi creative mới ready"
     },
-    "prevention": "Luôn có 2-3 creative backup sẵn sàng"
+    "prevention": "Luôn có 2-3 creative backup"
   },
   "prediction": {
-    "noAction": "CTR tiếp tục giảm về 1.8%, CPP tăng lên 250K trong 5 ngày. ROI sẽ âm.",
-    "withAction": "Creative mới reset CTR về 3%+, CPP giảm về 180K. Có thể scale sau 3 ngày."
+    "noAction": "CTR giảm về 1.8%, CPP tăng 250K trong 5 ngày",
+    "withAction": "Creative mới reset CTR, CPP giảm 15%"
   },
   "warningSignals": [
     {
@@ -248,7 +262,7 @@ OUTPUT FORMAT (JSON):
       "evidence": "CTR -25%, Frequency 2.3"
     }
   ],
-  "reasoning": "Campaign đang ở giai đoạn cần can thiệp. Tài chính còn OK nhưng trend xấu. Root cause là creative fatigue (CTR giảm + Frequency tăng). Ưu tiên #1: Làm creative mới ngay."
+  "reasoning": "Phân tích reasoning chi tiết..."
 }`;
 
 // ===================================================================
@@ -261,12 +275,12 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
             throw new Error('OPENAI_API_KEY not configured');
         }
 
-        // NEW: Preprocess data first
+        // Preprocess data
         const dailyMetrics = context.dailyTrend.map(d => ({
             date: d.date,
             spend: d.spend,
             purchases: d.purchases,
-            revenue: 0, // Will be calculated
+            revenue: 0,
             cpp: d.cpp,
             roas: 0,
             ctr: d.ctr,
@@ -276,39 +290,43 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
         })) as DailyMetric[];
 
         const preprocessed = preprocessCampaignData(dailyMetrics);
-
-        // Build enhanced prompt with preprocessed insights
         const userPrompt = buildEnhancedPrompt(context, preprocessed);
 
-        console.log('[AI_ANALYZER] 🧠 Sending enhanced prompt to AI...');
-        console.log('[AI_ANALYZER] 📊 Preprocessed insights:', JSON.stringify(preprocessed, null, 2));
+        console.log('[AI_ANALYZER_v4] 🧠 Sending to o4-mini (reasoning model)...');
+        console.log('[AI_ANALYZER_v4] 📊 ROAS:', context.metrics.roas.toFixed(2), 'CPP:', Math.round(context.metrics.cpp));
 
+        // o4-mini API: no temperature, use reasoning_effort
         const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'o4-mini',
+            reasoning_effort: 'medium',
             messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'developer', content: SYSTEM_PROMPT },
                 { role: 'user', content: userPrompt },
             ],
-            temperature: 0.4, // Lower for more consistent output
-            max_tokens: 2000, // Increased for detailed analysis
+            max_completion_tokens: 16000,
             response_format: { type: 'json_object' },
-        });
+        } as any);
 
         const content = response.choices[0]?.message?.content;
         if (!content) {
             throw new Error('No response from AI');
         }
 
-        const result = JSON.parse(content) as AIAnalysisResult;
+        let result = JSON.parse(content) as AIAnalysisResult;
 
-        // Add legacy fields for backward compatibility
+        // ===================================================================
+        // GUARDRAILS: Validate verdict vs actual metrics
+        // ===================================================================
+        result = applyGuardrails(result, context.metrics);
+
+        // Legacy fields
         result.summary = result.verdict?.headline || '';
         result.diagnosis = result.reasoning || '';
         result.confidence = result.dimensions?.financial?.status === 'excellent' ? 'high' :
             result.dimensions?.financial?.status === 'good' ? 'medium' : 'low';
 
-        // Merge preprocessed warning signals if AI missed any
-        if (!result.warningSignals) {
+        // Merge preprocessed warnings if AI missed any
+        if (!result.warningSignals || result.warningSignals.length === 0) {
             result.warningSignals = preprocessed.warningSignals.map(w => ({
                 type: w.type,
                 severity: w.severity,
@@ -316,16 +334,59 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
             }));
         }
 
-        console.log('[AI_ANALYZER] ✅ Analysis complete:', result.verdict?.action);
+        console.log('[AI_ANALYZER_v4] ✅ Analysis complete:', result.verdict?.action, '-', result.verdict?.headline);
 
         return result;
     } catch (error) {
         const errMessage = error instanceof Error ? error.message : String(error);
-        console.error('AI Analysis error:', errMessage);
-
-        // Fallback with new structure
+        console.error('[AI_ANALYZER_v4] ❌ Error:', errMessage);
         return getFallbackResult(context, errMessage);
     }
+}
+
+// ===================================================================
+// GUARDRAILS - Safety net after AI response
+// ===================================================================
+function applyGuardrails(
+    result: AIAnalysisResult,
+    metrics: CampaignContext['metrics']
+): AIAnalysisResult {
+    const roas = metrics.roas;
+    const action = result.verdict?.action;
+
+    // RULE 1: ROAS >= 4 → CANNOT be STOP/REDUCE
+    if (roas >= 4 && (action === 'STOP' || action === 'REDUCE')) {
+        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x nhưng AI nói ${action} → force MAINTAIN`);
+        result.verdict = {
+            action: 'MAINTAIN',
+            headline: `ROAS ${roas.toFixed(1)}x xuất sắc - Giữ nguyên chiến lược`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GHI ĐÈ] AI đề xuất ${action} nhưng ROAS ${roas.toFixed(2)}x > 4 = xuất sắc. ` + result.reasoning;
+    }
+
+    // RULE 2: ROAS < 1 → CANNOT be SCALE
+    if (roas < 1 && action === 'SCALE') {
+        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x < 1 nhưng AI nói SCALE → force REDUCE`);
+        result.verdict = {
+            action: 'REDUCE',
+            headline: `ROAS ${roas.toFixed(1)}x - Campaign đang lỗ, cần giảm budget`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GHI ĐÈ] AI đề xuất SCALE nhưng ROAS ${roas.toFixed(2)}x < 1 = lỗ. ` + result.reasoning;
+    }
+
+    // RULE 3: Financial status must match ROAS
+    if (roas >= 4 && result.dimensions?.financial?.status === 'critical') {
+        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: financial.status critical nhưng ROAS ${roas.toFixed(2)}x`);
+        result.dimensions.financial.status = 'excellent';
+        result.dimensions.financial.summary = `ROAS ${roas.toFixed(2)}x - XUẤT SẮC (${result.dimensions.financial.summary})`;
+    }
+    if (roas >= 2 && roas < 4 && result.dimensions?.financial?.status === 'critical') {
+        result.dimensions.financial.status = 'good';
+    }
+
+    return result;
 }
 
 // ===================================================================
@@ -334,7 +395,6 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
 function buildEnhancedPrompt(context: CampaignContext, preprocessed: PreprocessedInsights): string {
     const { campaign, metrics, dailyTrend, issues, comparison } = context;
 
-    // Format daily data
     const trendText = dailyTrend.map(d => {
         const dow = getDayOfWeek(d.date);
         return `${d.date} (${dow}): Spend ${formatMoney(d.spend)}, ${d.purchases} đơn, CPP ${formatMoney(d.cpp)}, CTR ${d.ctr.toFixed(2)}%`;
@@ -351,7 +411,6 @@ SO SÁNH VỚI CAMPAIGN KHÁC:
 - Vị trí: ${comparison.position === 'above_avg' ? '✅ Trên TB' : comparison.position === 'below_avg' ? '⚠️ Dưới TB' : 'Trung bình'}`;
     }
 
-    // Build preprocessed insights section
     const preprocessedSection = `
 ===== PHÂN TÍCH TRƯỚC (DATA-DRIVEN) =====
 
@@ -394,7 +453,7 @@ Trạng thái: ${campaign.status}
 ID: ${campaign.id}
 
 ===== TỔNG QUAN ${dailyTrend.length} NGÀY =====
-- Chi tiêu: ${formatMoney(metrics.spend)}
+- Chi tiêu (TỔNG cả kỳ): ${formatMoney(metrics.spend)}
 - Số đơn: ${metrics.purchases}
 - Doanh thu: ${formatMoney(metrics.revenue)}
 - CPP: ${formatMoney(metrics.cpp)}
@@ -402,6 +461,8 @@ ID: ${campaign.id}
 - CTR: ${metrics.ctr.toFixed(2)}%
 - CPM: ${formatMoney(metrics.cpm)}
 ${metrics.frequency ? `- Frequency: ${metrics.frequency.toFixed(1)}` : ''}
+
+LƯU Ý: "Chi tiêu" ở trên là TỔNG CHI TIÊU cả ${dailyTrend.length} ngày, KHÔNG phải daily budget.
 
 ===== DIỄN BIẾN THEO NGÀY =====
 ${trendText}
@@ -413,19 +474,22 @@ ${comparisonText}
 ${preprocessedSection}
 
 ===== YÊU CẦU =====
-Dựa trên dữ liệu và phân tích trước ở trên, hãy:
-1. Xác nhận hoặc điều chỉnh các insights đã tính toán
-2. Tìm ROOT CAUSE chính xác cho vấn đề (nếu có)
-3. Đưa ra VERDICT dứt khoát với HÀNH ĐỘNG CỤ THỂ
-4. Dự đoán sẽ xảy ra gì trong 3-5 ngày tới
+1. Đánh giá metrics theo BENCHMARK đã cho (ROAS >= 4 = xuất sắc, etc.)
+2. Tìm ROOT CAUSE cho vấn đề (nếu có)
+3. Đưa ra VERDICT dứt khoát - PHẢI nhất quán với data thực tế
+4. Dự đoán 3-5 ngày tới
 
-Trả về JSON đúng format đã hướng dẫn.`;
+KIỂM TRA LẦN CUỐI trước khi output:
+- verdict.action có match với ROAS ${metrics.roas.toFixed(2)}x theo benchmark không?
+- Nếu ROAS >= 4: action PHẢI là SCALE hoặc MAINTAIN
+- headline có nói đúng sự thật không?
+
+Trả về JSON đúng format.`;
 }
 
 // ===================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // ===================================================================
-
 const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 function getDayOfWeek(dateStr: string): string {
@@ -465,7 +529,7 @@ function getFallbackResult(context: CampaignContext, errorMessage: string): AIAn
         },
         verdict: {
             action: 'WATCH',
-            headline: '⚠️ Lỗi phân tích - Vui lòng thử lại',
+            headline: 'Lỗi phân tích - Vui lòng thử lại',
         },
         actionPlan: {
             immediate: {
@@ -480,7 +544,6 @@ function getFallbackResult(context: CampaignContext, errorMessage: string): AIAn
         },
         warningSignals: [],
         reasoning: `Lỗi: ${errorMessage}`,
-        // Legacy
         summary: 'Lỗi phân tích',
         diagnosis: errorMessage,
         confidence: 'low',

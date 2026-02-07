@@ -470,38 +470,38 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                 }}>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ROAS</p>
-                        <p style={{ color: deXuat.metrics_TruocKhi.roas >= 2 ? colors.success : colors.error, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                            {deXuat.metrics_TruocKhi.roas.toFixed(2)}x
+                        <p style={{ color: (deXuat.metrics_TruocKhi.roas || 0) >= 2 ? colors.success : colors.error, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                            {(deXuat.metrics_TruocKhi.roas || 0).toFixed(2)}x
                         </p>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CPP</p>
                         <p style={{ color: colors.text, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                            {formatCurrency(deXuat.metrics_TruocKhi.cpp)}
+                            {formatCurrency(deXuat.metrics_TruocKhi.cpp || 0)}
                         </p>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ĐƠN HÀNG</p>
                         <p style={{ color: colors.text, fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                            {deXuat.metrics_TruocKhi.donHang}
+                            {deXuat.metrics_TruocKhi.donHang || 0}
                         </p>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CHI TIÊU</p>
                         <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
-                            {formatCurrency(deXuat.metrics_TruocKhi.chiTieu)}
+                            {formatCurrency(deXuat.metrics_TruocKhi.chiTieu || 0)}
                         </p>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>DOANH THU</p>
                         <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
-                            {formatCurrency(deXuat.metrics_TruocKhi.doanhThu)}
+                            {formatCurrency(deXuat.metrics_TruocKhi.doanhThu || 0)}
                         </p>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ color: colors.textMuted, fontSize: '0.7rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CTR</p>
                         <p style={{ color: colors.text, fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
-                            {deXuat.metrics_TruocKhi.ctr.toFixed(2)}%
+                            {(deXuat.metrics_TruocKhi.ctr || 0).toFixed(2)}%
                         </p>
                     </div>
                 </div>

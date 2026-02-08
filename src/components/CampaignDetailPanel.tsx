@@ -1611,12 +1611,53 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     {/* Content Tab */}
                     {activeTab === 'ads' && (
                         <div style={styles.section}>
-                            <h3 style={styles.sectionTitle}>
-                                Danh sách Content
-                                <span style={{ fontWeight: 400, color: colors.textMuted, marginLeft: '8px' }}>
-                                    (sắp theo chi tiêu cao nhất)
-                                </span>
-                            </h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 style={styles.sectionTitle}>
+                                    Danh sách Content
+                                    <span style={{ fontWeight: 400, color: colors.textMuted, marginLeft: '8px' }}>
+                                        (sắp theo chi tiêu cao nhất)
+                                    </span>
+                                </h3>
+                                {ads.length > 0 && (
+                                    <button
+                                        onClick={() => {
+                                            const totalSpend = campaign.totals.spend;
+                                            const debugLines = ads.map((ad, i) => {
+                                                const ev = getContentBadge(ad, totalSpend);
+                                                return [
+                                                    `--- Content ${i + 1}: ${ad.name} ---`,
+                                                    `ID: ${ad.id} | Status: ${ad.status}`,
+                                                    `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                    `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
+                                                    `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
+                                                    `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
+                                                    `Tooltip: ${ev.tip}`,
+                                                    `Daily data points: ${ad.dailyMetrics?.length || 0}`,
+                                                ].join('\n');
+                                            });
+
+                                            const summary = [
+                                                `===== CONTENT DEBUG - ${campaign.name} =====`,
+                                                `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
+                                                `Tổng content: ${ads.length}`,
+                                                `Tổng chi tiêu campaign: ${formatMoney(totalSpend)}`,
+                                                ``,
+                                                ...debugLines,
+                                            ].join('\n\n');
+
+                                            navigator.clipboard.writeText(summary);
+                                        }}
+                                        style={{
+                                            background: 'transparent', border: `1px solid ${colors.border}`,
+                                            color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
+                                            padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                            fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                        }}
+                                    >
+                                        COPY DEBUG
+                                    </button>
+                                )}
+                            </div>
 
                             {isLoadingAds && (
                                 <div style={styles.loader}>

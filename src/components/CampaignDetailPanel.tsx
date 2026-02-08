@@ -923,106 +923,126 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
-    // Content evaluation: compare recent 7 days vs historical period
+    // Content evaluation: Bollinger Bands approach (same as campaign-level)
+    // Uses MA + σ from history, compares window avg via z-score
     const getContentBadge = (ad: Ad, totalCampaignSpend: number) => {
         const daily = ad.dailyMetrics || [];
         const totalSpend = ad.totals.spend;
         const spendShare = totalCampaignSpend > 0 ? (totalSpend / totalCampaignSpend) * 100 : 0;
 
-        // Not enough data
-        if (daily.length < 3 || totalSpend < totalCampaignSpend * 0.03 || ad.totals.purchases < 2) {
+        // --- Not enough data ---
+        if (daily.length < 5 || totalSpend < totalCampaignSpend * 0.02 || ad.totals.purchases < 2) {
             return {
                 badge: { text: 'Ít data', bg: `${colors.textSubtle}20`, color: colors.textMuted },
                 spendShare,
-                tip: 'Chưa đủ dữ liệu để đánh giá (chi tiêu < 3% hoặc < 2 đơn)',
+                tip: 'Chưa đủ dữ liệu để đánh giá',
             };
         }
 
-        // Split into recent (last 7 days) vs historical (before that)
-        const recentDays = daily.slice(-7);
-        const historicalDays = daily.slice(0, -7);
+        // --- Split history vs window (last 7 days) ---
+        const windowSize = Math.min(7, Math.floor(daily.length / 2));
+        const windowDays = daily.slice(-windowSize);
+        const historyDays = daily.slice(0, -windowSize);
 
-        // Calculate recent metrics
-        const recentSpend = recentDays.reduce((s, d) => s + d.spend, 0);
-        const recentPurchases = recentDays.reduce((s, d) => s + d.purchases, 0);
-        const recentClicks = recentDays.reduce((s, d) => s + d.clicks, 0);
-        const recentCPP = recentPurchases > 0 ? recentSpend / recentPurchases : 0;
-        const recentCTR = recentDays.length > 0
-            ? recentDays.reduce((s, d) => s + d.ctr, 0) / recentDays.length
-            : 0;
-
-        // Not enough historical data → "Tiềm năng" (new content)
-        if (historicalDays.length < 3) {
-            // New content - evaluate based on recent metrics vs campaign average
+        if (historyDays.length < 3) {
             return {
                 badge: { text: 'Tiềm năng', bg: '#3B82F620', color: '#3B82F6' },
                 spendShare,
-                tip: `Content mới (${daily.length} ngày data). CPP gần đây: ${recentCPP > 0 ? formatMoney(recentCPP) : 'N/A'}`,
+                tip: `Content mới (${daily.length} ngày). Chưa đủ lịch sử để so sánh.`,
             };
         }
 
-        // Calculate historical metrics
-        const histSpend = historicalDays.reduce((s, d) => s + d.spend, 0);
-        const histPurchases = historicalDays.reduce((s, d) => s + d.purchases, 0);
-        const histCPP = histPurchases > 0 ? histSpend / histPurchases : 0;
-        const histCTR = historicalDays.length > 0
-            ? historicalDays.reduce((s, d) => s + d.ctr, 0) / historicalDays.length
-            : 0;
+        // --- Calculate bands for CPP ---
+        const histCPP = historyDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
+        const winCPP = windowDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
 
-        // Compare trends
-        const cppChange = histCPP > 0 && recentCPP > 0 ? ((recentCPP - histCPP) / histCPP) * 100 : 0;
-        const ctrChange = histCTR > 0 && recentCTR > 0 ? ((recentCTR - histCTR) / histCTR) * 100 : 0;
+        let cppZ = 0;
+        let cppMA = 0;
+        let cppSigma = 0;
+        let cppWindowAvg = 0;
+        if (histCPP.length >= 3 && winCPP.length > 0) {
+            cppMA = histCPP.reduce((s, v) => s + v, 0) / histCPP.length;
+            const cppVariance = histCPP.reduce((s, v) => s + Math.pow(v - cppMA, 2), 0) / histCPP.length;
+            cppSigma = Math.sqrt(cppVariance);
+            cppWindowAvg = winCPP.reduce((s, v) => s + v, 0) / winCPP.length;
+            // CPP: z > 0 = xấu (tăng), z < 0 = tốt (giảm)
+            cppZ = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
+        }
 
-        // Build detailed tooltip
+        // --- Calculate bands for CTR ---
+        const histCTR = historyDays.map(d => d.ctr).filter(v => v > 0);
+        const winCTR = windowDays.map(d => d.ctr).filter(v => v > 0);
+
+        let ctrZ = 0;
+        let ctrMA = 0;
+        let ctrSigma = 0;
+        let ctrWindowAvg = 0;
+        if (histCTR.length >= 3 && winCTR.length > 0) {
+            ctrMA = histCTR.reduce((s, v) => s + v, 0) / histCTR.length;
+            const ctrVariance = histCTR.reduce((s, v) => s + Math.pow(v - ctrMA, 2), 0) / histCTR.length;
+            ctrSigma = Math.sqrt(ctrVariance);
+            ctrWindowAvg = winCTR.reduce((s, v) => s + v, 0) / winCTR.length;
+            // CTR: z > 0 = tốt (tăng), z < 0 = xấu (giảm) → invert for severity
+            ctrZ = ctrSigma > 0 ? (ctrWindowAvg - ctrMA) / ctrSigma : 0;
+        }
+
+        // --- Build tooltip ---
+        const fmtZ = (z: number) => `${z > 0 ? '+' : ''}${z.toFixed(1)}σ`;
         const tipParts = [
-            `Quá khứ (${historicalDays.length}d): CPP ${histCPP > 0 ? formatMoney(histCPP) : 'N/A'} · CTR ${histCTR.toFixed(2)}%`,
-            `Gần đây (${recentDays.length}d): CPP ${recentCPP > 0 ? formatMoney(recentCPP) : 'N/A'} · CTR ${recentCTR.toFixed(2)}%`,
-            `Thay đổi: CPP ${cppChange > 0 ? '+' : ''}${cppChange.toFixed(0)}% · CTR ${ctrChange > 0 ? '+' : ''}${ctrChange.toFixed(0)}%`,
+            `Lịch sử (${historyDays.length}d): CPP MA=${cppMA > 0 ? formatMoney(cppMA) : 'N/A'} · CTR MA=${ctrMA.toFixed(2)}%`,
+            `Gần đây (${windowDays.length}d): CPP=${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} · CTR=${ctrWindowAvg.toFixed(2)}%`,
+            `Z-Score: CPP ${fmtZ(cppZ)} · CTR ${fmtZ(ctrZ)}`,
         ];
 
-        // === BADGE LOGIC ===
-        // BÃO HOÀ: CPP tăng ≥30% VÀ/HOẶC CTR giảm ≥20%
-        if (cppChange >= 30 && ctrChange <= -15) {
-            return {
-                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + '\n⚠️ CPP tăng mạnh + CTR giảm → Content đang bão hoà',
-            };
-        }
-        if (cppChange >= 50) {
-            return {
-                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + '\n⚠️ CPP tăng >50% → Chi phí leo thang',
-            };
-        }
-
-        // KÉM: Recent CPP rất cao so với campaign average, hoặc không có đơn gần đây
-        if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.05) {
+        // --- Badge logic based on z-scores ---
+        // Check for no recent purchases but still spending
+        const recentSpend = windowDays.reduce((s, d) => s + d.spend, 0);
+        const recentPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
+        if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.03) {
             return {
                 badge: { text: 'Kém', bg: '#EF444420', color: '#EF4444' },
                 spendShare,
                 tip: tipParts.join('\n') + '\n🔴 Gần đây chi tiền nhưng không có đơn',
             };
         }
-        if (cppChange >= 30 || ctrChange <= -25) {
+
+        // BÃO HOÀ: CPP vượt +1.5σ VÀ CTR dưới -1σ
+        if (cppZ >= 1.5 && ctrZ <= -1.0) {
+            return {
+                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
+            };
+        }
+
+        // CPP tăng mạnh bất thường (vượt +2σ)
+        if (cppZ >= 2.0) {
+            return {
+                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
+            };
+        }
+
+        // YẾU: CPP tăng >1σ hoặc CTR giảm >1.5σ
+        if (cppZ >= 1.0 || ctrZ <= -1.5) {
             return {
                 badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
                 spendShare,
-                tip: tipParts.join('\n') + '\n⚠️ Hiệu suất gần đây suy giảm đáng kể',
+                tip: tipParts.join('\n') + '\n⚠️ Hiệu suất suy giảm đáng kể so với lịch sử',
             };
         }
 
-        // ĐANG TỐT: CPP ổn định hoặc giảm, CTR ổn định hoặc tăng
-        if (cppChange <= 10 && ctrChange >= -10) {
+        // ĐANG TỐT: CPP ổn định hoặc giảm (z ≤ 0.5), CTR không sụt (z ≥ -0.5)
+        if (cppZ <= 0.5 && ctrZ >= -0.5) {
             return {
                 badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
                 spendShare,
-                tip: tipParts.join('\n') + '\n✅ Hiệu suất ổn định, không có dấu hiệu suy giảm',
+                tip: tipParts.join('\n') + '\n✅ Hiệu suất ổn định trong vùng cho phép',
             };
         }
 
-        // ỔN: Trung bình, không nổi bật
+        // ỔN: Trung bình
         return {
             badge: { text: 'Ổn', bg: '#3B82F620', color: '#3B82F6' },
             spendShare,

@@ -346,14 +346,14 @@ export default function DashboardPage() {
     // Tab navigation - keeps state when switching views
     const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'monitoring'>('campaigns');
 
-    // Date range - last 7 days
-    const [endDate, setEndDate] = useState(() => {
+    // Date range - fixed 60 days (optimal for pattern analysis)
+    const [endDate] = useState(() => {
         const today = new Date();
         return today.toISOString().split('T')[0];
     });
-    const [startDate, setStartDate] = useState(() => {
+    const [startDate] = useState(() => {
         const date = new Date();
-        date.setDate(date.getDate() - 7);
+        date.setDate(date.getDate() - 60);
         return date.toISOString().split('T')[0];
     });
 
@@ -850,23 +850,20 @@ export default function DashboardPage() {
                         </select>
                     </div>
 
-                    {/* Date Range */}
+                    {/* Date Range - Fixed 60 days */}
                     <div style={styles.controlGroup}>
-                        <span style={styles.controlLabel}>Khoảng thời gian</span>
-                        <div style={styles.dateInputsGroup}>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                style={styles.dateInput}
-                            />
-                            <span style={{ color: 'rgba(255,255,255,0.4)' }}>→</span>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                style={styles.dateInput}
-                            />
+                        <span style={styles.controlLabel}>Khoảng phân tích</span>
+                        <div style={{
+                            padding: '10px 14px',
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: '10px',
+                            fontSize: '0.875rem',
+                            background: 'rgba(255,255,255,0.03)',
+                            color: colors.textMuted,
+                            fontFamily: '"JetBrains Mono", monospace',
+                            letterSpacing: '0.03em',
+                        }}>
+                            60 NGÀY GẦN NHẤT
                         </div>
                     </div>
 

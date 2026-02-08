@@ -36,6 +36,15 @@ interface CampaignWithIssues {
         color: string;
         healthScore?: number;
         windowAlert?: string;
+        metricTags?: Array<{
+            metric: 'CTR' | 'CPP' | 'ROAS';
+            direction: 'up' | 'down';
+            severity: 'info' | 'warning' | 'critical';
+            label: string;
+            detail: string;
+            color: string;
+        }>;
+        lifeStage?: string;
     };
     // Campaign metadata
     created_time?: string;
@@ -1388,6 +1397,29 @@ function CampaignCard({
                             {campaign.actionRecommendation.emoji} {campaign.actionRecommendation.action === 'STOP' ? 'TẮT NGAY' : campaign.actionRecommendation.action === 'SCALE' ? 'SCALE UP' : campaign.actionRecommendation.action === 'ADJUST' ? 'ĐIỀU CHỈNH' : campaign.actionRecommendation.action === 'GOOD' ? 'TỐT' : 'THEO DÕI'}
                         </span>
                     )}
+                    {/* Metric Band Tags */}
+                    {campaign.actionRecommendation?.metricTags?.map((tag, i) => (
+                        <span
+                            key={i}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                fontFamily: '"JetBrains Mono", monospace',
+                                background: tag.color + '15',
+                                color: tag.color,
+                                border: `1px solid ${tag.color}30`,
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.02em',
+                            }}
+                            title={tag.detail}
+                        >
+                            {tag.label}
+                        </span>
+                    ))}
                 </div>
             </div>
 

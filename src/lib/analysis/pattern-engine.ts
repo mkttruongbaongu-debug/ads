@@ -3,6 +3,8 @@
  * Phát hiện các pattern vấn đề của campaigns
  */
 
+import { generateMetricTags, MetricTag, CampaignLifeStage } from './metric-bands';
+
 // Types
 export interface DailyMetric {
     date: string;
@@ -428,6 +430,8 @@ export interface ActionRecommendation {
     trendInfo?: string;
     healthScore?: number;      // 0-100 campaign health
     windowAlert?: string;      // Cảnh báo khi gần đây khác quá khứ
+    metricTags?: MetricTag[];  // Bollinger Bands tags (CTR↓, CPP↑, ROAS↓)
+    lifeStage?: CampaignLifeStage; // Campaign age stage
 }
 
 /**
@@ -594,6 +598,9 @@ export function getRecommendedAction(
 ): ActionRecommendation {
     const { totals, dailyMetrics } = campaign;
 
+    // Tính Metric Bands (Bollinger Bands)
+    const bandsResult = generateMetricTags(dailyMetrics, campaign.created_time);
+
     // Tính Health Score
     const health = calculateHealthScore(dailyMetrics, totals);
     const trend = calculateTrendVsAverage(dailyMetrics);
@@ -615,6 +622,8 @@ export function getRecommendedAction(
             color: '#F6465D',
             trendInfo: trend.summary,
             healthScore: health.total,
+            metricTags: bandsResult.tags,
+            lifeStage: bandsResult.lifeStage,
         };
     }
 
@@ -632,6 +641,8 @@ export function getRecommendedAction(
             color: '#1E90FF',
             trendInfo: trend.summary,
             healthScore: health.total,
+            metricTags: bandsResult.tags,
+            lifeStage: bandsResult.lifeStage,
         };
     }
 
@@ -644,6 +655,8 @@ export function getRecommendedAction(
             color: '#0ECB81',
             trendInfo: trend.summary,
             healthScore: health.total,
+            metricTags: bandsResult.tags,
+            lifeStage: bandsResult.lifeStage,
         };
     }
 
@@ -660,6 +673,8 @@ export function getRecommendedAction(
             trendInfo: trend.summary,
             healthScore: health.total,
             windowAlert: health.windowAlert,
+            metricTags: bandsResult.tags,
+            lifeStage: bandsResult.lifeStage,
         };
     }
 
@@ -681,6 +696,8 @@ export function getRecommendedAction(
         trendInfo: trend.summary,
         healthScore: health.total,
         windowAlert: health.windowAlert,
+        metricTags: bandsResult.tags,
+        lifeStage: bandsResult.lifeStage,
     };
 }
 

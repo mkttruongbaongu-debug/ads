@@ -700,6 +700,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 }),
             });
 
+            if (!res.ok) {
+                if (res.status === 504 || res.status === 502 || res.status === 503) {
+                    throw new Error('Server quá tải, vui lòng thử lại sau ít phút');
+                }
+                throw new Error(`Lỗi server (${res.status}). Vui lòng thử lại`);
+            }
+
             const json = await res.json();
 
             if (!json.success) {
@@ -866,7 +873,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             fontSize: '0.5625rem', fontWeight: 600,
                                             padding: '1px 5px', borderRadius: '3px',
                                             background: `${colors.primary}20`, color: colors.primary,
-                                        }}>{campaign.actionRecommendation.lifeStage}</span>
+                                        }}>{{ LEARNING: 'Đang học', EARLY: 'Mới chạy', MATURE: 'Ổn định', VETERAN: 'Lão luyện' }[campaign.actionRecommendation.lifeStage] || campaign.actionRecommendation.lifeStage}</span>
                                     </>
                                 )}
                                 {campaign.created_time && (() => {
@@ -886,7 +893,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             padding: '1px 5px', borderRadius: '3px',
                                             background: campaign.actionRecommendation.color + '20',
                                             color: campaign.actionRecommendation.color,
-                                        }}>{campaign.actionRecommendation.action}</span>
+                                        }}>{{ STOP: 'Dừng', ADJUST: 'Điều chỉnh', WATCH: 'Theo dõi', GOOD: 'Tốt', SCALE: 'Tăng NS' }[campaign.actionRecommendation.action] || campaign.actionRecommendation.action}</span>
                                     </>
                                 )}
                             </p>

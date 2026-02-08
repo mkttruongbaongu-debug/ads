@@ -45,6 +45,8 @@ interface CampaignWithIssues {
             color: string;
         }>;
         lifeStage?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        debugData?: Record<string, any>;
     };
     // Campaign metadata
     created_time?: string;
@@ -1420,6 +1422,56 @@ function CampaignCard({
                             {tag.label}
                         </span>
                     ))}
+                    {/* DEBUG button */}
+                    {campaign.actionRecommendation?.debugData && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const debugLog = JSON.stringify(
+                                    campaign.actionRecommendation?.debugData,
+                                    null,
+                                    2
+                                );
+                                navigator.clipboard.writeText(debugLog).then(() => {
+                                    const btn = e.currentTarget;
+                                    btn.textContent = 'COPIED';
+                                    btn.style.color = colors.success;
+                                    btn.style.borderColor = colors.success + '40';
+                                    setTimeout(() => {
+                                        btn.textContent = 'DEBUG';
+                                        btn.style.color = colors.textMuted;
+                                        btn.style.borderColor = colors.border;
+                                    }, 1500);
+                                });
+                            }}
+                            style={{
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                fontSize: '0.6rem',
+                                fontWeight: 600,
+                                fontFamily: '"JetBrains Mono", monospace',
+                                background: 'transparent',
+                                color: colors.textMuted,
+                                border: `1px solid ${colors.border}`,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.05em',
+                                transition: 'all 0.2s',
+                                marginLeft: '4px',
+                            }}
+                            title="Copy full debug log vào clipboard"
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = colors.primary;
+                                e.currentTarget.style.borderColor = colors.primary + '60';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = colors.textMuted;
+                                e.currentTarget.style.borderColor = colors.border;
+                            }}
+                        >
+                            DEBUG
+                        </button>
+                    )}
                 </div>
             </div>
 

@@ -3,7 +3,7 @@
  * Phát hiện các pattern vấn đề của campaigns
  */
 
-import { generateMetricTags, MetricTag, CampaignLifeStage } from './metric-bands';
+import { generateMetricTags, MetricTag, CampaignLifeStage, splitHistoryAndWindow } from './metric-bands';
 
 // Types
 export interface DailyMetric {
@@ -432,6 +432,8 @@ export interface ActionRecommendation {
     windowAlert?: string;      // Cảnh báo khi gần đây khác quá khứ
     metricTags?: MetricTag[];  // Bollinger Bands tags (CTR↓, CPP↑, ROAS↓)
     lifeStage?: CampaignLifeStage; // Campaign age stage
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    debugData?: Record<string, any>; // Full pipeline debug data
 }
 
 /**
@@ -605,6 +607,40 @@ export function getRecommendedAction(
     const health = calculateHealthScore(dailyMetrics, totals);
     const trend = calculateTrendVsAverage(dailyMetrics);
 
+    // Build debug data (full pipeline)
+    const { history, window: windowSlice } = splitHistoryAndWindow(dailyMetrics);
+    const debugData = {
+        _generated: new Date().toISOString(),
+        input: {
+            campaignName: campaign.name,
+            campaignId: campaign.id,
+            created_time: campaign.created_time || 'N/A',
+            totalDays: dailyMetrics.length,
+            dailyMetrics: dailyMetrics,
+            totals: totals,
+        },
+        processing: {
+            lifeStage: bandsResult.lifeStage,
+            historySplit: {
+                historyDays: history.length,
+                historyRange: history.length > 0
+                    ? `${history[0]?.date} → ${history[history.length - 1]?.date}`
+                    : 'N/A',
+                windowDays: windowSlice.length,
+                windowRange: windowSlice.length > 0
+                    ? `${windowSlice[0]?.date} → ${windowSlice[windowSlice.length - 1]?.date}`
+                    : 'N/A',
+            },
+            bands: bandsResult.bands,
+            healthScore: health,
+            trend: trend,
+        },
+        output: {
+            tags: bandsResult.tags,
+            issues: issues,
+        },
+    };
+
     // ============================================
     // 🔴 STOP: CHỈ KHI CHẮC CHẮN LỖ
     // ============================================
@@ -624,6 +660,7 @@ export function getRecommendedAction(
             healthScore: health.total,
             metricTags: bandsResult.tags,
             lifeStage: bandsResult.lifeStage,
+            debugData: { ...debugData, output: { ...debugData.output, action: 'STOP' } },
         };
     }
 
@@ -643,6 +680,7 @@ export function getRecommendedAction(
             healthScore: health.total,
             metricTags: bandsResult.tags,
             lifeStage: bandsResult.lifeStage,
+            debugData: { ...debugData, output: { ...debugData.output, action: 'SCALE' } },
         };
     }
 
@@ -657,6 +695,7 @@ export function getRecommendedAction(
             healthScore: health.total,
             metricTags: bandsResult.tags,
             lifeStage: bandsResult.lifeStage,
+            debugData: { ...debugData, output: { ...debugData.output, action: 'GOOD' } },
         };
     }
 
@@ -675,6 +714,7 @@ export function getRecommendedAction(
             windowAlert: health.windowAlert,
             metricTags: bandsResult.tags,
             lifeStage: bandsResult.lifeStage,
+            debugData: { ...debugData, output: { ...debugData.output, action: 'ADJUST' } },
         };
     }
 
@@ -698,6 +738,7 @@ export function getRecommendedAction(
         windowAlert: health.windowAlert,
         metricTags: bandsResult.tags,
         lifeStage: bandsResult.lifeStage,
+        debugData: { ...debugData, output: { ...debugData.output, action: 'WATCH' } },
     };
 }
 

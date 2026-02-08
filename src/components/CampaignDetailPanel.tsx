@@ -58,6 +58,14 @@ interface Ad {
         cpp: number;
         ctr: number;
     };
+    dailyMetrics?: Array<{
+        date: string;
+        spend: number;
+        clicks: number;
+        purchases: number;
+        cpp: number;
+        ctr: number;
+    }>;
 }
 
 interface Props {
@@ -915,15 +923,111 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
-    const getCppBadge = (cpp: number, avgCpp: number) => {
-        if (cpp === 0) return null;
-        if (cpp < avgCpp * 0.8) {
-            return { text: 'Tốt', bg: '#dcfce7', color: '#166534' };
+    // Content evaluation: compare recent 7 days vs historical period
+    const getContentBadge = (ad: Ad, totalCampaignSpend: number) => {
+        const daily = ad.dailyMetrics || [];
+        const totalSpend = ad.totals.spend;
+        const spendShare = totalCampaignSpend > 0 ? (totalSpend / totalCampaignSpend) * 100 : 0;
+
+        // Not enough data
+        if (daily.length < 3 || totalSpend < totalCampaignSpend * 0.03 || ad.totals.purchases < 2) {
+            return {
+                badge: { text: 'Ít data', bg: `${colors.textSubtle}20`, color: colors.textMuted },
+                spendShare,
+                tip: 'Chưa đủ dữ liệu để đánh giá (chi tiêu < 3% hoặc < 2 đơn)',
+            };
         }
-        if (cpp > avgCpp * 1.3) {
-            return { text: 'Kém', bg: '#fee2e2', color: '#991b1b' };
+
+        // Split into recent (last 7 days) vs historical (before that)
+        const recentDays = daily.slice(-7);
+        const historicalDays = daily.slice(0, -7);
+
+        // Calculate recent metrics
+        const recentSpend = recentDays.reduce((s, d) => s + d.spend, 0);
+        const recentPurchases = recentDays.reduce((s, d) => s + d.purchases, 0);
+        const recentClicks = recentDays.reduce((s, d) => s + d.clicks, 0);
+        const recentCPP = recentPurchases > 0 ? recentSpend / recentPurchases : 0;
+        const recentCTR = recentDays.length > 0
+            ? recentDays.reduce((s, d) => s + d.ctr, 0) / recentDays.length
+            : 0;
+
+        // Not enough historical data → "Tiềm năng" (new content)
+        if (historicalDays.length < 3) {
+            // New content - evaluate based on recent metrics vs campaign average
+            return {
+                badge: { text: 'Tiềm năng', bg: '#3B82F620', color: '#3B82F6' },
+                spendShare,
+                tip: `Content mới (${daily.length} ngày data). CPP gần đây: ${recentCPP > 0 ? formatMoney(recentCPP) : 'N/A'}`,
+            };
         }
-        return null;
+
+        // Calculate historical metrics
+        const histSpend = historicalDays.reduce((s, d) => s + d.spend, 0);
+        const histPurchases = historicalDays.reduce((s, d) => s + d.purchases, 0);
+        const histCPP = histPurchases > 0 ? histSpend / histPurchases : 0;
+        const histCTR = historicalDays.length > 0
+            ? historicalDays.reduce((s, d) => s + d.ctr, 0) / historicalDays.length
+            : 0;
+
+        // Compare trends
+        const cppChange = histCPP > 0 && recentCPP > 0 ? ((recentCPP - histCPP) / histCPP) * 100 : 0;
+        const ctrChange = histCTR > 0 && recentCTR > 0 ? ((recentCTR - histCTR) / histCTR) * 100 : 0;
+
+        // Build detailed tooltip
+        const tipParts = [
+            `Quá khứ (${historicalDays.length}d): CPP ${histCPP > 0 ? formatMoney(histCPP) : 'N/A'} · CTR ${histCTR.toFixed(2)}%`,
+            `Gần đây (${recentDays.length}d): CPP ${recentCPP > 0 ? formatMoney(recentCPP) : 'N/A'} · CTR ${recentCTR.toFixed(2)}%`,
+            `Thay đổi: CPP ${cppChange > 0 ? '+' : ''}${cppChange.toFixed(0)}% · CTR ${ctrChange > 0 ? '+' : ''}${ctrChange.toFixed(0)}%`,
+        ];
+
+        // === BADGE LOGIC ===
+        // BÃO HOÀ: CPP tăng ≥30% VÀ/HOẶC CTR giảm ≥20%
+        if (cppChange >= 30 && ctrChange <= -15) {
+            return {
+                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + '\n⚠️ CPP tăng mạnh + CTR giảm → Content đang bão hoà',
+            };
+        }
+        if (cppChange >= 50) {
+            return {
+                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + '\n⚠️ CPP tăng >50% → Chi phí leo thang',
+            };
+        }
+
+        // KÉM: Recent CPP rất cao so với campaign average, hoặc không có đơn gần đây
+        if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.05) {
+            return {
+                badge: { text: 'Kém', bg: '#EF444420', color: '#EF4444' },
+                spendShare,
+                tip: tipParts.join('\n') + '\n🔴 Gần đây chi tiền nhưng không có đơn',
+            };
+        }
+        if (cppChange >= 30 || ctrChange <= -25) {
+            return {
+                badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + '\n⚠️ Hiệu suất gần đây suy giảm đáng kể',
+            };
+        }
+
+        // ĐANG TỐT: CPP ổn định hoặc giảm, CTR ổn định hoặc tăng
+        if (cppChange <= 10 && ctrChange >= -10) {
+            return {
+                badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
+                spendShare,
+                tip: tipParts.join('\n') + '\n✅ Hiệu suất ổn định, không có dấu hiệu suy giảm',
+            };
+        }
+
+        // ỔN: Trung bình, không nổi bật
+        return {
+            badge: { text: 'Ổn', bg: '#3B82F620', color: '#3B82F6' },
+            spendShare,
+            tip: tipParts.join('\n'),
+        };
     };
 
     return (
@@ -1518,7 +1622,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             )}
 
                             {ads.map((ad) => {
-                                const badge = getCppBadge(ad.totals.cpp, campaign.totals.cpp);
+                                const evaluation = getContentBadge(ad, campaign.totals.spend);
                                 return (
                                     <div key={ad.id} style={{
                                         background: colors.bgCard,
@@ -1547,8 +1651,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     width: '160px',
                                                     height: '160px',
                                                     background: colors.bgAlt,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
+                                                    display: 'flex', alignItems: 'center',
                                                     justifyContent: 'center',
                                                     flexShrink: 0,
                                                 }}>
@@ -1560,13 +1663,23 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <div style={{ flex: 1, padding: '12px 16px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                                 {/* Ad name + badges */}
                                                 <div>
-                                                    <p style={{
-                                                        fontSize: '0.875rem', fontWeight: 600, color: colors.text,
-                                                        margin: '0 0 6px', lineHeight: 1.3,
-                                                        overflow: 'hidden', textOverflow: 'ellipsis',
-                                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
-                                                    }}>
-                                                        {ad.name}
+                                                    {/* Badge row: evaluation badge + spend share + status */}
+                                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
+                                                        <span title={evaluation.tip} style={{
+                                                            fontSize: '0.6875rem', fontWeight: 700,
+                                                            padding: '2px 8px', borderRadius: '3px',
+                                                            background: evaluation.badge.bg,
+                                                            color: evaluation.badge.color,
+                                                            cursor: 'help',
+                                                        }}>
+                                                            {evaluation.badge.text}
+                                                        </span>
+                                                        <span style={{
+                                                            fontSize: '0.625rem', fontWeight: 600, color: colors.textSubtle,
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                        }}>
+                                                            FB chi: {evaluation.spendShare.toFixed(1)}%
+                                                        </span>
                                                         {ad.status !== 'ACTIVE' && (
                                                             <span style={{
                                                                 ...styles.adBadge,
@@ -1576,15 +1689,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 {ad.status}
                                                             </span>
                                                         )}
-                                                        {badge && (
-                                                            <span style={{
-                                                                ...styles.adBadge,
-                                                                background: badge.bg,
-                                                                color: badge.color
-                                                            }}>
-                                                                {badge.text}
-                                                            </span>
-                                                        )}
+                                                    </div>
+                                                    <p style={{
+                                                        fontSize: '0.8125rem', fontWeight: 600, color: colors.text,
+                                                        margin: '0 0 6px', lineHeight: 1.3,
+                                                        overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' as const,
+                                                    }}>
+                                                        {ad.name}
                                                     </p>
 
                                                     {/* Caption / Message */}

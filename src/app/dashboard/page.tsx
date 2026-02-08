@@ -1240,9 +1240,7 @@ export default function DashboardPage() {
                                                                                 </span>
                                                                             )}
                                                                         </div>
-                                                                        <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
-                                                                            {campaign.id}
-                                                                        </div>
+
                                                                         {campaign.created_time && (
                                                                             <div style={{ fontSize: '0.7rem', color: colors.textSubtle }}>
                                                                                 Tạo: {new Date(campaign.created_time).toLocaleDateString('vi-VN')}

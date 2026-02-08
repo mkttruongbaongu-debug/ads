@@ -884,36 +884,6 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Search Button */}
-                    <div style={{ ...styles.controlGroup, justifyContent: 'flex-end' }}>
-                        <button
-                            onClick={handleSearch}
-                            disabled={isLoading || !selectedAccountId}
-                            style={{
-                                ...styles.searchBtn,
-                                opacity: (isLoading || !selectedAccountId) ? 0.6 : 1,
-                                cursor: (isLoading || !selectedAccountId) ? 'not-allowed' : 'pointer',
-                            }}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                                        <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
-                                        <path d="M12 2a10 10 0 0 1 10 10" />
-                                    </svg>
-                                    Đang tải...
-                                </>
-                            ) : (
-                                <>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <circle cx="11" cy="11" r="8" />
-                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                    </svg>
-                                    Tra cứu
-                                </>
-                            )}
-                        </button>
-                    </div>
 
                     {/* Campaign Filter - inline with other controls */}
                     <div style={styles.controlGroup}>

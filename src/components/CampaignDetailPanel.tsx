@@ -966,7 +966,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 marginBottom: '20px',
                             }}>
                                 {[
-                                    { label: 'SPEND', value: formatMoney(campaign.totals.spend) },
+                                    { label: 'CHI TIÊU', value: formatMoney(campaign.totals.spend) },
                                     { label: 'ĐƠN', value: String(campaign.totals.purchases) },
                                     { label: 'CPP', value: formatMoney(campaign.totals.cpp) },
                                     { label: 'ROAS', value: `${campaign.totals.roas.toFixed(2)}x` },

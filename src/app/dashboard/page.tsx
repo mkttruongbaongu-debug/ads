@@ -112,11 +112,11 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '20px 32px',
+        padding: '10px 32px',
         borderBottom: `1px solid ${colors.border}`,
     },
     logo: {
-        fontSize: '1.75rem',
+        fontSize: '1.25rem',
         fontWeight: 700,
         color: colors.text,
         letterSpacing: '-0.03em',
@@ -124,13 +124,13 @@ const styles = {
     headerControls: {
         display: 'flex',
         alignItems: 'flex-end',
-        gap: '20px',
-        padding: '16px 32px',
+        gap: '16px',
+        padding: '10px 32px',
     },
     controlGroup: {
         display: 'flex',
         flexDirection: 'column' as const,
-        gap: '8px',
+        gap: '4px',
     },
     controlLabel: {
         fontSize: '0.7rem',
@@ -143,7 +143,7 @@ const styles = {
         background: colors.bg,
         border: `1px solid ${colors.border}`,
         color: colors.text,
-        padding: '12px 16px',
+        padding: '8px 12px',
         borderRadius: '4px',
         fontSize: '0.875rem',
         cursor: 'pointer',
@@ -1163,7 +1163,7 @@ export default function DashboardPage() {
                                                         Chi tiêu
                                                     </th>
                                                     <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        Budget/ngày
+                                                        NS/ngày
                                                     </th>
                                                     <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                         ROAS

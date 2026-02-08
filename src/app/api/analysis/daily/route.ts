@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
         console.log('[ANALYSIS/DAILY] 📡 Fetching campaigns from Facebook...');
         const campaignsRes = await fetch(
             `${FB_API_BASE}/${adAccountId}/campaigns?` +
-            `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
+            `fields=id,name,status,created_time,daily_budget,` +
+            `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,frequency` +
             `}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]` +
             `&limit=500&access_token=${accessToken}`
@@ -89,6 +90,8 @@ export async function GET(request: NextRequest) {
             id: string;
             name: string;
             status: string;
+            created_time?: string;
+            daily_budget?: string;
             insights?: {
                 data?: Array<{
                     date_start: string;
@@ -147,6 +150,11 @@ export async function GET(request: NextRequest) {
                 impressions: acc.impressions + day.impressions,
             }), { spend: 0, purchases: 0, revenue: 0, clicks: 0, impressions: 0 });
 
+            // Daily budget: thật từ Facebook hoặc ước lượng
+            const fbDailyBudget = campaign.daily_budget ? parseInt(campaign.daily_budget) : 0;
+            const numberOfDays = dailyMetrics.length || 1;
+            const estimatedDailyBudget = Math.round(totals.spend / numberOfDays);
+
             return {
                 id: campaign.id,
                 name: campaign.name,
@@ -160,6 +168,9 @@ export async function GET(request: NextRequest) {
                     roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
                     ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
                 },
+                created_time: campaign.created_time,
+                daily_budget: fbDailyBudget > 0 ? fbDailyBudget : undefined,
+                daily_budget_estimated: fbDailyBudget > 0 ? fbDailyBudget : estimatedDailyBudget,
             };
         });
 

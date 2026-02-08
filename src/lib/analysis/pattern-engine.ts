@@ -32,6 +32,10 @@ export interface CampaignData {
         roas: number;
         ctr: number;
     };
+    // NEW: Campaign metadata
+    created_time?: string;          // ISO datetime khi campaign được tạo
+    daily_budget?: number;          // Ngân sách hàng ngày thật (từ Facebook)
+    daily_budget_estimated?: number; // Ước lượng = totalSpend / numberOfDays
 }
 
 export interface Issue {

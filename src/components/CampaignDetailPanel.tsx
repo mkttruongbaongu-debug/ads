@@ -77,6 +77,26 @@ interface Props {
             cpp: number;
             ctr: number;
         }>;
+        actionRecommendation?: {
+            action: string;
+            reason: string;
+            emoji: string;
+            color: string;
+            healthScore?: number;
+            metricTags?: Array<{
+                metric: 'CTR' | 'CPP' | 'ROAS';
+                direction: 'up' | 'down';
+                severity: 'info' | 'warning' | 'critical';
+                label: string;
+                detail: string;
+                color: string;
+                zScore?: number;
+            }>;
+            lifeStage?: string;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            debugData?: Record<string, any>;
+        };
+        created_time?: string;
     };
     dateRange: { startDate: string; endDate: string };
     onClose: () => void;
@@ -84,93 +104,144 @@ interface Props {
     accountId: string; // Facebook Ad Account ID
 }
 
-// Mini Bar Chart Component for issue visualization
-function MiniBarChart({
+// Bollinger Bands Bar Chart — Terminal Style
+function BandsChart({
     data,
     metricKey,
     label,
     formatValue,
-    highlightCondition
+    ma,
+    sigma,
+    windowDays = 7,
 }: {
     data: Array<{ date: string;[key: string]: number | string }>;
-    metricKey: 'cpp' | 'ctr';
+    metricKey: 'cpp' | 'ctr' | 'roas';
     label: string;
     formatValue: (v: number) => string;
-    highlightCondition?: (value: number, avgValue: number) => boolean;
+    ma?: number;
+    sigma?: number;
+    windowDays?: number;
 }) {
     if (!data || data.length === 0) return null;
 
     const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
     const maxValue = Math.max(...values);
-    const minValue = Math.min(...values.filter(v => v > 0)); // Filter out 0s for better scaling
-    const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+    const minValue = Math.min(...values.filter(v => v > 0));
 
-    // Chart container height in pixels
-    const chartHeight = 80;
+    // Include MA and bands in range calculation for proper scaling
+    const upperBand = ma && sigma ? ma + 2 * sigma : maxValue;
+    const lowerBand = ma && sigma ? Math.max(0, ma - 2 * sigma) : minValue;
+    const chartMax = Math.max(maxValue, upperBand) * 1.05;
+    const chartMin = Math.min(minValue, lowerBand) * 0.95;
+    const chartRange = chartMax - chartMin || 1;
+
+    const chartHeight = 90;
+    const historyCount = data.length - windowDays;
+
+    // Convert value to Y position (pixels from bottom)
+    const valueToY = (val: number) => {
+        return ((val - chartMin) / chartRange) * chartHeight;
+    };
+
+    const maY = ma ? valueToY(ma) : undefined;
+    const upperY = ma && sigma ? valueToY(ma + 2 * sigma) : undefined;
+    const lowerY = ma && sigma ? valueToY(Math.max(0, ma - 2 * sigma)) : undefined;
 
     return (
-        <div style={{ marginTop: '16px' }}>
+        <div style={{ marginBottom: '16px' }}>
             <p style={{
-                fontSize: '0.75rem',
+                fontSize: '0.6875rem',
                 fontWeight: 600,
                 color: colors.textMuted,
-                marginBottom: '12px',
+                marginBottom: '8px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
             }}>
-                {label} — {data.length} days
+                {label} — {data.length}D
             </p>
-            <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', height: `${chartHeight}px` }}>
-                {data.map((d, idx) => {
-                    const value = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
-                    // Scale from minValue to maxValue for better visualization
-                    // If all values are same, show 50% height
-                    let heightPercent: number;
-                    if (maxValue === minValue) {
-                        heightPercent = 50;
-                    } else {
-                        // Scale between 15% (min) and 100% (max) for better visual differentiation
-                        heightPercent = 15 + ((value - minValue) / (maxValue - minValue)) * 85;
-                    }
-                    const barHeight = Math.max((heightPercent / 100) * chartHeight, 4);
-                    const isHighlighted = highlightCondition ? highlightCondition(value, avgValue) : false;
+            <div style={{ position: 'relative', height: `${chartHeight}px` }}>
+                {/* Band lines */}
+                {maY !== undefined && (
+                    <div style={{
+                        position: 'absolute', bottom: `${maY}px`, left: 0, right: 0,
+                        borderBottom: `1px solid ${colors.primary}60`,
+                        zIndex: 1,
+                    }}>
+                        <span style={{
+                            position: 'absolute', right: 0, top: '-14px',
+                            fontSize: '0.5625rem', color: colors.primary, fontFamily: '"JetBrains Mono", monospace',
+                        }}>MA</span>
+                    </div>
+                )}
+                {upperY !== undefined && upperY <= chartHeight && (
+                    <div style={{
+                        position: 'absolute', bottom: `${upperY}px`, left: 0, right: 0,
+                        borderBottom: `1px dashed ${colors.error}40`,
+                        zIndex: 1,
+                    }}>
+                        <span style={{
+                            position: 'absolute', right: 0, top: '-14px',
+                            fontSize: '0.5rem', color: `${colors.error}80`, fontFamily: '"JetBrains Mono", monospace',
+                        }}>+2σ</span>
+                    </div>
+                )}
+                {lowerY !== undefined && lowerY >= 0 && (
+                    <div style={{
+                        position: 'absolute', bottom: `${lowerY}px`, left: 0, right: 0,
+                        borderBottom: `1px dashed ${colors.success}40`,
+                        zIndex: 1,
+                    }}>
+                        <span style={{
+                            position: 'absolute', right: 0, top: '-14px',
+                            fontSize: '0.5rem', color: `${colors.success}80`, fontFamily: '"JetBrains Mono", monospace',
+                        }}>-2σ</span>
+                    </div>
+                )}
 
-                    return (
-                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                            <div
-                                style={{
-                                    width: '100%',
-                                    height: `${barHeight}px`,
-                                    background: isHighlighted
-                                        ? 'linear-gradient(180deg, #F6465D, #F6465D80)'
-                                        : `linear-gradient(180deg, ${colors.primary}, ${colors.primary}80)`,
-                                    borderRadius: '3px 3px 0 0',
-                                    transition: 'height 0.3s ease',
-                                }}
-                                title={`${d.date}: ${formatValue(value)}`}
-                            />
-                            <span style={{
-                                fontSize: '0.5rem',
-                                color: colors.textSubtle,
-                                marginTop: '4px',
-                                whiteSpace: 'nowrap'
+                {/* Bars */}
+                <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: '100%', position: 'relative', zIndex: 2 }}>
+                    {data.map((d, idx) => {
+                        const value = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
+                        const barHeight = Math.max(valueToY(value), 3);
+                        const isWindow = idx >= historyCount;
+                        // For CPP (inverse metric), higher = worse
+                        const isInverse = metricKey === 'cpp';
+                        const isBad = isInverse ? (ma && value > ma * 1.3) : (ma && value < ma * 0.7);
+
+                        return (
+                            <div key={idx} style={{
+                                flex: 1, display: 'flex', flexDirection: 'column',
+                                alignItems: 'center', justifyContent: 'flex-end', height: '100%'
                             }}>
-                                {d.date.slice(8)} {/* DD only */}
-                            </span>
-                        </div>
-                    );
-                })}
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: `${barHeight}px`,
+                                        background: isBad
+                                            ? colors.error
+                                            : isWindow
+                                                ? colors.primary
+                                                : `${colors.textSubtle}80`,
+                                        borderRadius: '2px 2px 0 0',
+                                        opacity: isWindow ? 1 : 0.6,
+                                        transition: 'height 0.3s ease',
+                                    }}
+                                    title={`${d.date}: ${formatValue(value)}${isWindow ? ' (window)' : ''}`}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
+            {/* Legend */}
             <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginTop: '8px',
-                fontSize: '0.7rem',
-                color: colors.textMuted
+                display: 'flex', justifyContent: 'space-between',
+                marginTop: '6px', fontSize: '0.625rem', color: colors.textSubtle,
+                fontFamily: '"JetBrains Mono", monospace',
             }}>
-                <span>Thấp nhất: {formatValue(Math.min(...values))}</span>
-                <span>TB: {formatValue(avgValue)}</span>
-                <span>Cao nhất: {formatValue(maxValue)}</span>
+                <span>MIN {formatValue(Math.min(...values))}</span>
+                {ma && <span>MA {formatValue(ma)}</span>}
+                <span>MAX {formatValue(maxValue)}</span>
             </div>
         </div>
     );
@@ -683,8 +754,42 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     <div style={styles.headerRow}>
                         <div>
                             <h2 style={styles.title}>{campaign.name}</h2>
-                            <p style={{ fontSize: '0.875rem', color: colors.textMuted, margin: 0 }}>
-                                {dateRange.startDate} → {dateRange.endDate}
+                            <p style={{
+                                fontSize: '0.8125rem', color: colors.textMuted, margin: 0,
+                                fontFamily: '"JetBrains Mono", monospace',
+                                display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                            }}>
+                                <span>{dateRange.startDate} → {dateRange.endDate}</span>
+                                {campaign.actionRecommendation?.lifeStage && (
+                                    <>
+                                        <span style={{ color: colors.textSubtle }}>·</span>
+                                        <span style={{
+                                            fontSize: '0.625rem', fontWeight: 600,
+                                            padding: '1px 6px', borderRadius: '3px',
+                                            background: `${colors.primary}20`, color: colors.primary,
+                                        }}>{campaign.actionRecommendation.lifeStage}</span>
+                                    </>
+                                )}
+                                {campaign.created_time && (() => {
+                                    const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
+                                    return (
+                                        <>
+                                            <span style={{ color: colors.textSubtle }}>·</span>
+                                            <span>{ageDays}D</span>
+                                        </>
+                                    );
+                                })()}
+                                {campaign.actionRecommendation && (
+                                    <>
+                                        <span style={{ color: colors.textSubtle }}>·</span>
+                                        <span style={{
+                                            fontSize: '0.625rem', fontWeight: 700,
+                                            padding: '1px 6px', borderRadius: '3px',
+                                            background: campaign.actionRecommendation.color + '20',
+                                            color: campaign.actionRecommendation.color,
+                                        }}>{campaign.actionRecommendation.action}</span>
+                                    </>
+                                )}
                             </p>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -765,100 +870,246 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     {/* Overview Tab */}
                     {activeTab === 'overview' && (
                         <>
-                            {/* Metrics */}
-                            <div style={styles.section}>
-                                <h3 style={styles.sectionTitle}>Tổng quan</h3>
-                                <div style={styles.metricsGrid}>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>Chi tiêu</p>
-                                        <p style={styles.metricValue}>{formatMoney(campaign.totals.spend)}</p>
+                            {/* ═══ TICKER BAR ═══ */}
+                            <div style={{
+                                display: 'flex', flexWrap: 'wrap', gap: '0',
+                                borderBottom: `1px solid ${colors.border}`,
+                                marginBottom: '20px',
+                            }}>
+                                {[
+                                    { label: 'SPEND', value: formatMoney(campaign.totals.spend) },
+                                    { label: 'ĐƠN', value: String(campaign.totals.purchases) },
+                                    { label: 'CPP', value: formatMoney(campaign.totals.cpp) },
+                                    { label: 'ROAS', value: `${campaign.totals.roas.toFixed(2)}x` },
+                                    { label: 'CTR', value: `${campaign.totals.ctr.toFixed(2)}%` },
+                                    { label: 'DOANH THU', value: formatMoney(campaign.totals.revenue) },
+                                ].map((item, idx) => (
+                                    <div key={idx} style={{
+                                        flex: '1 1 auto',
+                                        minWidth: '90px',
+                                        padding: '12px 16px',
+                                        borderRight: idx < 5 ? `1px solid ${colors.border}` : 'none',
+                                    }}>
+                                        <p style={{
+                                            fontSize: '0.5625rem', fontWeight: 600, color: colors.textSubtle,
+                                            margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em',
+                                        }}>{item.label}</p>
+                                        <p style={{
+                                            fontSize: '1rem', fontWeight: 700, color: colors.text,
+                                            margin: 0, fontFamily: '"JetBrains Mono", monospace',
+                                        }}>{item.value}</p>
                                     </div>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>Số đơn</p>
-                                        <p style={styles.metricValue}>{campaign.totals.purchases}</p>
-                                    </div>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>CPP</p>
-                                        <p style={styles.metricValue}>{formatMoney(campaign.totals.cpp)}</p>
-                                    </div>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>ROAS</p>
-                                        <p style={styles.metricValue}>{campaign.totals.roas.toFixed(2)}x</p>
-                                    </div>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>CTR</p>
-                                        <p style={styles.metricValue}>{campaign.totals.ctr.toFixed(2)}%</p>
-                                    </div>
-                                    <div style={styles.metricCard}>
-                                        <p style={styles.metricLabel}>Doanh thu</p>
-                                        <p style={styles.metricValue}>{formatMoney(campaign.totals.revenue)}</p>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
 
-                            {/* Issues */}
-                            {campaign.issues.length > 0 && (
-                                <div style={styles.section}>
-                                    <h3 style={styles.sectionTitle}>Vấn đề phát hiện</h3>
-                                    <div style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
-                                        {campaign.issues.map((issue, idx) => (
-                                            <div
-                                                key={idx}
-                                                style={{
-                                                    background: issue.severity === 'critical' ? colors.bgAlt : colors.bgAlt,
-                                                    border: `1px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
-                                                    borderLeft: `4px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
-                                                    borderRadius: '6px',
-                                                    padding: '8px 12px',
-                                                    marginBottom: '8px',
-                                                }}
-                                            >
-                                                <p style={{
-                                                    fontWeight: 600,
-                                                    fontSize: '0.875rem',
-                                                    color: issue.severity === 'critical' ? colors.error : colors.warning,
-                                                    margin: '0 0 4px',
-                                                }}>
-                                                    {issue.message}
-                                                </p>
-                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, margin: '0 0 8px', lineHeight: 1.5 }}>
-                                                    {issue.detail}
-                                                </p>
-                                                <p style={{ fontSize: '0.75rem', fontWeight: 500, color: colors.success, margin: 0 }}>
-                                                    → {issue.action}
-                                                </p>
+                            {/* ═══ BANDS ANALYSIS ═══ */}
+                            {(() => {
+                                const rec = campaign.actionRecommendation;
+                                const bands = rec?.debugData?.processing?.bands;
+                                const tags = rec?.metricTags || [];
+                                const healthScore = rec?.healthScore;
+                                const lifeStage = rec?.lifeStage || rec?.debugData?.processing?.lifeStage;
+
+                                if (!bands && tags.length === 0) return null;
+
+                                return (
+                                    <div style={{
+                                        background: colors.bgAlt,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '20px',
+                                    }}>
+                                        {/* Header */}
+                                        <div style={{
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            marginBottom: '16px', paddingBottom: '10px',
+                                            borderBottom: `1px solid ${colors.border}`,
+                                        }}>
+                                            <span style={{
+                                                fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
+                                                textTransform: 'uppercase', letterSpacing: '0.08em',
+                                            }}>METRIC BANDS</span>
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                {lifeStage && (
+                                                    <span style={{
+                                                        fontSize: '0.625rem', fontWeight: 600,
+                                                        padding: '2px 8px', borderRadius: '3px',
+                                                        background: `${colors.primary}20`, color: colors.primary,
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                    }}>{lifeStage}</span>
+                                                )}
+                                                {healthScore !== undefined && (
+                                                    <span style={{
+                                                        fontSize: '0.75rem', fontWeight: 700,
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                        color: healthScore >= 75 ? colors.success
+                                                            : healthScore >= 50 ? colors.warning
+                                                                : colors.error,
+                                                    }}>HP {healthScore}</span>
+                                                )}
                                             </div>
-                                        ))}
+                                        </div>
+
+                                        {/* Metric Rows */}
+                                        {(['CTR', 'CPP', 'ROAS'] as const).map(metric => {
+                                            const band = bands?.[metric.toLowerCase()];
+                                            const tag = tags.find(t => t.metric === metric);
+                                            if (!band && !tag) return null;
+
+                                            const windowAvg = band?.windowAvg;
+                                            const ma = band?.ma;
+                                            const zScore = band?.zScore ?? tag?.zScore;
+                                            const isInverse = metric === 'CPP';
+
+                                            // Format values
+                                            const fmtWindow = metric === 'CTR' ? `${windowAvg?.toFixed(2)}%`
+                                                : metric === 'ROAS' ? `${windowAvg?.toFixed(2)}x`
+                                                    : formatMoney(windowAvg || 0);
+                                            const fmtMA = metric === 'CTR' ? `${ma?.toFixed(2)}%`
+                                                : metric === 'ROAS' ? `${ma?.toFixed(2)}x`
+                                                    : formatMoney(ma || 0);
+
+                                            // Deviation ratio for progress bar
+                                            let ratio = ma && windowAvg ? windowAvg / ma : 1;
+                                            if (isInverse) ratio = ma && windowAvg ? ma / windowAvg : 1;
+                                            const barPercent = Math.min(Math.max(ratio * 100, 5), 200);
+                                            const isGood = isInverse ? (windowAvg || 0) < (ma || 0) : (windowAvg || 0) > (ma || 0);
+
+                                            // Severity color
+                                            const sevColor = tag?.severity === 'critical' ? colors.error
+                                                : tag?.severity === 'warning' ? colors.warning
+                                                    : tag ? '#3B82F6' : colors.textMuted;
+
+                                            return (
+                                                <div key={metric} style={{
+                                                    padding: '10px 0',
+                                                    borderBottom: metric !== 'ROAS' ? `1px solid ${colors.border}30` : 'none',
+                                                }}>
+                                                    {/* Top row: metric name, value, tag, z-score, MA */}
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                                        marginBottom: '6px',
+                                                    }}>
+                                                        <span style={{
+                                                            fontSize: '0.75rem', fontWeight: 700, color: colors.text,
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                            width: '40px',
+                                                        }}>{metric}</span>
+                                                        <span style={{
+                                                            fontSize: '0.9375rem', fontWeight: 700,
+                                                            color: colors.text,
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                            minWidth: '80px',
+                                                        }}>{fmtWindow}</span>
+                                                        {tag && (
+                                                            <span style={{
+                                                                fontSize: '0.6875rem', fontWeight: 700,
+                                                                padding: '2px 6px', borderRadius: '3px',
+                                                                background: `${sevColor}20`, color: sevColor,
+                                                            }}>{tag.label}</span>
+                                                        )}
+                                                        {zScore !== undefined && (
+                                                            <span style={{
+                                                                fontSize: '0.6875rem', fontWeight: 600,
+                                                                color: sevColor,
+                                                                fontFamily: '"JetBrains Mono", monospace',
+                                                            }}>{zScore > 0 ? '+' : ''}{zScore.toFixed(1)}σ</span>
+                                                        )}
+                                                        <span style={{
+                                                            fontSize: '0.6875rem', color: colors.textSubtle,
+                                                            marginLeft: 'auto',
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                        }}>MA: {fmtMA}</span>
+                                                    </div>
+                                                    {/* Deviation bar */}
+                                                    <div style={{
+                                                        height: '4px', borderRadius: '2px',
+                                                        background: colors.border,
+                                                        position: 'relative',
+                                                        overflow: 'hidden',
+                                                    }}>
+                                                        <div style={{
+                                                            height: '100%', borderRadius: '2px',
+                                                            width: `${Math.min(barPercent, 100)}%`,
+                                                            background: isGood ? colors.success
+                                                                : tag?.severity === 'critical' ? colors.error
+                                                                    : tag?.severity === 'warning' ? colors.warning
+                                                                        : '#3B82F6',
+                                                            transition: 'width 0.5s ease',
+                                                        }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
+                                );
+                            })()}
+
+                            {/* ═══ ISSUES (compact) ═══ */}
+                            {campaign.issues.length > 0 && (
+                                <div style={{ marginBottom: '20px' }}>
+                                    {campaign.issues.map((issue, idx) => (
+                                        <div key={idx} style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                            padding: '8px 12px', marginBottom: '4px',
+                                            background: colors.bgAlt,
+                                            borderLeft: `3px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
+                                            borderRadius: '0 4px 4px 0',
+                                        }}>
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{
+                                                    fontSize: '0.8125rem', fontWeight: 600,
+                                                    color: issue.severity === 'critical' ? colors.error : colors.warning,
+                                                }}>{issue.message}</span>
+                                                <span style={{
+                                                    fontSize: '0.75rem', color: colors.textMuted, marginLeft: '8px',
+                                                }}>{issue.detail}</span>
+                                            </div>
+                                            <span style={{
+                                                fontSize: '0.6875rem', color: colors.success,
+                                                fontWeight: 500, whiteSpace: 'nowrap',
+                                            }}>→ {issue.action}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 
-                            {/* Mini Bar Chart for Issue Metrics */}
-                            {dailyTrend.length > 0 && campaign.issues.length > 0 && (
-                                <div style={styles.section}>
-                                    <h3 style={styles.sectionTitle}>Biểu đồ chi tiết</h3>
-                                    {campaign.issues.some(i => i.type.toLowerCase().includes('cpp')) && (
-                                        <MiniBarChart
+                            {/* ═══ BANDS CHARTS ═══ */}
+                            {dailyTrend.length > 0 && (() => {
+                                const bands = campaign.actionRecommendation?.debugData?.processing?.bands;
+                                const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
+                                return (
+                                    <div style={{
+                                        background: colors.bgAlt,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '20px',
+                                    }}>
+                                        <BandsChart
                                             data={dailyTrend}
                                             metricKey="cpp"
                                             label="CPP (Chi phí/đơn)"
                                             formatValue={(v) => formatMoney(v)}
-                                            highlightCondition={(value, avg) => value > avg * 1.2}
+                                            ma={bands?.cpp?.ma}
+                                            sigma={bands?.cpp?.sigma}
+                                            windowDays={windowDays}
                                         />
-                                    )}
-                                    {campaign.issues.some(i => i.type.toLowerCase().includes('ctr')) && (
-                                        <MiniBarChart
+                                        <BandsChart
                                             data={dailyTrend}
                                             metricKey="ctr"
                                             label="CTR (Click rate)"
                                             formatValue={(v) => v.toFixed(2) + '%'}
-                                            highlightCondition={(value, avg) => value < avg * 0.8}
+                                            ma={bands?.ctr?.ma}
+                                            sigma={bands?.ctr?.sigma}
+                                            windowDays={windowDays}
                                         />
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                );
+                            })()}
 
-                            {/* AI Analysis */}
+                            {/* ═══ AI ANALYSIS ═══ */}
                             <div style={styles.section}>
                                 <h3 style={styles.sectionTitle}>Phân tích AI</h3>
 
@@ -894,7 +1145,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                 {aiAnalysis && (
                                     <div style={styles.aiResult}>
-                                        {/* Verdict Header - CEX Style: No Gradient */}
+                                        {/* Verdict Header */}
                                         {aiAnalysis.verdict && (
                                             <div style={{
                                                 padding: '14px 16px',
@@ -933,8 +1184,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             </div>
                                         )}
 
-                                        {/* PROMINENT CTA: Create Proposal Status */}
-                                        {/* Only show this section during or after proposal creation */}
+                                        {/* Proposal Status */}
                                         {(isCreatingProposal || proposalSuccess) && (
                                             <div style={{
                                                 padding: '20px',
@@ -944,30 +1194,22 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 marginBottom: '16px',
                                                 textAlign: 'center' as const,
                                             }}>
-                                                {/* Show loading spinner while creating */}
                                                 {isCreatingProposal && !proposalSuccess && (
                                                     <>
                                                         <p style={{
-                                                            color: colors.text,
-                                                            fontSize: '0.875rem',
-                                                            fontWeight: 600,
-                                                            margin: '0 0 12px',
+                                                            color: colors.text, fontSize: '0.875rem',
+                                                            fontWeight: 600, margin: '0 0 12px',
                                                         }}>
                                                             Phân tích hoàn tất! Đang tự động tạo đề xuất...
                                                         </p>
                                                         <div style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            gap: '12px',
-                                                            padding: '16px',
-                                                            background: colors.primary + '10',
-                                                            borderRadius: '6px',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            gap: '12px', padding: '16px',
+                                                            background: colors.primary + '10', borderRadius: '6px',
                                                             border: `1px solid ${colors.primary}30`,
                                                         }}>
                                                             <div style={{
-                                                                width: '20px',
-                                                                height: '20px',
+                                                                width: '20px', height: '20px',
                                                                 border: `3px solid ${colors.primary}30`,
                                                                 borderTop: `3px solid ${colors.primary}`,
                                                                 borderRadius: '50%',
@@ -979,21 +1221,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         </div>
                                                     </>
                                                 )}
-
-                                                {/* Show success message after creation */}
                                                 {proposalSuccess && (
                                                     <div style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '12px',
-                                                        padding: '16px',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        gap: '12px', padding: '16px',
                                                     }}>
                                                         <span style={{ fontSize: '1.5rem' }}>✅</span>
                                                         <span style={{
-                                                            color: colors.success,
-                                                            fontWeight: 600,
-                                                            fontSize: '0.9375rem',
+                                                            color: colors.success, fontWeight: 600, fontSize: '0.9375rem',
                                                         }}>
                                                             {proposalSuccess}
                                                         </span>
@@ -1009,137 +1244,18 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             }
                                         `}</style>
 
-
-                                        {/* NEW: Data Basis (thay thế Độ tin cậy) */}
+                                        {/* Data Basis */}
                                         {aiAnalysis.dataBasis && (
                                             <div style={{
-                                                display: 'flex',
-                                                gap: '12px',
-                                                marginBottom: '16px',
-                                                fontSize: '12px',
-                                                color: '#8b8b8b',
+                                                display: 'flex', gap: '12px', marginBottom: '16px',
+                                                fontSize: '0.75rem', color: colors.textMuted,
+                                                fontFamily: '"JetBrains Mono", monospace',
                                             }}>
-                                                <span>Cơ sở: {aiAnalysis.dataBasis.days} ngày</span>
-                                                <span>|</span>
+                                                <span>{aiAnalysis.dataBasis.days}D</span>
+                                                <span style={{ color: colors.textSubtle }}>|</span>
                                                 <span>{aiAnalysis.dataBasis.orders} đơn</span>
-                                                <span>|</span>
-                                                <span>{formatMoney(aiAnalysis.dataBasis.spend)} chi tiêu</span>
-                                            </div>
-                                        )}
-
-                                        {/* NEW: 4 Dimensions */}
-                                        {aiAnalysis.dimensions && (
-                                            <div style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                                                gap: '12px',
-                                                marginBottom: '16px',
-                                            }}>
-                                                {/* Financial */}
-                                                <div style={{
-                                                    padding: '12px',
-                                                    borderRadius: '8px',
-                                                    background: colors.bgAlt,
-                                                    border: `1px solid ${colors.border}`,
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tài chính</span>
-                                                        <span style={{
-                                                            marginLeft: 'auto',
-                                                            fontSize: '11px',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '4px',
-                                                            background: aiAnalysis.dimensions.financial.status === 'excellent' ? '#059669' :
-                                                                aiAnalysis.dimensions.financial.status === 'good' ? '#3b82f6' :
-                                                                    aiAnalysis.dimensions.financial.status === 'warning' ? '#d97706' : '#dc2626',
-                                                            color: '#fff',
-                                                        }}>
-                                                            {aiAnalysis.dimensions.financial.status === 'excellent' ? '✓ Xuất sắc' :
-                                                                aiAnalysis.dimensions.financial.status === 'good' ? '✓ Tốt' :
-                                                                    aiAnalysis.dimensions.financial.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
-                                                        </span>
-                                                    </div>
-                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.financial.summary}</p>
-                                                </div>
-
-                                                {/* Content */}
-                                                <div style={{
-                                                    padding: '12px',
-                                                    borderRadius: '8px',
-                                                    background: colors.bgAlt,
-                                                    border: `1px solid ${colors.border}`,
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nội dung</span>
-                                                        <span style={{
-                                                            marginLeft: 'auto',
-                                                            fontSize: '11px',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '4px',
-                                                            background: aiAnalysis.dimensions.content.status === 'excellent' ? '#059669' :
-                                                                aiAnalysis.dimensions.content.status === 'good' ? '#3b82f6' :
-                                                                    aiAnalysis.dimensions.content.status === 'warning' ? '#d97706' : '#dc2626',
-                                                            color: '#fff',
-                                                        }}>
-                                                            {aiAnalysis.dimensions.content.status === 'excellent' ? '✓ Xuất sắc' :
-                                                                aiAnalysis.dimensions.content.status === 'good' ? '✓ Tốt' :
-                                                                    aiAnalysis.dimensions.content.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
-                                                        </span>
-                                                    </div>
-                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.content.summary}</p>
-                                                </div>
-
-                                                {/* Audience */}
-                                                <div style={{
-                                                    padding: '12px',
-                                                    borderRadius: '8px',
-                                                    background: colors.bgAlt,
-                                                    border: `1px solid ${colors.border}`,
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Đối tượng</span>
-                                                        <span style={{
-                                                            marginLeft: 'auto',
-                                                            fontSize: '11px',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '4px',
-                                                            background: aiAnalysis.dimensions.audience.status === 'excellent' ? '#059669' :
-                                                                aiAnalysis.dimensions.audience.status === 'good' ? '#3b82f6' :
-                                                                    aiAnalysis.dimensions.audience.status === 'warning' ? '#d97706' : '#dc2626',
-                                                            color: '#fff',
-                                                        }}>
-                                                            {aiAnalysis.dimensions.audience.status === 'excellent' ? '✓ Xuất sắc' :
-                                                                aiAnalysis.dimensions.audience.status === 'good' ? '✓ Tốt' :
-                                                                    aiAnalysis.dimensions.audience.status === 'warning' ? '⚠ Cần chú ý' : '✗ Nghiêm trọng'}
-                                                        </span>
-                                                    </div>
-                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.audience.summary}</p>
-                                                </div>
-
-                                                {/* Trend */}
-                                                <div style={{
-                                                    padding: '12px',
-                                                    borderRadius: '8px',
-                                                    background: colors.bgAlt,
-                                                    border: `1px solid ${colors.border}`,
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: '#e0e0e0', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Xu hướng</span>
-                                                        <span style={{
-                                                            marginLeft: 'auto',
-                                                            fontSize: '11px',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '4px',
-                                                            background: aiAnalysis.dimensions.trend.direction === 'improving' ? '#059669' :
-                                                                aiAnalysis.dimensions.trend.direction === 'stable' ? '#3b82f6' : '#dc2626',
-                                                            color: '#fff',
-                                                        }}>
-                                                            {aiAnalysis.dimensions.trend.direction === 'improving' ? '↗️ Đang tốt lên' :
-                                                                aiAnalysis.dimensions.trend.direction === 'stable' ? '→ Ổn định' : '↘️ Đang xấu đi'}
-                                                        </span>
-                                                    </div>
-                                                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>{aiAnalysis.dimensions.trend.summary}</p>
-                                                </div>
+                                                <span style={{ color: colors.textSubtle }}>|</span>
+                                                <span>{formatMoney(aiAnalysis.dataBasis.spend)}</span>
                                             </div>
                                         )}
 
@@ -1148,11 +1264,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
                                         )}
 
-                                        {/* Action plans removed - now handled by Execution Manager with concrete steps */}
-
                                         {/* Reasoning */}
                                         {aiAnalysis.reasoning && (
-                                            <div style={{ ...styles.aiBlock, borderTop: '1px solid #2a2a2a', paddingTop: '16px', marginTop: '16px' }}>
+                                            <div style={{ ...styles.aiBlock, borderTop: `1px solid ${colors.border}`, paddingTop: '16px', marginTop: '16px' }}>
                                                 <p style={styles.aiBlockTitle}>Lý do</p>
                                                 <p style={styles.aiBlockContent}>{aiAnalysis.reasoning}</p>
                                             </div>

@@ -214,14 +214,16 @@ function getZScoreSeverity(
 /**
  * Tạo tag label dựa trên severity
  */
-function buildTagLabel(metric: string, severity: 'info' | 'warning' | 'critical', isBad: boolean): string {
+function buildTagLabel(_metric: string, severity: 'info' | 'warning' | 'critical', isBad: boolean): string {
+    // NOTE: Metric name is already shown separately in the UI row,
+    // so label only contains direction icon to avoid duplication like "ROAS  ROAS ↓"
     if (!isBad) {
-        return `${metric} 🔥`; // Đang tốt bất thường
+        return '🔥'; // Đang tốt bất thường
     }
     switch (severity) {
-        case 'info': return `${metric} ↓`;
-        case 'warning': return `${metric} ↓↓`;
-        case 'critical': return `${metric} ⚠`;
+        case 'info': return '↓';
+        case 'warning': return '↓↓';
+        case 'critical': return '⚠';
     }
 }
 
@@ -259,7 +261,7 @@ function generateBenchmarkTags(windowMetrics: DailyMetric[]): MetricTag[] {
     if (avgCtr > 0 && avgCtr < FB_BENCHMARKS.ctr.bad) {
         tags.push({
             metric: 'CTR', direction: 'down', severity: 'warning',
-            zScore: 0, label: 'CTR ↓',
+            zScore: 0, label: '↓',
             detail: `CTR ${fmtPct(avgCtr)} < benchmark ngành ${fmtPct(FB_BENCHMARKS.ctr.bad)}`,
             color: TAG_COLORS.warning,
         });
@@ -269,7 +271,7 @@ function generateBenchmarkTags(windowMetrics: DailyMetric[]): MetricTag[] {
     if (avgCpp > 0 && avgCpp > FB_BENCHMARKS.cpp.bad) {
         tags.push({
             metric: 'CPP', direction: 'up', severity: 'warning',
-            zScore: 0, label: 'CPP ↑',
+            zScore: 0, label: '↑',
             detail: `CPP ${fmtMoney(avgCpp)} > benchmark ngành ${fmtMoney(FB_BENCHMARKS.cpp.bad)}`,
             color: TAG_COLORS.warning,
         });
@@ -279,7 +281,7 @@ function generateBenchmarkTags(windowMetrics: DailyMetric[]): MetricTag[] {
     if (avgRoas > 0 && avgRoas < FB_BENCHMARKS.roas.bad) {
         tags.push({
             metric: 'ROAS', direction: 'down', severity: 'warning',
-            zScore: 0, label: 'ROAS ↓',
+            zScore: 0, label: '↓',
             detail: `ROAS ${fmtRoas(avgRoas)} < benchmark ngành ${fmtRoas(FB_BENCHMARKS.roas.bad)}`,
             color: TAG_COLORS.warning,
         });
@@ -374,7 +376,7 @@ export function generateMetricTags(
                 zScore: ctrBand.zScore,
                 label: isBad
                     ? buildTagLabel('CTR', severity, true)
-                    : 'CTR 🔥',
+                    : '🔥',
                 detail: `CTR ${fmtPct(ctrBand.windowAvg)} vs TB lịch sử ${fmtPct(ctrBand.ma)} (${ctrBand.zScore > 0 ? '+' : ''}${ctrBand.zScore.toFixed(1)}σ)`,
                 color: isBad ? TAG_COLORS[severity] : TAG_COLORS.good,
             });
@@ -397,7 +399,7 @@ export function generateMetricTags(
                 zScore: cppBand.zScore,
                 label: isBad
                     ? buildTagLabel('CPP', severity, true).replace('↓', '↑').replace('⚠', '⚠')
-                    : 'CPP 🔥',
+                    : '🔥',
                 detail: `CPP ${fmtMoney(cppBand.windowAvg)} vs TB lịch sử ${fmtMoney(cppBand.ma)} (${cppBand.zScore > 0 ? '+' : ''}${cppBand.zScore.toFixed(1)}σ)`,
                 color: isBad ? TAG_COLORS[severity] : TAG_COLORS.good,
             });
@@ -420,7 +422,7 @@ export function generateMetricTags(
                 zScore: roasBand.zScore,
                 label: isBad
                     ? buildTagLabel('ROAS', severity, true)
-                    : 'ROAS 🔥',
+                    : '🔥',
                 detail: `ROAS ${fmtRoas(roasBand.windowAvg)} vs TB lịch sử ${fmtRoas(roasBand.ma)} (${roasBand.zScore > 0 ? '+' : ''}${roasBand.zScore.toFixed(1)}σ)`,
                 color: isBad ? TAG_COLORS[severity] : TAG_COLORS.good,
             });

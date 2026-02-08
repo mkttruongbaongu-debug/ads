@@ -695,6 +695,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         cpp: number;
         ctr: number;
     }>>([]);
+    const [isLoadingTrend, setIsLoadingTrend] = useState(false);
 
     // Ads data
     const [ads, setAds] = useState<Ad[]>([]);
@@ -708,10 +709,29 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     // Auto-prompt modal state
     const [showProposalPrompt, setShowProposalPrompt] = useState(false);
 
-    // Auto-trigger AI analysis when campaign is selected
+    // FAST: Fetch trend data for charts — separate from AI to render instantly
+    const fetchTrend = async () => {
+        setIsLoadingTrend(true);
+        try {
+            console.log('[TREND] ⚡ Fetching chart data (fast path)...');
+            const res = await fetch(
+                `/api/analysis/campaign/${campaign.id}/trend?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+            );
+            const json = await res.json();
+            if (json.success && json.data?.dailyTrend) {
+                setDailyTrend(json.data.dailyTrend);
+                console.log(`[TREND] ✅ Chart data ready! ${json.data.dailyTrend.length} days`);
+            }
+        } catch (error) {
+            console.warn('[TREND] ⚠️ Failed to fetch trend:', error);
+        } finally {
+            setIsLoadingTrend(false);
+        }
+    };
+
+    // Auto-trigger when campaign is selected — 3 PARALLEL streams
     useEffect(() => {
         // CRITICAL: Reset ALL campaign-specific state when campaign changes
-        // This prevents stale data from previous campaign being used in proposals
         console.log(`[CAMPAIGN_DETAIL] 🔄 Campaign changed to: ${campaign.id} (${campaign.name})`);
         console.log('[CAMPAIGN_DETAIL] 🧹 Resetting all campaign-specific state...');
 
@@ -722,6 +742,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
         // Reset trend data  
         setDailyTrend([]);
+        setIsLoadingTrend(false);
 
         // Reset ads data
         setAds([]);
@@ -735,9 +756,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         // Reset tab to overview
         setActiveTab('overview');
 
-        console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Starting fresh AI analysis...');
+        console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Launching 3 parallel streams...');
 
-        // Now trigger fresh AI analysis + ads fetch for the new campaign
+        // 🚀 PARALLEL: All 3 run simultaneously!
+        // Stream 1: FAST — Chart data (~1-2s)
+        // Stream 2: SLOW — AI analysis (~6-18s)
+        // Stream 3: MEDIUM — Ads data (~2-5s)
+        fetchTrend();
         handleAnalyzeAI();
         fetchAds();
     }, [campaign.id]); // Trigger when campaign changes
@@ -795,10 +820,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             const freshAiAnalysis = json.data.aiAnalysis;
 
             setAiAnalysis(freshAiAnalysis);
-            // Save daily trend for chart
-            if (json.data.dailyTrend) {
-                setDailyTrend(json.data.dailyTrend);
-            }
+            // NOTE: dailyTrend is now fetched via the fast /trend endpoint
+            // No longer waiting for AI to get chart data
 
             // Mark campaign as analyzed in localStorage
             const analyzedCampaigns = JSON.parse(localStorage.getItem('analyzedCampaigns') || '{}');
@@ -1207,13 +1230,111 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 ))}
                             </div>
 
-                            {/* ═══ BANDS ANALYSIS ═══ */}
+
+                            {/* ═══ ISSUES — chỉ hiện absolute checks (không trùng với bands) ═══ */}
+                            {(() => {
+                                const bandIssueTypes = ['content_worn', 'cpp_rising'];
+                                const absoluteIssues = campaign.issues.filter(i => !bandIssueTypes.includes(i.type));
+                                if (absoluteIssues.length === 0) return null;
+                                return (
+                                    <div style={{ marginBottom: '20px' }}>
+                                        {absoluteIssues.map((issue, idx) => (
+                                            <div key={idx} style={{
+                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                                padding: '8px 12px', marginBottom: '4px',
+                                                background: colors.bgAlt,
+                                                borderLeft: `3px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
+                                                borderRadius: '0 4px 4px 0',
+                                            }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{
+                                                        fontSize: '0.8125rem', fontWeight: 600,
+                                                        color: issue.severity === 'critical' ? colors.error : colors.warning,
+                                                    }}>{issue.message}</span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem', color: colors.textMuted, marginLeft: '8px',
+                                                    }}>{issue.detail}</span>
+                                                </div>
+                                                <span style={{
+                                                    fontSize: '0.6875rem', color: colors.success,
+                                                    fontWeight: 500, whiteSpace: 'nowrap',
+                                                }}>→ {issue.action}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ═══ BANDS CHARTS ═══ */}
+                            {isLoadingTrend && dailyTrend.length === 0 && (
+                                <div style={{
+                                    background: colors.bgAlt,
+                                    border: `1px solid ${colors.border}`,
+                                    borderRadius: '8px',
+                                    padding: '16px',
+                                    marginBottom: '20px',
+                                }}>
+                                    {/* Chart skeleton — pulsing placeholder */}
+                                    {[0, 1].map(i => (
+                                        <div key={i} style={{
+                                            height: '140px',
+                                            marginBottom: i === 0 ? '16px' : '0',
+                                            background: `linear-gradient(90deg, ${colors.border}40 25%, ${colors.border}80 50%, ${colors.border}40 75%)`,
+                                            backgroundSize: '200% 100%',
+                                            borderRadius: '6px',
+                                            animation: 'shimmer 1.5s infinite',
+                                        }} />
+                                    ))}
+                                    <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+                                </div>
+                            )}
+                            {dailyTrend.length > 0 && (() => {
+                                const bands = campaign.actionRecommendation?.debugData?.processing?.bands;
+                                const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
+                                return (
+                                    <div style={{
+                                        background: colors.bgAlt,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '20px',
+                                    }}>
+                                        <BandsChart
+                                            data={dailyTrend}
+                                            metricKey="cpp"
+                                            label="CPP (Chi phí/đơn)"
+                                            formatValue={(v) => formatMoney(v)}
+                                            ma={bands?.cpp?.ma}
+                                            sigma={bands?.cpp?.sigma}
+                                            windowDays={windowDays}
+                                        />
+                                        <BandsChart
+                                            data={dailyTrend}
+                                            metricKey="ctr"
+                                            label="CTR (Click rate)"
+                                            formatValue={(v) => v.toFixed(2) + '%'}
+                                            ma={bands?.ctr?.ma}
+                                            sigma={bands?.ctr?.sigma}
+                                            windowDays={windowDays}
+                                        />
+                                        <BandsChart
+                                            data={dailyTrend}
+                                            metricKey="roas"
+                                            label="ROAS (Return on Ad Spend)"
+                                            formatValue={(v) => v.toFixed(2) + 'x'}
+                                            ma={bands?.roas?.ma}
+                                            sigma={bands?.roas?.sigma}
+                                            windowDays={windowDays}
+                                        />
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ═══ BANDS ANALYSIS (7-day avg) ═══ */}
                             {(() => {
                                 const rec = campaign.actionRecommendation;
                                 const bands = rec?.debugData?.processing?.bands;
                                 const tags = rec?.metricTags || [];
-                                const healthScore = rec?.healthScore;
-                                const lifeStage = rec?.lifeStage || rec?.debugData?.processing?.lifeStage;
 
                                 if (!bands && tags.length === 0) return null;
 
@@ -1252,9 +1373,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             const fmtWindow = metric === 'CTR' ? `${windowAvg?.toFixed(2)}%`
                                                 : metric === 'ROAS' ? `${windowAvg?.toFixed(2)}x`
                                                     : formatMoney(windowAvg || 0);
-                                            const fmtMA = metric === 'CTR' ? `${ma?.toFixed(2)}%`
-                                                : metric === 'ROAS' ? `${ma?.toFixed(2)}x`
-                                                    : formatMoney(ma || 0);
 
                                             // Deviation ratio for progress bar
                                             let ratio = ma && windowAvg ? windowAvg / ma : 1;
@@ -1339,74 +1457,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 </div>
                                             );
                                         })}
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ═══ ISSUES — chỉ hiện absolute checks (không trùng với bands) ═══ */}
-                            {(() => {
-                                const bandIssueTypes = ['content_worn', 'cpp_rising'];
-                                const absoluteIssues = campaign.issues.filter(i => !bandIssueTypes.includes(i.type));
-                                if (absoluteIssues.length === 0) return null;
-                                return (
-                                    <div style={{ marginBottom: '20px' }}>
-                                        {absoluteIssues.map((issue, idx) => (
-                                            <div key={idx} style={{
-                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
-                                                padding: '8px 12px', marginBottom: '4px',
-                                                background: colors.bgAlt,
-                                                borderLeft: `3px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
-                                                borderRadius: '0 4px 4px 0',
-                                            }}>
-                                                <div style={{ flex: 1 }}>
-                                                    <span style={{
-                                                        fontSize: '0.8125rem', fontWeight: 600,
-                                                        color: issue.severity === 'critical' ? colors.error : colors.warning,
-                                                    }}>{issue.message}</span>
-                                                    <span style={{
-                                                        fontSize: '0.75rem', color: colors.textMuted, marginLeft: '8px',
-                                                    }}>{issue.detail}</span>
-                                                </div>
-                                                <span style={{
-                                                    fontSize: '0.6875rem', color: colors.success,
-                                                    fontWeight: 500, whiteSpace: 'nowrap',
-                                                }}>→ {issue.action}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ═══ BANDS CHARTS ═══ */}
-                            {dailyTrend.length > 0 && (() => {
-                                const bands = campaign.actionRecommendation?.debugData?.processing?.bands;
-                                const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
-                                return (
-                                    <div style={{
-                                        background: colors.bgAlt,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '8px',
-                                        padding: '16px',
-                                        marginBottom: '20px',
-                                    }}>
-                                        <BandsChart
-                                            data={dailyTrend}
-                                            metricKey="cpp"
-                                            label="CPP (Chi phí/đơn)"
-                                            formatValue={(v) => formatMoney(v)}
-                                            ma={bands?.cpp?.ma}
-                                            sigma={bands?.cpp?.sigma}
-                                            windowDays={windowDays}
-                                        />
-                                        <BandsChart
-                                            data={dailyTrend}
-                                            metricKey="ctr"
-                                            label="CTR (Click rate)"
-                                            formatValue={(v) => v.toFixed(2) + '%'}
-                                            ma={bands?.ctr?.ma}
-                                            sigma={bands?.ctr?.sigma}
-                                            windowDays={windowDays}
-                                        />
                                     </div>
                                 );
                             })()}

@@ -1420,7 +1420,7 @@ function CampaignCard({
                             }}
                             title={tag.detail}
                         >
-                            {tag.label}
+                            {tag.metric} {tag.label}
                         </span>
                     ))}
                     {/* DEBUG button */}

@@ -1304,13 +1304,14 @@ export default function DashboardPage() {
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
+                                                                                const btn = e.currentTarget;
                                                                                 const debugLog = JSON.stringify(
                                                                                     campaign.actionRecommendation?.debugData,
                                                                                     null,
                                                                                     2
                                                                                 );
                                                                                 navigator.clipboard.writeText(debugLog).then(() => {
-                                                                                    const btn = e.currentTarget;
+                                                                                    if (!btn) return;
                                                                                     btn.textContent = '✓';
                                                                                     btn.style.color = colors.success;
                                                                                     btn.style.borderColor = colors.success;
@@ -1478,13 +1479,14 @@ function CampaignCard({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+                                const btn = e.currentTarget;
                                 const debugLog = JSON.stringify(
                                     campaign.actionRecommendation?.debugData,
                                     null,
                                     2
                                 );
                                 navigator.clipboard.writeText(debugLog).then(() => {
-                                    const btn = e.currentTarget;
+                                    if (!btn) return;
                                     btn.textContent = 'COPIED';
                                     btn.style.color = colors.success;
                                     btn.style.borderColor = colors.success + '40';

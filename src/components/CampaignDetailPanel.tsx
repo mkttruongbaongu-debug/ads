@@ -364,7 +364,7 @@ const styles = {
     },
     panel: {
         width: '100%',
-        maxWidth: '650px',
+        maxWidth: '480px',
         background: colors.bgCard,
         height: '100%',
         overflowY: 'auto' as const,
@@ -1200,7 +1200,34 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                             {/* ═══ AI ANALYSIS ═══ */}
                             <div style={styles.section}>
-                                <h3 style={styles.sectionTitle}>Phân tích AI</h3>
+                                <h3 style={{ ...styles.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    Phân tích AI
+                                    <button
+                                        onClick={() => {
+                                            const debugData = {
+                                                campaign: {
+                                                    id: campaign.id,
+                                                    name: campaign.name,
+                                                    created_time: campaign.created_time,
+                                                    totals: campaign.totals,
+                                                },
+                                                actionRecommendation: campaign.actionRecommendation,
+                                                issues: campaign.issues,
+                                                dailyTrend: campaign.dailyMetrics?.slice(-14),
+                                                aiAnalysis: aiAnalysis || null,
+                                            };
+                                            navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
+                                            alert('DEBUG data copied to clipboard!');
+                                        }}
+                                        style={{
+                                            padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
+                                            background: 'transparent', border: `1px solid ${colors.border}`,
+                                            borderRadius: '4px', color: colors.textSubtle, cursor: 'pointer',
+                                            fontFamily: '"JetBrains Mono", monospace',
+                                        }}
+                                        title="Copy full debug data to clipboard"
+                                    >COPY DEBUG</button>
+                                </h3>
 
                                 {!aiAnalysis && !isLoadingAI && !aiError && (
                                     <button

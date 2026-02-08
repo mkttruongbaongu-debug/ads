@@ -55,6 +55,7 @@ interface Ad {
     totals: {
         spend: number;
         purchases: number;
+        revenue: number;
         cpp: number;
         ctr: number;
     };
@@ -1726,6 +1727,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             margin: '0 0 8px', lineHeight: 1.5,
                                                             overflow: 'hidden', textOverflow: 'ellipsis',
                                                             display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
+                                                            whiteSpace: 'pre-line',
                                                         }}>
                                                             {ad.message}
                                                         </p>
@@ -1736,6 +1738,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                     <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
                                                         Chi: <strong style={{ color: colors.text }}>{formatMoney(ad.totals.spend)}</strong>
+                                                    </span>
+                                                    <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Thu: <strong style={{ color: '#22C55E' }}>{formatMoney(ad.totals.revenue)}</strong>
                                                     </span>
                                                     <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
                                                         Đơn: <strong style={{ color: colors.text }}>{ad.totals.purchases}</strong>

@@ -737,16 +737,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
         console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Starting fresh AI analysis...');
 
-        // Now trigger fresh AI analysis for the new campaign
+        // Now trigger fresh AI analysis + ads fetch for the new campaign
         handleAnalyzeAI();
+        fetchAds();
     }, [campaign.id]); // Trigger when campaign changes
-
-    // Fetch ads when tab changes
-    useEffect(() => {
-        if (activeTab === 'ads' && ads.length === 0 && !isLoadingAds) {
-            fetchAds();
-        }
-    }, [activeTab]);
 
     const fetchAds = async () => {
         setIsLoadingAds(true);

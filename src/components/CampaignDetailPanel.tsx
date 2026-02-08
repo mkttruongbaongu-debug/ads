@@ -863,40 +863,67 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             <p style={{
                                 fontSize: '0.6875rem', color: colors.textMuted, margin: 0,
                                 fontFamily: '"JetBrains Mono", monospace',
-                                display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap',
                             }}>
-                                <span>{dateRange.startDate} → {dateRange.endDate}</span>
-                                {campaign.actionRecommendation?.lifeStage && (
-                                    <>
-                                        <span style={{ color: colors.textSubtle }}>·</span>
-                                        <span style={{
-                                            fontSize: '0.5625rem', fontWeight: 600,
-                                            padding: '1px 5px', borderRadius: '3px',
-                                            background: `${colors.primary}20`, color: colors.primary,
-                                        }}>{{ LEARNING: 'Đang học', EARLY: 'Mới chạy', MATURE: 'Ổn định', VETERAN: 'Lão luyện' }[campaign.actionRecommendation.lifeStage] || campaign.actionRecommendation.lifeStage}</span>
-                                    </>
-                                )}
-                                {campaign.created_time && (() => {
-                                    const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
-                                    return (
-                                        <>
-                                            <span style={{ color: colors.textSubtle }}>·</span>
-                                            <span>{ageDays}D</span>
-                                        </>
-                                    );
-                                })()}
-                                {campaign.actionRecommendation && (
-                                    <>
-                                        <span style={{ color: colors.textSubtle }}>·</span>
-                                        <span style={{
-                                            fontSize: '0.5625rem', fontWeight: 700,
-                                            padding: '1px 5px', borderRadius: '3px',
-                                            background: campaign.actionRecommendation.color + '20',
-                                            color: campaign.actionRecommendation.color,
-                                        }}>{{ STOP: 'Dừng', ADJUST: 'Điều chỉnh', WATCH: 'Theo dõi', GOOD: 'Tốt', SCALE: 'Tăng NS' }[campaign.actionRecommendation.action] || campaign.actionRecommendation.action}</span>
-                                    </>
-                                )}
+                                {dateRange.startDate} → {dateRange.endDate}
                             </p>
+                            {/* Badge rows: Life Stage + Action */}
+                            {campaign.actionRecommendation && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                                    {/* Life Stage row */}
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '36px', flexShrink: 0 }}>Đời:</span>
+                                        {[
+                                            { key: 'LEARNING', label: 'Đang học', tip: '0-7 ngày: Facebook đang tối ưu, data chưa ổn định' },
+                                            { key: 'EARLY', label: 'Mới chạy', tip: '8-14 ngày: Bắt đầu có data nhưng chưa đủ tin cậy' },
+                                            { key: 'MATURE', label: 'Ổn định', tip: '15-21 ngày: Data đáng tin, bắt đầu đánh giá được' },
+                                            { key: 'VETERAN', label: 'Lão luyện', tip: '22+ ngày: Data rất tin cậy, đánh giá nghiêm ngặt nhất' },
+                                        ].map(s => {
+                                            const isActive = campaign.actionRecommendation!.lifeStage === s.key;
+                                            return (
+                                                <span key={s.key} title={s.tip} style={{
+                                                    fontSize: '0.5625rem', fontWeight: isActive ? 700 : 500,
+                                                    padding: '1px 6px', borderRadius: '3px',
+                                                    background: isActive ? `${colors.primary}25` : 'transparent',
+                                                    color: isActive ? colors.primary : colors.textSubtle,
+                                                    border: `1px solid ${isActive ? colors.primary + '50' : colors.border}`,
+                                                    opacity: isActive ? 1 : 0.35,
+                                                    cursor: 'default',
+                                                    transition: 'all 0.2s',
+                                                }}>{s.label}</span>
+                                            );
+                                        })}
+                                        {campaign.created_time && (() => {
+                                            const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
+                                            return <span style={{ fontSize: '0.5625rem', color: colors.textMuted, marginLeft: '2px' }}>({ageDays}D)</span>;
+                                        })()}
+                                    </div>
+                                    {/* Action row */}
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '36px', flexShrink: 0 }}>KN:</span>
+                                        {[
+                                            { key: 'STOP', label: 'Dừng', color: '#ef4444', tip: 'Health < 20: Lỗ nặng, khuyến nghị tắt campaign' },
+                                            { key: 'WATCH', label: 'Theo dõi', color: '#f97316', tip: 'Health 20-34: Chưa tệ nhưng cần canh chừng' },
+                                            { key: 'ADJUST', label: 'Điều chỉnh', color: '#eab308', tip: 'Health 35-59: Metrics tổng OK nhưng gần đây suy giảm, cần can thiệp' },
+                                            { key: 'GOOD', label: 'Tốt', color: '#22c55e', tip: 'Health 60-74: Ổn định, giữ nguyên chiến lược' },
+                                            { key: 'SCALE', label: 'Tăng NS', color: '#06b6d4', tip: 'Health ≥ 75: Xuất sắc cả tổng lẫn gần đây, tăng ngân sách' },
+                                        ].map(a => {
+                                            const isActive = campaign.actionRecommendation!.action === a.key;
+                                            return (
+                                                <span key={a.key} title={a.tip} style={{
+                                                    fontSize: '0.5625rem', fontWeight: isActive ? 700 : 500,
+                                                    padding: '1px 6px', borderRadius: '3px',
+                                                    background: isActive ? a.color + '25' : 'transparent',
+                                                    color: isActive ? a.color : colors.textSubtle,
+                                                    border: `1px solid ${isActive ? a.color + '50' : colors.border}`,
+                                                    opacity: isActive ? 1 : 0.35,
+                                                    cursor: 'default',
+                                                    transition: 'all 0.2s',
+                                                }}>{a.label}</span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <button style={styles.closeBtn} onClick={onClose}>×</button>
                     </div>
@@ -924,24 +951,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 onClick={() => setActiveTab('ads')}
                             >Ads ({ads.length || '...'})</button>
                         </div>
-                        <button
-                            onClick={() => handleCreateProposal()}
-                            disabled={isCreatingProposal}
-                            style={{
-                                padding: '4px 10px',
-                                background: isCreatingProposal ? colors.bgAlt : colors.primary,
-                                color: colors.bg,
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '0.6875rem',
-                                fontWeight: 600,
-                                cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
-                                opacity: isCreatingProposal ? 0.6 : 1,
-                                whiteSpace: 'nowrap' as const,
-                            }}
-                        >
-                            {isCreatingProposal ? 'Đang...' : 'Tạo đề xuất'}
-                        </button>
+
                     </div>
                 </div>
 
@@ -1496,91 +1506,93 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             </div>
 
             {/* Auto-Prompt Modal */}
-            {showProposalPrompt && (
-                <div style={{
-                    position: 'fixed' as const,
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10000,
-                }} onClick={() => setShowProposalPrompt(false)}>
+            {
+                showProposalPrompt && (
                     <div style={{
-                        background: colors.bgCard,
-                        borderRadius: '12px',
-                        padding: '32px',
-                        maxWidth: '480px',
-                        width: '90%',
-                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-                        border: `1px solid ${colors.border}`,
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ textAlign: 'center' as const }}>
+                        position: 'fixed' as const,
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000,
+                    }} onClick={() => setShowProposalPrompt(false)}>
+                        <div style={{
+                            background: colors.bgCard,
+                            borderRadius: '12px',
+                            padding: '32px',
+                            maxWidth: '480px',
+                            width: '90%',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                            border: `1px solid ${colors.border}`,
+                        }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ textAlign: 'center' as const }}>
 
-                            <h3 style={{
-                                fontSize: '1.5rem',
-                                fontWeight: 700,
-                                color: colors.text,
-                                margin: '0 0 12px',
-                            }}>
-                                Phân tích hoàn tất!
-                            </h3>
-                            <p style={{
-                                fontSize: '0.9375rem',
-                                color: colors.textMuted,
-                                margin: '0 0 24px',
-                                lineHeight: 1.6,
-                            }}>
-                                AI đã phát hiện <strong>{aiAnalysis?.verdict ? 1 : 0}</strong> khuyến nghị quan trọng.
-                                <br />
-                                Bạn muốn tạo đề xuất tự động không?
-                            </p>
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                                <button
-                                    onClick={() => {
-                                        setShowProposalPrompt(false);
-                                        handleCreateProposal();
-                                    }}
-                                    style={{
-                                        flex: 1,
-                                        padding: '14px 24px',
-                                        background: colors.primary,
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '0.9375rem',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    }}
-                                >
-                                    TẠO NGAY
-                                </button>
-                                <button
-                                    onClick={() => setShowProposalPrompt(false)}
-                                    style={{
-                                        flex: 1,
-                                        padding: '14px 24px',
-                                        background: colors.bgAlt,
-                                        color: colors.text,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '8px',
-                                        fontSize: '0.9375rem',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    }}
-                                >
-                                    Xem chi tiết
-                                </button>
+                                <h3 style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: 700,
+                                    color: colors.text,
+                                    margin: '0 0 12px',
+                                }}>
+                                    Phân tích hoàn tất!
+                                </h3>
+                                <p style={{
+                                    fontSize: '0.9375rem',
+                                    color: colors.textMuted,
+                                    margin: '0 0 24px',
+                                    lineHeight: 1.6,
+                                }}>
+                                    AI đã phát hiện <strong>{aiAnalysis?.verdict ? 1 : 0}</strong> khuyến nghị quan trọng.
+                                    <br />
+                                    Bạn muốn tạo đề xuất tự động không?
+                                </p>
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                    <button
+                                        onClick={() => {
+                                            setShowProposalPrompt(false);
+                                            handleCreateProposal();
+                                        }}
+                                        style={{
+                                            flex: 1,
+                                            padding: '14px 24px',
+                                            background: colors.primary,
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '0.9375rem',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        TẠO NGAY
+                                    </button>
+                                    <button
+                                        onClick={() => setShowProposalPrompt(false)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '14px 24px',
+                                            background: colors.bgAlt,
+                                            color: colors.text,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '8px',
+                                            fontSize: '0.9375rem',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        Xem chi tiết
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div >
     );
 }

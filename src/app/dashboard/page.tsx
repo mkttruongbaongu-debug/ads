@@ -868,23 +868,6 @@ export default function DashboardPage() {
                         </select>
                     </div>
 
-                    {/* Date Range - Fixed 60 days */}
-                    <div style={styles.controlGroup}>
-                        <div style={{
-                            padding: '7px 12px',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: '6px',
-                            fontSize: '0.8125rem',
-                            background: colors.bg,
-                            color: colors.textMuted,
-                            fontFamily: '"JetBrains Mono", monospace',
-                            letterSpacing: '0.03em',
-                        }}>
-                            60 NGÀY
-                        </div>
-                    </div>
-
-
                     {/* Campaign Filter - inline with other controls */}
                     <div style={styles.controlGroup}>
                         <input
@@ -893,14 +876,8 @@ export default function DashboardPage() {
                             value={filterText}
                             onChange={(e) => setFilterText(e.target.value)}
                             style={{
-                                padding: '7px 12px',
-                                border: `1px solid ${colors.border}`,
-                                borderRadius: '6px',
-                                fontSize: '0.8125rem',
-                                background: colors.bg,
+                                ...styles.selectInput,
                                 color: 'white',
-                                outline: 'none',
-                                minWidth: '180px',
                             }}
                         />
                     </div>

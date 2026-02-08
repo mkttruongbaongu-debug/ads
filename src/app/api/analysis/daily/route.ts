@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
             `${FB_API_BASE}/${adAccountId}/campaigns?` +
             `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,frequency` +
-            `}&limit=500&access_token=${accessToken}`
+            `}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]` +
+            `&limit=500&access_token=${accessToken}`
         );
 
         const campaignsData = await campaignsRes.json();

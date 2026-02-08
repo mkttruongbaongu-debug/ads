@@ -138,6 +138,12 @@ function BandsChart({
 
     if (!data || data.length === 0) return null;
 
+    // CPP is inverse: lower = better. CTR/ROAS: higher = better
+    const isInverse = metricKey === 'cpp';
+    // Semantic colors: which band line means "good" vs "bad"
+    const upperColor = isInverse ? colors.error : colors.success;   // CPP high=bad, CTR/ROAS high=good
+    const lowerColor = isInverse ? colors.success : colors.error;   // CPP low=good, CTR/ROAS low=bad
+
     const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
     const maxValue = Math.max(...values);
     const minValue = Math.min(...values.filter(v => v > 0));
@@ -262,7 +268,7 @@ function BandsChart({
                     <line
                         x1={PAD_L} y1={toY(ma + 2 * sigma)}
                         x2={W - PAD_R} y2={toY(ma + 2 * sigma)}
-                        stroke={`${colors.error}50`} strokeWidth="0.8" strokeDasharray="4,3"
+                        stroke={`${upperColor}50`} strokeWidth="0.8" strokeDasharray="4,3"
                     />
                 )}
 
@@ -271,7 +277,7 @@ function BandsChart({
                     <line
                         x1={PAD_L} y1={toY(Math.max(0, ma - 2 * sigma))}
                         x2={W - PAD_R} y2={toY(Math.max(0, ma - 2 * sigma))}
-                        stroke={`${colors.success}50`} strokeWidth="0.8" strokeDasharray="4,3"
+                        stroke={`${lowerColor}50`} strokeWidth="0.8" strokeDasharray="4,3"
                     />
                 )}
 
@@ -305,12 +311,16 @@ function BandsChart({
                 {/* Data dots for window days */}
                 {values.map((v, i) => {
                     if (i < historyCount) return null;
-                    const isOutBand = ma && sigma && (v > ma + 2 * sigma || v < ma - 2 * sigma);
+                    const isAboveUpper = ma && sigma && v > ma + 2 * sigma;
+                    const isBelowLower = ma && sigma && v < ma - 2 * sigma;
+                    const dotColor = isAboveUpper ? upperColor
+                        : isBelowLower ? lowerColor
+                            : colors.primary;
                     return (
                         <circle
                             key={i}
                             cx={toX(i)} cy={toY(v)} r="2.5"
-                            fill={isOutBand ? colors.error : colors.primary}
+                            fill={dotColor}
                             stroke={colors.bg} strokeWidth="1"
                         />
                     );
@@ -333,12 +343,12 @@ function BandsChart({
                     <>
                         <text
                             x={W - PAD_R - 2} y={toY(ma + 2 * sigma) - 3}
-                            textAnchor="end" fill={`${colors.error}90`} fontSize="7"
+                            textAnchor="end" fill={`${upperColor}90`} fontSize="7"
                             fontFamily='"JetBrains Mono", monospace'
                         >+2σ</text>
                         <text
                             x={W - PAD_R - 2} y={toY(Math.max(0, ma - 2 * sigma)) + 10}
-                            textAnchor="end" fill={`${colors.success}90`} fontSize="7"
+                            textAnchor="end" fill={`${lowerColor}90`} fontSize="7"
                             fontFamily='"JetBrains Mono", monospace'
                         >-2σ</text>
                     </>

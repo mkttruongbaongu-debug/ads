@@ -13,6 +13,8 @@
  */
 
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL;
 const APPS_SCRIPT_SECRET = process.env.GOOGLE_APPS_SCRIPT_SECRET;
@@ -35,10 +37,23 @@ export async function GET() {
         getTaiKhoanUrl.searchParams.set('action', 'getTaiKhoan');
         getTaiKhoanUrl.searchParams.set('fb_user_id', 'first');
 
+        // Get userId from session for filtering proposals
+        let userId = '';
+        try {
+            const session = await getServerSession(authOptions);
+            userId = session?.user?.name || session?.user?.email || '';
+        } catch { /* ignore auth errors for init */ }
+
         // Fetch TaiKhoan + pending proposals in parallel
+        const pendingUrl = new URL(APPS_SCRIPT_URL);
+        pendingUrl.searchParams.set('secret', APPS_SCRIPT_SECRET);
+        pendingUrl.searchParams.set('action', 'layDanhSachDeXuat');
+        pendingUrl.searchParams.set('status', 'CHO_DUYET');
+        if (userId) pendingUrl.searchParams.set('userId', userId);
+
         const [taiKhoanRes, pendingRes] = await Promise.allSettled([
             fetch(getTaiKhoanUrl.toString()),
-            fetch(`${APPS_SCRIPT_URL}?secret=${APPS_SCRIPT_SECRET}&action=layDanhSachDeXuat&status=CHO_DUYET`),
+            fetch(pendingUrl.toString()),
         ]);
 
         // Parse TaiKhoan

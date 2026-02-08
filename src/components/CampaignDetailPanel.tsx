@@ -1302,11 +1302,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 fontFamily: '"JetBrains Mono", monospace',
                                                             }}>{zScore > 0 ? '+' : ''}{zScore.toFixed(1)}σ</span>
                                                         )}
-                                                        <span style={{
-                                                            fontSize: '0.6875rem', color: colors.textSubtle,
-                                                            marginLeft: 'auto',
-                                                            fontFamily: '"JetBrains Mono", monospace',
-                                                        }}>TB 7 ngày: {fmtMA}</span>
                                                     </div>
                                                     {/* Deviation bar */}
                                                     <div style={{

@@ -125,6 +125,8 @@ function BandsChart({
     sigma?: number;
     windowDays?: number;
 }) {
+    const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
     if (!data || data.length === 0) return null;
 
     const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
@@ -180,6 +182,14 @@ function BandsChart({
     const lastX = toX(data.length - 1);
     const lastY = toY(lastVal);
 
+    // Hover helpers
+    const hoverVal = hoveredIdx !== null ? values[hoveredIdx] : null;
+    const hoverDate = hoveredIdx !== null ? data[hoveredIdx]?.date : null;
+    const hoverX = hoveredIdx !== null ? toX(hoveredIdx) : 0;
+    const hoverY = hoveredIdx !== null && hoverVal !== null ? toY(hoverVal) : 0;
+    // Tooltip position: flip to left if near right edge
+    const tooltipRight = hoveredIdx !== null && hoveredIdx > data.length * 0.75;
+
     return (
         <div style={{ marginBottom: '16px' }}>
             <div style={{
@@ -200,6 +210,7 @@ function BandsChart({
                 viewBox={`0 0 ${W} ${H}`}
                 style={{ width: '100%', height: 'auto', display: 'block' }}
                 preserveAspectRatio="none"
+                onMouseLeave={() => setHoveredIdx(null)}
             >
                 {/* Grid lines */}
                 {yTicks.map((tick, i) => (
@@ -334,6 +345,67 @@ function BandsChart({
                         fontFamily='"JetBrains Mono", monospace'
                     >{(data[idx]?.date || '').slice(5)}</text>
                 ))}
+
+                {/* === HOVER INTERACTION === */}
+                {/* Invisible hit zones for each data point */}
+                {values.map((_v, i) => {
+                    const slotW = plotW / Math.max(data.length - 1, 1);
+                    return (
+                        <rect
+                            key={`hit-${i}`}
+                            x={toX(i) - slotW / 2}
+                            y={PAD_T}
+                            width={slotW}
+                            height={plotH}
+                            fill="transparent"
+                            onMouseEnter={() => setHoveredIdx(i)}
+                            style={{ cursor: 'crosshair' }}
+                        />
+                    );
+                })}
+
+                {/* Hover crosshair + tooltip */}
+                {hoveredIdx !== null && hoverVal !== null && (
+                    <g>
+                        {/* Vertical crosshair */}
+                        <line
+                            x1={hoverX} y1={PAD_T} x2={hoverX} y2={H - PAD_B}
+                            stroke={`${colors.text}40`} strokeWidth="0.8" strokeDasharray="3,2"
+                        />
+                        {/* Horizontal crosshair */}
+                        <line
+                            x1={PAD_L} y1={hoverY} x2={W - PAD_R} y2={hoverY}
+                            stroke={`${colors.text}25`} strokeWidth="0.5" strokeDasharray="3,2"
+                        />
+                        {/* Highlight dot */}
+                        <circle
+                            cx={hoverX} cy={hoverY} r="4.5"
+                            fill={colors.primary} stroke={colors.text} strokeWidth="1.5"
+                        />
+                        {/* Tooltip background */}
+                        <rect
+                            x={tooltipRight ? hoverX - 90 : hoverX + 6}
+                            y={Math.max(PAD_T, hoverY - 22)}
+                            width={84} height={20} rx={3}
+                            fill={colors.bgAlt} stroke={colors.border} strokeWidth="0.8"
+                        />
+                        {/* Tooltip text - date */}
+                        <text
+                            x={tooltipRight ? hoverX - 86 : hoverX + 10}
+                            y={Math.max(PAD_T, hoverY - 22) + 13}
+                            fill={colors.textMuted} fontSize="7.5"
+                            fontFamily='"JetBrains Mono", monospace'
+                        >{(hoverDate || '').slice(5)}</text>
+                        {/* Tooltip text - value */}
+                        <text
+                            x={tooltipRight ? hoverX - 10 : hoverX + 86}
+                            y={Math.max(PAD_T, hoverY - 22) + 13}
+                            textAnchor="end"
+                            fill={colors.text} fontSize="8" fontWeight="700"
+                            fontFamily='"JetBrains Mono", monospace'
+                        >{formatValue(hoverVal)}</text>
+                    </g>
+                )}
             </svg>
         </div>
     );
@@ -1036,7 +1108,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <span style={{
                                                 fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
                                                 textTransform: 'uppercase', letterSpacing: '0.08em',
-                                            }}>METRIC BANDS</span>
+                                            }}>CHỈ SỐ PHÂN TÍCH</span>
                                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                                 {lifeStage && (
                                                     <span style={{
@@ -1044,7 +1116,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         padding: '2px 8px', borderRadius: '3px',
                                                         background: `${colors.primary}20`, color: colors.primary,
                                                         fontFamily: '"JetBrains Mono", monospace',
-                                                    }}>{lifeStage}</span>
+                                                    }}>{({ 'LEARNING': 'Đang học', 'EARLY': 'Mới chạy', 'MATURE': 'Ổn định', 'VETERAN': 'Lão luyện' } as Record<string, string>)[lifeStage] || lifeStage}</span>
                                                 )}
                                                 {healthScore !== undefined && (
                                                     <span style={{
@@ -1053,7 +1125,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         color: healthScore >= 75 ? colors.success
                                                             : healthScore >= 50 ? colors.warning
                                                                 : colors.error,
-                                                    }}>HP {healthScore}</span>
+                                                    }}>Sức khỏe: {healthScore}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -1127,7 +1199,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             fontSize: '0.6875rem', color: colors.textSubtle,
                                                             marginLeft: 'auto',
                                                             fontFamily: '"JetBrains Mono", monospace',
-                                                        }}>MA: {fmtMA}</span>
+                                                        }}>TB 7 ngày: {fmtMA}</span>
                                                     </div>
                                                     {/* Deviation bar */}
                                                     <div style={{

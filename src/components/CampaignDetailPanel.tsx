@@ -684,7 +684,7 @@ const styles = {
 };
 
 export default function CampaignDetailPanel({ campaign, dateRange, onClose, formatMoney, accountId }: Props) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'ads'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'ads' | 'conclusion'>('overview');
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
@@ -1150,6 +1150,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 }}
                                 onClick={() => setActiveTab('ads')}
                             >Content ({ads.length || '...'})</button>
+                            <button
+                                style={{
+                                    ...styles.tab,
+                                    ...(activeTab === 'conclusion' ? styles.tabActive : {})
+                                }}
+                                onClick={() => setActiveTab('conclusion')}
+                            >Kết luận</button>
                         </div>
 
                     </div>
@@ -1412,200 +1419,272 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </div>
                                 );
                             })()}
+                        </>
+                    )}
 
-                            {/* ═══ AI ANALYSIS ═══ */}
-                            <div style={styles.section}>
-                                <h3 style={{ ...styles.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    Phân tích AI
-                                    <button
-                                        onClick={() => {
-                                            const debugData = {
-                                                campaign: {
-                                                    id: campaign.id,
-                                                    name: campaign.name,
-                                                    created_time: campaign.created_time,
-                                                    totals: campaign.totals,
-                                                },
-                                                actionRecommendation: campaign.actionRecommendation,
-                                                issues: campaign.issues,
-                                                dailyTrend: campaign.dailyMetrics?.slice(-14),
-                                                aiAnalysis: aiAnalysis || null,
-                                            };
-                                            navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
-                                            alert('DEBUG data copied to clipboard!');
-                                        }}
-                                        style={{
-                                            padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
-                                            background: 'transparent', border: `1px solid ${colors.border}`,
-                                            borderRadius: '4px', color: colors.textSubtle, cursor: 'pointer',
-                                            fontFamily: '"JetBrains Mono", monospace',
-                                        }}
-                                        title="Copy full debug data to clipboard"
-                                    >COPY DEBUG</button>
-                                </h3>
-
-                                {!aiAnalysis && !isLoadingAI && !aiError && (
-                                    <button
-                                        style={styles.aiButton}
-                                        onClick={handleAnalyzeAI}
-                                    >
-                                        Phân tích sâu với AI
-                                    </button>
-                                )}
-
-                                {isLoadingAI && (
-                                    <div style={styles.loader}>
-                                        <p>Đang phân tích...</p>
-                                        <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
-                                            AI đang xem xét dữ liệu và đưa ra khuyến nghị
-                                        </p>
-                                    </div>
-                                )}
-
-                                {aiError && (
-                                    <div style={{ textAlign: 'center', padding: '20px', color: '#dc2626' }}>
-                                        <p>{aiError}</p>
+                    {/* ═══ KẾT LUẬN TAB ═══ */}
+                    {activeTab === 'conclusion' && (
+                        <div style={styles.section}>
+                            {/* Content Summary for AI */}
+                            {ads.length > 0 && (
+                                <div style={{
+                                    padding: '12px 16px', marginBottom: '16px',
+                                    background: colors.bgAlt, border: `1px solid ${colors.border}`,
+                                    borderRadius: '6px',
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+                                            Tổng hợp Content ({ads.length})
+                                        </h4>
                                         <button
-                                            onClick={handleAnalyzeAI}
-                                            style={{ ...styles.aiButton, marginTop: '12px', background: '#dc2626' }}
-                                        >
-                                            Thử lại
-                                        </button>
-                                    </div>
-                                )}
+                                            onClick={() => {
+                                                const totalSpend = campaign.totals.spend;
+                                                const debugLines = ads.map((ad, i) => {
+                                                    const ev = getContentBadge(ad, totalSpend);
+                                                    return [
+                                                        `--- Content ${i + 1}: ${ad.name} ---`,
+                                                        `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                        `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
+                                                        `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
+                                                        `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
+                                                        `Z-Score detail: ${ev.tip}`,
+                                                    ].join('\n');
+                                                });
 
-                                {aiAnalysis && (
-                                    <div style={styles.aiResult}>
-                                        {/* Verdict Header */}
-                                        {aiAnalysis.verdict && (
-                                            <div style={{
-                                                padding: '14px 16px',
-                                                borderRadius: '6px',
-                                                marginBottom: '16px',
-                                                background: colors.bgAlt,
-                                                border: `1px solid ${aiAnalysis.verdict.action === 'SCALE' ? colors.success :
-                                                    aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
-                                                        aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
-                                                            aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error}`,
-                                                borderLeftWidth: '4px',
-                                            }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                const summary = [
+                                                    `===== CONTENT DEBUG - ${campaign.name} =====`,
+                                                    `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
+                                                    `Tổng: ${ads.length} content | Chi: ${formatMoney(totalSpend)}`,
+                                                    ``,
+                                                    ...debugLines,
+                                                ].join('\n\n');
+
+                                                navigator.clipboard.writeText(summary);
+                                            }}
+                                            style={{
+                                                background: 'transparent', border: `1px solid ${colors.border}`,
+                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
+                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                            }}
+                                        >COPY DEBUG</button>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+                                        {ads.slice(0, 10).map((ad, i) => {
+                                            const ev = getContentBadge(ad, campaign.totals.spend);
+                                            return (
+                                                <div key={ad.id} style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                                    fontSize: '0.6875rem', color: colors.textMuted, lineHeight: 1.6,
+                                                }}>
+                                                    <span style={{ color: colors.textSubtle, width: '16px', textAlign: 'right' as const }}>{i + 1}</span>
                                                     <span style={{
-                                                        fontSize: '0.6875rem',
-                                                        fontWeight: 600,
-                                                        padding: '3px 8px',
-                                                        borderRadius: '4px',
-                                                        background: aiAnalysis.verdict.action === 'SCALE' ? colors.success :
-                                                            aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
-                                                                aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
-                                                                    aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error,
-                                                        color: aiAnalysis.verdict.action === 'WATCH' ? colors.bg : '#fff',
-                                                    }}>
-                                                        {aiAnalysis.verdict.action}
-                                                    </span>
-                                                    <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
-                                                        {aiAnalysis.verdict.headline}
+                                                        fontSize: '0.5625rem', fontWeight: 700,
+                                                        padding: '1px 5px', borderRadius: '3px',
+                                                        background: ev.badge.bg, color: ev.badge.color,
+                                                        minWidth: '50px', textAlign: 'center' as const,
+                                                    }}>{ev.badge.text}</span>
+                                                    <span style={{ color: colors.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{ad.name}</span>
+                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
+                                                        FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
                                                     </span>
                                                 </div>
-                                                {aiAnalysis.verdict.condition && (
-                                                    <p style={{ fontSize: '0.8125rem', color: colors.textMuted, marginTop: '8px', marginBottom: 0 }}>
-                                                        {aiAnalysis.verdict.condition}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
-                                        {/* Proposal Status */}
-                                        {(isCreatingProposal || proposalSuccess) && (
-                                            <div style={{
-                                                padding: '20px',
-                                                background: proposalSuccess ? colors.success + '15' : colors.bgAlt,
-                                                border: `1px solid ${proposalSuccess ? colors.success + '40' : colors.border}`,
-                                                borderRadius: '8px',
-                                                marginBottom: '16px',
-                                                textAlign: 'center' as const,
-                                            }}>
-                                                {isCreatingProposal && !proposalSuccess && (
-                                                    <>
-                                                        <p style={{
-                                                            color: colors.text, fontSize: '0.875rem',
-                                                            fontWeight: 600, margin: '0 0 12px',
-                                                        }}>
-                                                            Phân tích hoàn tất! Đang tự động tạo đề xuất...
-                                                        </p>
-                                                        <div style={{
-                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                            gap: '12px', padding: '16px',
-                                                            background: colors.primary + '10', borderRadius: '6px',
-                                                            border: `1px solid ${colors.primary}30`,
-                                                        }}>
-                                                            <div style={{
-                                                                width: '20px', height: '20px',
-                                                                border: `3px solid ${colors.primary}30`,
-                                                                borderTop: `3px solid ${colors.primary}`,
-                                                                borderRadius: '50%',
-                                                                animation: 'spin 1s linear infinite',
-                                                            }} />
-                                                            <span style={{ color: colors.primary, fontWeight: 600 }}>
-                                                                Đang tạo đề xuất hành động...
-                                                            </span>
-                                                        </div>
-                                                    </>
-                                                )}
-                                                {proposalSuccess && (
+                            {/* AI Analysis */}
+                            <h3 style={{ ...styles.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                Phân tích AI
+                                <button
+                                    onClick={() => {
+                                        const debugData = {
+                                            campaign: {
+                                                id: campaign.id,
+                                                name: campaign.name,
+                                                created_time: campaign.created_time,
+                                                totals: campaign.totals,
+                                            },
+                                            actionRecommendation: campaign.actionRecommendation,
+                                            issues: campaign.issues,
+                                            dailyTrend: campaign.dailyMetrics?.slice(-14),
+                                            aiAnalysis: aiAnalysis || null,
+                                        };
+                                        navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
+                                    }}
+                                    style={{
+                                        padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
+                                        background: 'transparent', border: `1px solid ${colors.border}`,
+                                        borderRadius: '4px', color: colors.textSubtle, cursor: 'pointer',
+                                        fontFamily: '"JetBrains Mono", monospace',
+                                    }}
+                                    title="Copy full debug data to clipboard"
+                                >COPY DEBUG</button>
+                            </h3>
+
+                            {!aiAnalysis && !isLoadingAI && !aiError && (
+                                <button
+                                    style={styles.aiButton}
+                                    onClick={handleAnalyzeAI}
+                                >
+                                    Phân tích sâu với AI
+                                </button>
+                            )}
+
+                            {isLoadingAI && (
+                                <div style={styles.loader}>
+                                    <p>Đang phân tích...</p>
+                                    <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
+                                        AI đang xem xét dữ liệu và đưa ra khuyến nghị
+                                    </p>
+                                </div>
+                            )}
+
+                            {aiError && (
+                                <div style={{ textAlign: 'center', padding: '20px', color: '#dc2626' }}>
+                                    <p>{aiError}</p>
+                                    <button
+                                        onClick={handleAnalyzeAI}
+                                        style={{ ...styles.aiButton, marginTop: '12px', background: '#dc2626' }}
+                                    >
+                                        Thử lại
+                                    </button>
+                                </div>
+                            )}
+
+                            {aiAnalysis && (
+                                <div style={styles.aiResult}>
+                                    {/* Verdict Header */}
+                                    {aiAnalysis.verdict && (
+                                        <div style={{
+                                            padding: '14px 16px',
+                                            borderRadius: '6px',
+                                            marginBottom: '16px',
+                                            background: colors.bgAlt,
+                                            border: `1px solid ${aiAnalysis.verdict.action === 'SCALE' ? colors.success :
+                                                aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
+                                                    aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
+                                                        aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error}`,
+                                            borderLeftWidth: '4px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{
+                                                    fontSize: '0.6875rem',
+                                                    fontWeight: 600,
+                                                    padding: '3px 8px',
+                                                    borderRadius: '4px',
+                                                    background: aiAnalysis.verdict.action === 'SCALE' ? colors.success :
+                                                        aiAnalysis.verdict.action === 'MAINTAIN' ? '#3b82f6' :
+                                                            aiAnalysis.verdict.action === 'WATCH' ? colors.warning :
+                                                                aiAnalysis.verdict.action === 'REDUCE' ? '#ea580c' : colors.error,
+                                                    color: aiAnalysis.verdict.action === 'WATCH' ? colors.bg : '#fff',
+                                                }}>
+                                                    {aiAnalysis.verdict.action}
+                                                </span>
+                                                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                                                    {aiAnalysis.verdict.headline}
+                                                </span>
+                                            </div>
+                                            {aiAnalysis.verdict.condition && (
+                                                <p style={{ fontSize: '0.8125rem', color: colors.textMuted, marginTop: '8px', marginBottom: 0 }}>
+                                                    {aiAnalysis.verdict.condition}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Proposal Status */}
+                                    {(isCreatingProposal || proposalSuccess) && (
+                                        <div style={{
+                                            padding: '20px',
+                                            background: proposalSuccess ? colors.success + '15' : colors.bgAlt,
+                                            border: `1px solid ${proposalSuccess ? colors.success + '40' : colors.border}`,
+                                            borderRadius: '8px',
+                                            marginBottom: '16px',
+                                            textAlign: 'center' as const,
+                                        }}>
+                                            {isCreatingProposal && !proposalSuccess && (
+                                                <>
+                                                    <p style={{
+                                                        color: colors.text, fontSize: '0.875rem',
+                                                        fontWeight: 600, margin: '0 0 12px',
+                                                    }}>
+                                                        Phân tích hoàn tất! Đang tự động tạo đề xuất...
+                                                    </p>
                                                     <div style={{
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         gap: '12px', padding: '16px',
+                                                        background: colors.primary + '10', borderRadius: '6px',
+                                                        border: `1px solid ${colors.primary}30`,
                                                     }}>
-                                                        <span style={{ fontSize: '1.5rem' }}>✅</span>
-                                                        <span style={{
-                                                            color: colors.success, fontWeight: 600, fontSize: '0.9375rem',
-                                                        }}>
-                                                            {proposalSuccess}
+                                                        <div style={{
+                                                            width: '20px', height: '20px',
+                                                            border: `3px solid ${colors.primary}30`,
+                                                            borderTop: `3px solid ${colors.primary}`,
+                                                            borderRadius: '50%',
+                                                            animation: 'spin 1s linear infinite',
+                                                        }} />
+                                                        <span style={{ color: colors.primary, fontWeight: 600 }}>
+                                                            Đang tạo đề xuất hành động...
                                                         </span>
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                </>
+                                            )}
+                                            {proposalSuccess && (
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    gap: '12px', padding: '16px',
+                                                }}>
+                                                    <span style={{ fontSize: '1.5rem' }}>✅</span>
+                                                    <span style={{
+                                                        color: colors.success, fontWeight: 600, fontSize: '0.9375rem',
+                                                    }}>
+                                                        {proposalSuccess}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
-                                        <style jsx>{`
+                                    <style jsx>{`
                                             @keyframes spin {
                                                 0% { transform: rotate(0deg); }
                                                 100% { transform: rotate(360deg); }
                                             }
                                         `}</style>
 
-                                        {/* Data Basis */}
-                                        {aiAnalysis.dataBasis && (
-                                            <div style={{
-                                                display: 'flex', gap: '12px', marginBottom: '16px',
-                                                fontSize: '0.75rem', color: colors.textMuted,
-                                                fontFamily: '"JetBrains Mono", monospace',
-                                            }}>
-                                                <span>{aiAnalysis.dataBasis.days}D</span>
-                                                <span style={{ color: colors.textSubtle }}>|</span>
-                                                <span>{aiAnalysis.dataBasis.orders} đơn</span>
-                                                <span style={{ color: colors.textSubtle }}>|</span>
-                                                <span>{formatMoney(aiAnalysis.dataBasis.spend)}</span>
-                                            </div>
-                                        )}
+                                    {/* Data Basis */}
+                                    {aiAnalysis.dataBasis && (
+                                        <div style={{
+                                            display: 'flex', gap: '12px', marginBottom: '16px',
+                                            fontSize: '0.75rem', color: colors.textMuted,
+                                            fontFamily: '"JetBrains Mono", monospace',
+                                        }}>
+                                            <span>{aiAnalysis.dataBasis.days}D</span>
+                                            <span style={{ color: colors.textSubtle }}>|</span>
+                                            <span>{aiAnalysis.dataBasis.orders} đơn</span>
+                                            <span style={{ color: colors.textSubtle }}>|</span>
+                                            <span>{formatMoney(aiAnalysis.dataBasis.spend)}</span>
+                                        </div>
+                                    )}
 
-                                        {/* Fallback: Legacy summary if no verdict */}
-                                        {!aiAnalysis.verdict && aiAnalysis.summary && (
-                                            <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
-                                        )}
+                                    {/* Fallback: Legacy summary if no verdict */}
+                                    {!aiAnalysis.verdict && aiAnalysis.summary && (
+                                        <p style={styles.aiSummary}>{aiAnalysis.summary}</p>
+                                    )}
 
-                                        {/* Reasoning */}
-                                        {aiAnalysis.reasoning && (
-                                            <div style={{ ...styles.aiBlock, borderTop: `1px solid ${colors.border}`, paddingTop: '16px', marginTop: '16px' }}>
-                                                <p style={styles.aiBlockTitle}>Lý do</p>
-                                                <p style={styles.aiBlockContent}>{aiAnalysis.reasoning}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </>
+                                    {/* Reasoning */}
+                                    {aiAnalysis.reasoning && (
+                                        <div style={{ ...styles.aiBlock, borderTop: `1px solid ${colors.border}`, paddingTop: '16px', marginTop: '16px' }}>
+                                            <p style={styles.aiBlockTitle}>Lý do</p>
+                                            <p style={styles.aiBlockContent}>{aiAnalysis.reasoning}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {/* Content Tab */}

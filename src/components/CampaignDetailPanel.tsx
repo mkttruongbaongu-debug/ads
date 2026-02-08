@@ -371,44 +371,38 @@ const styles = {
         boxShadow: '-4px 0 20px rgba(0,0,0,0.3)',
     },
     header: {
-        padding: '0 16px',
-        borderBottom: `1px solid ${colors.border}`,
         background: colors.bgCard,
         position: 'sticky' as const,
         top: 0,
         zIndex: 10,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        minHeight: '44px',
     },
     headerRow: {
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '16px',
+        alignItems: 'center',
+        padding: '12px 20px 8px',
     },
     title: {
-        fontSize: '1.5rem', // Increased from 1.25rem for more prominence
+        fontSize: '1.125rem',
         fontWeight: 700,
         color: colors.text,
-        margin: '0 0 6px', // Increased bottom margin for better spacing
+        margin: '0 0 4px',
     },
     closeBtn: {
         background: 'transparent',
         border: 'none',
-        fontSize: '1.5rem',
+        fontSize: '1.25rem',
         cursor: 'pointer',
         color: colors.textMuted,
-        padding: '4px',
+        padding: '4px 8px',
+        flexShrink: 0,
     },
     tabs: {
         display: 'flex',
         gap: '0',
-        marginLeft: '16px',
     },
     tab: {
-        padding: '10px 14px',
+        padding: '8px 16px',
         border: 'none',
         background: 'transparent',
         fontSize: '0.8125rem',
@@ -847,15 +841,60 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     return (
         <div style={styles.overlay} onClick={onClose}>
             <div style={styles.panel} onClick={e => e.stopPropagation()}>
-                {/* Header — compact single line */}
+                {/* Header — 2-row sticky */}
                 <div style={styles.header}>
-                    <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                        <h2 style={{
-                            fontSize: '1rem', fontWeight: 700, color: colors.text,
-                            margin: 0, whiteSpace: 'nowrap', overflow: 'hidden',
-                            textOverflow: 'ellipsis', maxWidth: '200px',
-                        }}>{campaign.name}</h2>
-                        {/* Tabs inline */}
+                    {/* Row 1: Name + meta + close */}
+                    <div style={styles.headerRow}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <h2 style={styles.title}>{campaign.name}</h2>
+                            <p style={{
+                                fontSize: '0.6875rem', color: colors.textMuted, margin: 0,
+                                fontFamily: '"JetBrains Mono", monospace',
+                                display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap',
+                            }}>
+                                <span>{dateRange.startDate} → {dateRange.endDate}</span>
+                                {campaign.actionRecommendation?.lifeStage && (
+                                    <>
+                                        <span style={{ color: colors.textSubtle }}>·</span>
+                                        <span style={{
+                                            fontSize: '0.5625rem', fontWeight: 600,
+                                            padding: '1px 5px', borderRadius: '3px',
+                                            background: `${colors.primary}20`, color: colors.primary,
+                                        }}>{campaign.actionRecommendation.lifeStage}</span>
+                                    </>
+                                )}
+                                {campaign.created_time && (() => {
+                                    const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
+                                    return (
+                                        <>
+                                            <span style={{ color: colors.textSubtle }}>·</span>
+                                            <span>{ageDays}D</span>
+                                        </>
+                                    );
+                                })()}
+                                {campaign.actionRecommendation && (
+                                    <>
+                                        <span style={{ color: colors.textSubtle }}>·</span>
+                                        <span style={{
+                                            fontSize: '0.5625rem', fontWeight: 700,
+                                            padding: '1px 5px', borderRadius: '3px',
+                                            background: campaign.actionRecommendation.color + '20',
+                                            color: campaign.actionRecommendation.color,
+                                        }}>{campaign.actionRecommendation.action}</span>
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                        <button style={styles.closeBtn} onClick={onClose}>×</button>
+                    </div>
+
+                    {/* Row 2: Tabs + proposal button */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '0 20px',
+                        borderTop: `1px solid ${colors.border}`,
+                        borderBottom: `1px solid ${colors.border}`,
+                    }}>
                         <div style={styles.tabs}>
                             <button
                                 style={{
@@ -872,78 +911,31 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 onClick={() => setActiveTab('ads')}
                             >Ads ({ads.length || '...'})</button>
                         </div>
+                        <button
+                            onClick={() => handleCreateProposal()}
+                            disabled={isCreatingProposal}
+                            style={{
+                                padding: '4px 10px',
+                                background: isCreatingProposal ? colors.bgAlt : colors.primary,
+                                color: colors.bg,
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '0.6875rem',
+                                fontWeight: 600,
+                                cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
+                                opacity: isCreatingProposal ? 0.6 : 1,
+                                whiteSpace: 'nowrap' as const,
+                            }}
+                        >
+                            {isCreatingProposal ? 'Đang...' : 'Tạo đề xuất'}
+                        </button>
                     </div>
-                    <button style={styles.closeBtn} onClick={onClose}>×</button>
-                </div>
-
-                {/* Sub-header: meta + proposal button */}
-                <div style={{
-                    padding: '10px 16px',
-                    borderBottom: `1px solid ${colors.border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    flexWrap: 'wrap', gap: '8px',
-                }}>
-                    <p style={{
-                        fontSize: '0.75rem', color: colors.textMuted, margin: 0,
-                        fontFamily: '"JetBrains Mono", monospace',
-                        display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap',
-                    }}>
-                        <span>{dateRange.startDate} → {dateRange.endDate}</span>
-                        {campaign.actionRecommendation?.lifeStage && (
-                            <>
-                                <span style={{ color: colors.textSubtle }}>·</span>
-                                <span style={{
-                                    fontSize: '0.625rem', fontWeight: 600,
-                                    padding: '1px 6px', borderRadius: '3px',
-                                    background: `${colors.primary}20`, color: colors.primary,
-                                }}>{campaign.actionRecommendation.lifeStage}</span>
-                            </>
-                        )}
-                        {campaign.created_time && (() => {
-                            const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
-                            return (
-                                <>
-                                    <span style={{ color: colors.textSubtle }}>·</span>
-                                    <span>{ageDays}D</span>
-                                </>
-                            );
-                        })()}
-                        {campaign.actionRecommendation && (
-                            <>
-                                <span style={{ color: colors.textSubtle }}>·</span>
-                                <span style={{
-                                    fontSize: '0.625rem', fontWeight: 700,
-                                    padding: '1px 6px', borderRadius: '3px',
-                                    background: campaign.actionRecommendation.color + '20',
-                                    color: campaign.actionRecommendation.color,
-                                }}>{campaign.actionRecommendation.action}</span>
-                            </>
-                        )}
-                    </p>
-                    <button
-                        onClick={() => handleCreateProposal()}
-                        disabled={isCreatingProposal}
-                        style={{
-                            padding: '5px 12px',
-                            background: isCreatingProposal ? colors.bgAlt : colors.primary,
-                            color: colors.bg,
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '0.6875rem',
-                            fontWeight: 600,
-                            cursor: isCreatingProposal ? 'not-allowed' : 'pointer',
-                            opacity: isCreatingProposal ? 0.6 : 1,
-                            whiteSpace: 'nowrap' as const,
-                        }}
-                    >
-                        {isCreatingProposal ? '⏳ Đang...' : '🤖 Tạo đề xuất'}
-                    </button>
                 </div>
 
                 {/* Success Message */}
                 {proposalSuccess && (
                     <div style={{
-                        margin: '0 16px',
+                        margin: '8px 20px 0',
                         padding: '8px 12px',
                         background: 'rgba(14, 203, 129, 0.1)',
                         border: `1px solid ${colors.success}`,

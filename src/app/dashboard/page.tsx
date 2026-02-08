@@ -112,25 +112,25 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '10px 32px',
+        padding: '6px 24px',
         borderBottom: `1px solid ${colors.border}`,
     },
     logo: {
-        fontSize: '1.25rem',
+        fontSize: '1.1rem',
         fontWeight: 700,
         color: colors.text,
         letterSpacing: '-0.03em',
     },
     headerControls: {
         display: 'flex',
-        alignItems: 'flex-end',
-        gap: '16px',
-        padding: '10px 32px',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '6px 24px',
     },
     controlGroup: {
         display: 'flex',
         flexDirection: 'column' as const,
-        gap: '4px',
+        gap: '2px',
     },
     controlLabel: {
         fontSize: '0.7rem',
@@ -143,11 +143,11 @@ const styles = {
         background: colors.bg,
         border: `1px solid ${colors.border}`,
         color: colors.text,
-        padding: '8px 12px',
+        padding: '6px 10px',
         borderRadius: '4px',
-        fontSize: '0.875rem',
+        fontSize: '0.8125rem',
         cursor: 'pointer',
-        minWidth: '200px',
+        minWidth: '180px',
         outline: 'none',
         transition: 'all 0.2s ease',
     },
@@ -508,6 +508,16 @@ export default function DashboardPage() {
         fetchData();
     }, [fetchData]);
 
+    // Auto-search when account is selected
+    useEffect(() => {
+        if (selectedAccountId && status === 'authenticated') {
+            console.log('[DASHBOARD] 🔄 Auto-search triggered by account change:', selectedAccountId);
+            setHasSearched(true);
+            fetchData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedAccountId]);
+
     // Load everything on mount via unified init
     useEffect(() => {
         console.log('[DASHBOARD/MOUNT] 🔄 Status:', status, 'Has session:', !!session);
@@ -547,8 +557,6 @@ export default function DashboardPage() {
             document.removeEventListener('click', handleClickOutside);
         };
     }, [showUserMenu]);
-
-    // NO auto-fetch - user must click "Tra cứu" button
 
     if (status === 'loading' || status === 'unauthenticated') {
         return (
@@ -825,7 +833,6 @@ export default function DashboardPage() {
                 <div style={styles.headerControls}>
                     {/* Account Selector */}
                     <div style={styles.controlGroup}>
-                        <span style={styles.controlLabel}>Tài khoản</span>
                         <select
                             value={selectedAccountId}
                             onChange={(e) => setSelectedAccountId(e.target.value)}
@@ -863,24 +870,22 @@ export default function DashboardPage() {
 
                     {/* Date Range - Fixed 60 days */}
                     <div style={styles.controlGroup}>
-                        <span style={styles.controlLabel}>Khoảng phân tích</span>
                         <div style={{
-                            padding: '10px 14px',
+                            padding: '8px 12px',
                             border: `1px solid ${colors.border}`,
-                            borderRadius: '10px',
-                            fontSize: '0.875rem',
+                            borderRadius: '6px',
+                            fontSize: '0.8125rem',
                             background: 'rgba(255,255,255,0.03)',
                             color: colors.textMuted,
                             fontFamily: '"JetBrains Mono", monospace',
                             letterSpacing: '0.03em',
                         }}>
-                            60 NGÀY GẦN NHẤT
+                            60 NGÀY
                         </div>
                     </div>
 
                     {/* Search Button */}
                     <div style={{ ...styles.controlGroup, justifyContent: 'flex-end' }}>
-                        <span style={styles.controlLabel}>&nbsp;</span>
                         <button
                             onClick={handleSearch}
                             disabled={isLoading || !selectedAccountId}
@@ -912,17 +917,16 @@ export default function DashboardPage() {
 
                     {/* Campaign Filter - inline with other controls */}
                     <div style={styles.controlGroup}>
-                        <span style={styles.controlLabel}>Lọc chiến dịch</span>
                         <input
                             type="text"
-                            placeholder="Tìm theo tên..."
+                            placeholder="Lọc chiến dịch..."
                             value={filterText}
                             onChange={(e) => setFilterText(e.target.value)}
                             style={{
-                                padding: '10px 14px',
+                                padding: '6px 10px',
                                 border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '10px',
-                                fontSize: '0.875rem',
+                                borderRadius: '4px',
+                                fontSize: '0.8125rem',
                                 background: 'rgba(255,255,255,0.05)',
                                 color: 'white',
                                 outline: 'none',

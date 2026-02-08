@@ -364,7 +364,7 @@ const styles = {
     },
     panel: {
         width: '100%',
-        maxWidth: '480px',
+        maxWidth: '540px',
         background: colors.bgCard,
         height: '100%',
         overflowY: 'auto' as const,
@@ -961,9 +961,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         <>
                             {/* ═══ TICKER BAR ═══ */}
                             <div style={{
-                                display: 'flex', flexWrap: 'wrap', gap: '0',
+                                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                                 borderBottom: `1px solid ${colors.border}`,
-                                marginBottom: '20px',
+                                marginBottom: '16px',
                             }}>
                                 {[
                                     { label: 'CHI TIÊU', value: formatMoney(campaign.totals.spend) },
@@ -974,10 +974,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     { label: 'DOANH THU', value: formatMoney(campaign.totals.revenue) },
                                 ].map((item, idx) => (
                                     <div key={idx} style={{
-                                        flex: '1 1 auto',
-                                        minWidth: '90px',
-                                        padding: '12px 16px',
-                                        borderRight: idx < 5 ? `1px solid ${colors.border}` : 'none',
+                                        padding: '8px 12px',
+                                        borderRight: (idx % 3 !== 2) ? `1px solid ${colors.border}` : 'none',
+                                        borderBottom: idx < 3 ? `1px solid ${colors.border}` : 'none',
                                     }}>
                                         <p style={{
                                             fontSize: '0.75rem', fontWeight: 600, color: colors.textMuted,

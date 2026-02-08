@@ -37,6 +37,10 @@ interface CampaignWithIssues {
         healthScore?: number;
         windowAlert?: string;
     };
+    // Campaign metadata
+    created_time?: string;
+    daily_budget?: number;
+    daily_budget_estimated?: number;
 }
 
 interface AnalysisData {
@@ -1151,10 +1155,16 @@ export default function DashboardPage() {
                                                         Chi tiêu
                                                     </th>
                                                     <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        Budget/ngày
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                         ROAS
                                                     </th>
                                                     <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                         CTR
+                                                    </th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        Tuổi
                                                     </th>
                                                     <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                         Đề xuất AI
@@ -1225,6 +1235,11 @@ export default function DashboardPage() {
                                                                         <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
                                                                             {campaign.id}
                                                                         </div>
+                                                                        {campaign.created_time && (
+                                                                            <div style={{ fontSize: '0.7rem', color: colors.textSubtle }}>
+                                                                                Tạo: {new Date(campaign.created_time).toLocaleDateString('vi-VN')}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -1232,6 +1247,16 @@ export default function DashboardPage() {
                                                                 <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
                                                                     {formatMoney(campaign.totals.spend)}
                                                                 </span>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <div>
+                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text, fontSize: '0.9rem' }}>
+                                                                        {formatMoney(campaign.daily_budget_estimated || 0)}
+                                                                    </span>
+                                                                    <div style={{ fontSize: '0.65rem', color: colors.textSubtle, marginTop: '2px' }}>
+                                                                        {campaign.daily_budget ? 'CBO' : 'ước lượng'}
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                                                                 <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
@@ -1242,6 +1267,15 @@ export default function DashboardPage() {
                                                                 <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
                                                                     {campaign.totals.ctr.toFixed(2)}%
                                                                 </span>
+                                                            </td>
+                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                {campaign.created_time ? (
+                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted, fontSize: '0.85rem' }}>
+                                                                        {Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / (1000 * 60 * 60 * 24))}d
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{ color: colors.textSubtle }}>—</span>
+                                                                )}
                                                             </td>
                                                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                                                                 <button style={{

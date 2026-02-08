@@ -49,6 +49,9 @@ interface Ad {
     name: string;
     status: string;
     thumbnail: string | null;
+    message?: string | null;
+    link?: string | null;
+    postUrl?: string | null;
     totals: {
         spend: number;
         purchases: number;
@@ -949,7 +952,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     ...(activeTab === 'ads' ? styles.tabActive : {})
                                 }}
                                 onClick={() => setActiveTab('ads')}
-                            >Ads ({ads.length || '...'})</button>
+                            >Content ({ads.length || '...'})</button>
                         </div>
 
                     </div>
@@ -1408,19 +1411,19 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         </>
                     )}
 
-                    {/* Ads Tab */}
+                    {/* Content Tab */}
                     {activeTab === 'ads' && (
                         <div style={styles.section}>
                             <h3 style={styles.sectionTitle}>
-                                Danh sách Ads
-                                <span style={{ fontWeight: 400, color: '#71717a', marginLeft: '8px' }}>
+                                Danh sách Content
+                                <span style={{ fontWeight: 400, color: colors.textMuted, marginLeft: '8px' }}>
                                     (sắp theo chi tiêu cao nhất)
                                 </span>
                             </h3>
 
                             {isLoadingAds && (
                                 <div style={styles.loader}>
-                                    <p>Đang tải danh sách ads...</p>
+                                    <p>Đang tải danh sách content...</p>
                                 </div>
                             )}
 
@@ -1437,64 +1440,124 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             )}
 
                             {!isLoadingAds && !adsError && ads.length === 0 && (
-                                <div style={{ textAlign: 'center', padding: '40px', color: '#71717a' }}>
-                                    <p>Không có ads nào trong khoảng thời gian này</p>
+                                <div style={{ textAlign: 'center', padding: '40px', color: colors.textMuted }}>
+                                    <p>Không có content nào trong khoảng thời gian này</p>
                                 </div>
                             )}
 
                             {ads.map((ad) => {
                                 const badge = getCppBadge(ad.totals.cpp, campaign.totals.cpp);
                                 return (
-                                    <div key={ad.id} style={styles.adCard}>
-                                        {/* Thumbnail */}
-                                        {ad.thumbnail ? (
-                                            <img
-                                                src={ad.thumbnail}
-                                                alt={ad.name}
-                                                style={styles.adThumbnail as React.CSSProperties}
-                                            />
-                                        ) : (
-                                            <div style={styles.adThumbnail}>
-                                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textMuted }}>AD</span>
-                                            </div>
-                                        )}
+                                    <div key={ad.id} style={{
+                                        background: colors.bgCard,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        marginBottom: '12px',
+                                        overflow: 'hidden',
+                                    }}>
+                                        {/* Top: Image + Info side by side */}
+                                        <div style={{ display: 'flex', gap: '0' }}>
+                                            {/* Image - larger */}
+                                            {ad.thumbnail ? (
+                                                <img
+                                                    src={ad.thumbnail}
+                                                    alt={ad.name}
+                                                    style={{
+                                                        width: '160px',
+                                                        height: '160px',
+                                                        objectFit: 'cover',
+                                                        flexShrink: 0,
+                                                        display: 'block',
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div style={{
+                                                    width: '160px',
+                                                    height: '160px',
+                                                    background: colors.bgAlt,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                }}>
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textMuted }}>NO IMG</span>
+                                                </div>
+                                            )}
 
-                                        {/* Info */}
-                                        <div style={styles.adInfo}>
-                                            <p style={styles.adName}>
-                                                {ad.name}
-                                                {ad.status !== 'ACTIVE' && (
-                                                    <span style={{
-                                                        ...styles.adBadge,
-                                                        background: '#f4f4f5',
-                                                        color: '#71717a'
+                                            {/* Info column */}
+                                            <div style={{ flex: 1, padding: '12px 16px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                                {/* Ad name + badges */}
+                                                <div>
+                                                    <p style={{
+                                                        fontSize: '0.875rem', fontWeight: 600, color: colors.text,
+                                                        margin: '0 0 6px', lineHeight: 1.3,
+                                                        overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
                                                     }}>
-                                                        {ad.status}
+                                                        {ad.name}
+                                                        {ad.status !== 'ACTIVE' && (
+                                                            <span style={{
+                                                                ...styles.adBadge,
+                                                                background: `${colors.textSubtle}20`,
+                                                                color: colors.textMuted,
+                                                            }}>
+                                                                {ad.status}
+                                                            </span>
+                                                        )}
+                                                        {badge && (
+                                                            <span style={{
+                                                                ...styles.adBadge,
+                                                                background: badge.bg,
+                                                                color: badge.color
+                                                            }}>
+                                                                {badge.text}
+                                                            </span>
+                                                        )}
+                                                    </p>
+
+                                                    {/* Caption / Message */}
+                                                    {ad.message && (
+                                                        <p style={{
+                                                            fontSize: '0.75rem', color: colors.textMuted,
+                                                            margin: '0 0 8px', lineHeight: 1.5,
+                                                            overflow: 'hidden', textOverflow: 'ellipsis',
+                                                            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const,
+                                                        }}>
+                                                            {ad.message}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Metrics row */}
+                                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Chi: <strong style={{ color: colors.text }}>{formatMoney(ad.totals.spend)}</strong>
                                                     </span>
-                                                )}
-                                                {badge && (
-                                                    <span style={{
-                                                        ...styles.adBadge,
-                                                        background: badge.bg,
-                                                        color: badge.color
-                                                    }}>
-                                                        {badge.text}
+                                                    <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Đơn: <strong style={{ color: colors.text }}>{ad.totals.purchases}</strong>
                                                     </span>
-                                                )}
-                                            </p>
-                                            <div style={styles.adMetrics}>
-                                                <span style={styles.adMetric}>
-                                                    Spend: <strong>{formatMoney(ad.totals.spend)}</strong>
-                                                </span>
-                                                <span style={styles.adMetric}>
-                                                    Orders: <strong>{ad.totals.purchases}</strong>
-                                                </span>
-                                                <span style={styles.adMetric}>
-                                                    CPP: <strong>{formatMoney(ad.totals.cpp)}</strong>
-                                                </span>
-                                                <span style={styles.adMetric}>
-                                                    CTR: <strong>{ad.totals.ctr.toFixed(2)}%</strong>
-                                                </span>
+                                                    <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        CPP: <strong style={{ color: colors.text }}>{formatMoney(ad.totals.cpp)}</strong>
+                                                    </span>
+                                                    <span style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        CTR: <strong style={{ color: colors.text }}>{ad.totals.ctr.toFixed(2)}%</strong>
+                                                    </span>
+                                                    {/* Link to post */}
+                                                    {ad.postUrl && (
+                                                        <a
+                                                            href={ad.postUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            style={{
+                                                                fontSize: '0.6875rem', color: colors.primary,
+                                                                textDecoration: 'none', fontWeight: 600,
+                                                                marginLeft: 'auto',
+                                                            }}
+                                                        >
+                                                            Xem bài viết →
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

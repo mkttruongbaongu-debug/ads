@@ -33,7 +33,8 @@ export async function GET(
         // Fetch ads with daily insights and creative info
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
-            `fields=id,name,status,creative{id,thumbnail_url,object_story_spec},` +
+            `fields=id,name,status,effective_object_story_id,` +
+            `creative{id,thumbnail_url,image_url,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
@@ -53,12 +54,17 @@ export async function GET(
             id: string;
             name: string;
             status: string;
+            effective_object_story_id?: string;
             creative?: {
                 id: string;
                 thumbnail_url?: string;
+                image_url?: string;
+                body?: string;
+                effective_object_story_id?: string;
                 object_story_spec?: {
-                    link_data?: { message?: string; link?: string };
-                    video_data?: { message?: string; video_id?: string };
+                    link_data?: { message?: string; link?: string; image_hash?: string };
+                    video_data?: { message?: string; video_id?: string; image_url?: string };
+                    photo_data?: { caption?: string; url?: string };
                 };
             };
             insights?: {
@@ -99,12 +105,37 @@ export async function GET(
                 };
             }, { spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0 });
 
+            // Extract message/caption from creative
+            const storySpec = ad.creative?.object_story_spec;
+            const message = ad.creative?.body
+                || storySpec?.link_data?.message
+                || storySpec?.video_data?.message
+                || storySpec?.photo_data?.caption
+                || null;
+
+            // Extract link
+            const link = storySpec?.link_data?.link || null;
+
+            // Build Facebook post URL from effective_object_story_id
+            const storyId = ad.effective_object_story_id || ad.creative?.effective_object_story_id;
+            const postUrl = storyId ? `https://www.facebook.com/${storyId.replace('_', '/posts/')}` : null;
+
+            // Use full image or fallback to thumbnail
+            const imageUrl = ad.creative?.image_url
+                || storySpec?.video_data?.image_url
+                || storySpec?.photo_data?.url
+                || ad.creative?.thumbnail_url
+                || null;
+
             return {
                 id: ad.id,
                 name: ad.name,
                 status: ad.status,
-                thumbnail: ad.creative?.thumbnail_url || null,
+                thumbnail: imageUrl,
                 creativeId: ad.creative?.id,
+                message,
+                link,
+                postUrl,
                 totals: {
                     ...totals,
                     cpp: totals.purchases > 0 ? totals.spend / totals.purchases : 0,

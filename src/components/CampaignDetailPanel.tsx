@@ -375,6 +375,8 @@ const styles = {
         position: 'sticky' as const,
         top: 0,
         zIndex: 10,
+        borderBottom: `2px solid ${colors.border}`,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
     },
     headerRow: {
         display: 'flex',

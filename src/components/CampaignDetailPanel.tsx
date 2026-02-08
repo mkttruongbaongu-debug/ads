@@ -980,7 +980,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         borderRight: idx < 5 ? `1px solid ${colors.border}` : 'none',
                                     }}>
                                         <p style={{
-                                            fontSize: '0.5625rem', fontWeight: 600, color: colors.textSubtle,
+                                            fontSize: '0.6875rem', fontWeight: 600, color: colors.textMuted,
                                             margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em',
                                         }}>{item.label}</p>
                                         <p style={{

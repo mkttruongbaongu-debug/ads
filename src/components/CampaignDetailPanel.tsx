@@ -874,7 +874,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                                     {/* Life Stage row */}
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '36px', flexShrink: 0 }}>Đời:</span>
+                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '56px', flexShrink: 0 }}>Tuổi đời:</span>
                                         {[
                                             { key: 'LEARNING', label: 'Đang học', tip: '0-7 ngày: Facebook đang tối ưu, data chưa ổn định' },
                                             { key: 'EARLY', label: 'Mới chạy', tip: '8-14 ngày: Bắt đầu có data nhưng chưa đủ tin cậy' },
@@ -902,7 +902,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </div>
                                     {/* Action row */}
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '36px', flexShrink: 0 }}>KN:</span>
+                                        <span style={{ fontSize: '0.5625rem', color: colors.textSubtle, width: '56px', flexShrink: 0 }}>Khuyến nghị:</span>
                                         {[
                                             { key: 'STOP', label: 'Dừng', color: '#ef4444', tip: 'Health < 20: Lỗ nặng, khuyến nghị tắt campaign' },
                                             { key: 'WATCH', label: 'Theo dõi', color: '#f97316', tip: 'Health 20-34: Chưa tệ nhưng cần canh chừng' },

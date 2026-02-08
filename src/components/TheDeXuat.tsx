@@ -247,7 +247,7 @@ const styles = {
 
 export default function TheDeXuat({ deXuat, onUpdated }: Props) {
     const [isProcessing, setIsProcessing] = useState(false);
-    const [expandedAgents, setExpandedAgents] = useState(false);
+
 
     // ===================================================================
     // HANDLERS
@@ -507,30 +507,7 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                 </div>
             )}
 
-            {/* AI Agents Analysis */}
-            <div style={styles.agentsSection}>
-                <button
-                    onClick={() => setExpandedAgents(!expandedAgents)}
-                    style={{
-                        ...styles.button('neutral'),
-                        marginBottom: '16px',
-                    }}
-                >
-                    {expandedAgents ? '▼' : '▶'} Phân tích từ {deXuat.phanTich_ChuyenGia.length} chuyên gia AI
-                </button>
 
-                {expandedAgents && deXuat.phanTich_ChuyenGia.map((agent, idx) => (
-                    <div key={idx} style={styles.agentItem}>
-                        <div style={styles.agentHeader}>
-                            <span style={styles.agentName}>{agentNameLabels[agent.tenChuyenGia] || agent.tenChuyenGia.replace(/_/g, ' ')}</span>
-                            <span style={styles.agentConfidence(agent.doTinCay)}>
-                                {Math.round(agent.doTinCay * 100)}% tin cậy
-                            </span>
-                        </div>
-                        <p style={styles.agentText}>{agent.nhanDinh}</p>
-                    </div>
-                ))}
-            </div>
 
             {/* Action Buttons */}
             {deXuat.trangThai === 'CHO_DUYET' && (

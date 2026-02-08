@@ -104,7 +104,7 @@ interface Props {
     accountId: string; // Facebook Ad Account ID
 }
 
-// Bollinger Bands Bar Chart — Terminal Style
+// SVG Line Chart — Stock Terminal Style with Bollinger Bands
 function BandsChart({
     data,
     metricKey,
@@ -128,121 +128,210 @@ function BandsChart({
     const maxValue = Math.max(...values);
     const minValue = Math.min(...values.filter(v => v > 0));
 
-    // Include MA and bands in range calculation for proper scaling
+    // Include bands in range
     const upperBand = ma && sigma ? ma + 2 * sigma : maxValue;
     const lowerBand = ma && sigma ? Math.max(0, ma - 2 * sigma) : minValue;
-    const chartMax = Math.max(maxValue, upperBand) * 1.05;
-    const chartMin = Math.min(minValue, lowerBand) * 0.95;
+    const chartMax = Math.max(maxValue, upperBand) * 1.08;
+    const chartMin = Math.max(0, Math.min(minValue, lowerBand) * 0.92);
     const chartRange = chartMax - chartMin || 1;
 
-    const chartHeight = 90;
-    const historyCount = data.length - windowDays;
+    // SVG dimensions
+    const W = 600;
+    const H = 140;
+    const PAD_L = 52; // left padding for Y axis
+    const PAD_R = 8;
+    const PAD_T = 12;
+    const PAD_B = 22;
+    const plotW = W - PAD_L - PAD_R;
+    const plotH = H - PAD_T - PAD_B;
 
-    // Convert value to Y position (pixels from bottom)
-    const valueToY = (val: number) => {
-        return ((val - chartMin) / chartRange) * chartHeight;
-    };
+    // Convert value to SVG Y (top = high value)
+    const toY = (v: number) => PAD_T + plotH - ((v - chartMin) / chartRange) * plotH;
+    const toX = (i: number) => PAD_L + (i / Math.max(data.length - 1, 1)) * plotW;
 
-    const maY = ma ? valueToY(ma) : undefined;
-    const upperY = ma && sigma ? valueToY(ma + 2 * sigma) : undefined;
-    const lowerY = ma && sigma ? valueToY(Math.max(0, ma - 2 * sigma)) : undefined;
+    const historyCount = Math.max(0, data.length - windowDays);
+
+    // Build price line path
+    const linePts = values.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`);
+    const linePath = `M ${linePts.join(' L ')}`;
+
+    // Build area fill (under line)
+    const areaPath = `M ${toX(0).toFixed(1)},${toY(0) > H - PAD_B ? (H - PAD_B).toFixed(1) : toY(values[0]).toFixed(1)} L ${linePts.join(' L ')} L ${toX(data.length - 1).toFixed(1)},${(H - PAD_B).toFixed(1)} Z`;
+
+    // Band area polygon (shaded ±2σ zone)
+    let bandAreaPath = '';
+    if (ma && sigma) {
+        const upper = Math.min(toY(ma + 2 * sigma), H - PAD_B);
+        const lower = Math.max(toY(Math.max(0, ma - 2 * sigma)), PAD_T);
+        bandAreaPath = `M ${PAD_L},${upper} L ${W - PAD_R},${upper} L ${W - PAD_R},${lower} L ${PAD_L},${lower} Z`;
+    }
+
+    // Y-axis ticks (4 ticks)
+    const yTicks = [0, 0.33, 0.66, 1].map(pct => chartMin + pct * chartRange);
+
+    // Window region
+    const windowStartX = historyCount > 0 ? toX(historyCount) : PAD_L;
+
+    // Current (last) value
+    const lastVal = values[values.length - 1];
+    const lastX = toX(data.length - 1);
+    const lastY = toY(lastVal);
 
     return (
         <div style={{ marginBottom: '16px' }}>
-            <p style={{
-                fontSize: '0.6875rem',
-                fontWeight: 600,
-                color: colors.textMuted,
-                marginBottom: '8px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-            }}>
-                {label} — {data.length}D
-            </p>
-            <div style={{ position: 'relative', height: `${chartHeight}px` }}>
-                {/* Band lines */}
-                {maY !== undefined && (
-                    <div style={{
-                        position: 'absolute', bottom: `${maY}px`, left: 0, right: 0,
-                        borderBottom: `1px solid ${colors.primary}60`,
-                        zIndex: 1,
-                    }}>
-                        <span style={{
-                            position: 'absolute', right: 0, top: '-14px',
-                            fontSize: '0.5625rem', color: colors.primary, fontFamily: '"JetBrains Mono", monospace',
-                        }}>MA</span>
-                    </div>
-                )}
-                {upperY !== undefined && upperY <= chartHeight && (
-                    <div style={{
-                        position: 'absolute', bottom: `${upperY}px`, left: 0, right: 0,
-                        borderBottom: `1px dashed ${colors.error}40`,
-                        zIndex: 1,
-                    }}>
-                        <span style={{
-                            position: 'absolute', right: 0, top: '-14px',
-                            fontSize: '0.5rem', color: `${colors.error}80`, fontFamily: '"JetBrains Mono", monospace',
-                        }}>+2σ</span>
-                    </div>
-                )}
-                {lowerY !== undefined && lowerY >= 0 && (
-                    <div style={{
-                        position: 'absolute', bottom: `${lowerY}px`, left: 0, right: 0,
-                        borderBottom: `1px dashed ${colors.success}40`,
-                        zIndex: 1,
-                    }}>
-                        <span style={{
-                            position: 'absolute', right: 0, top: '-14px',
-                            fontSize: '0.5rem', color: `${colors.success}80`, fontFamily: '"JetBrains Mono", monospace',
-                        }}>-2σ</span>
-                    </div>
-                )}
-
-                {/* Bars */}
-                <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: '100%', position: 'relative', zIndex: 2 }}>
-                    {data.map((d, idx) => {
-                        const value = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
-                        const barHeight = Math.max(valueToY(value), 3);
-                        const isWindow = idx >= historyCount;
-                        // For CPP (inverse metric), higher = worse
-                        const isInverse = metricKey === 'cpp';
-                        const isBad = isInverse ? (ma && value > ma * 1.3) : (ma && value < ma * 0.7);
-
-                        return (
-                            <div key={idx} style={{
-                                flex: 1, display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', justifyContent: 'flex-end', height: '100%'
-                            }}>
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: `${barHeight}px`,
-                                        background: isBad
-                                            ? colors.error
-                                            : isWindow
-                                                ? colors.primary
-                                                : `${colors.textSubtle}80`,
-                                        borderRadius: '2px 2px 0 0',
-                                        opacity: isWindow ? 1 : 0.6,
-                                        transition: 'height 0.3s ease',
-                                    }}
-                                    title={`${d.date}: ${formatValue(value)}${isWindow ? ' (window)' : ''}`}
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-            {/* Legend */}
             <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                marginTop: '6px', fontSize: '0.625rem', color: colors.textSubtle,
-                fontFamily: '"JetBrains Mono", monospace',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '6px',
             }}>
-                <span>MIN {formatValue(Math.min(...values))}</span>
-                {ma && <span>MA {formatValue(ma)}</span>}
-                <span>MAX {formatValue(maxValue)}</span>
+                <span style={{
+                    fontSize: '0.6875rem', fontWeight: 600, color: colors.textMuted,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>{label} — {data.length}D</span>
+                <span style={{
+                    fontSize: '0.75rem', fontWeight: 700,
+                    color: lastVal > (ma || 0) ? (metricKey === 'cpp' ? colors.error : colors.success) : (metricKey === 'cpp' ? colors.success : colors.error),
+                    fontFamily: '"JetBrains Mono", monospace',
+                }}>{formatValue(lastVal)}</span>
             </div>
+            <svg
+                viewBox={`0 0 ${W} ${H}`}
+                style={{ width: '100%', height: 'auto', display: 'block' }}
+                preserveAspectRatio="none"
+            >
+                {/* Grid lines */}
+                {yTicks.map((tick, i) => (
+                    <g key={i}>
+                        <line
+                            x1={PAD_L} y1={toY(tick)} x2={W - PAD_R} y2={toY(tick)}
+                            stroke={`${colors.border}40`} strokeWidth="0.5"
+                        />
+                        <text
+                            x={PAD_L - 4} y={toY(tick) + 3}
+                            textAnchor="end"
+                            fill={colors.textSubtle}
+                            fontSize="8"
+                            fontFamily='"JetBrains Mono", monospace'
+                        >{formatValue(tick)}</text>
+                    </g>
+                ))}
+
+                {/* Window background highlight */}
+                <rect
+                    x={windowStartX} y={PAD_T}
+                    width={W - PAD_R - windowStartX} height={plotH}
+                    fill={`${colors.primary}08`}
+                />
+                {/* Window separator line */}
+                {historyCount > 0 && (
+                    <line
+                        x1={windowStartX} y1={PAD_T} x2={windowStartX} y2={H - PAD_B}
+                        stroke={`${colors.primary}30`} strokeWidth="1" strokeDasharray="4,3"
+                    />
+                )}
+
+                {/* ±2σ Band area */}
+                {bandAreaPath && (
+                    <path d={bandAreaPath} fill={`${colors.primary}10`} />
+                )}
+
+                {/* Upper band line (+2σ) */}
+                {ma && sigma && (
+                    <line
+                        x1={PAD_L} y1={toY(ma + 2 * sigma)}
+                        x2={W - PAD_R} y2={toY(ma + 2 * sigma)}
+                        stroke={`${colors.error}50`} strokeWidth="0.8" strokeDasharray="4,3"
+                    />
+                )}
+
+                {/* Lower band line (-2σ) */}
+                {ma && sigma && (
+                    <line
+                        x1={PAD_L} y1={toY(Math.max(0, ma - 2 * sigma))}
+                        x2={W - PAD_R} y2={toY(Math.max(0, ma - 2 * sigma))}
+                        stroke={`${colors.success}50`} strokeWidth="0.8" strokeDasharray="4,3"
+                    />
+                )}
+
+                {/* MA line */}
+                {ma && (
+                    <line
+                        x1={PAD_L} y1={toY(ma)} x2={W - PAD_R} y2={toY(ma)}
+                        stroke={colors.primary} strokeWidth="1.2" strokeDasharray="6,3"
+                    />
+                )}
+
+                {/* Area fill gradient */}
+                <defs>
+                    <linearGradient id={`area-${metricKey}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={colors.primary} stopOpacity="0.15" />
+                        <stop offset="100%" stopColor={colors.primary} stopOpacity="0.02" />
+                    </linearGradient>
+                </defs>
+                <path d={areaPath} fill={`url(#area-${metricKey})`} />
+
+                {/* Price line */}
+                <path
+                    d={linePath}
+                    fill="none"
+                    stroke={colors.primary}
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                />
+
+                {/* Data dots for window days */}
+                {values.map((v, i) => {
+                    if (i < historyCount) return null;
+                    const isOutBand = ma && sigma && (v > ma + 2 * sigma || v < ma - 2 * sigma);
+                    return (
+                        <circle
+                            key={i}
+                            cx={toX(i)} cy={toY(v)} r="2.5"
+                            fill={isOutBand ? colors.error : colors.primary}
+                            stroke={colors.bg} strokeWidth="1"
+                        />
+                    );
+                })}
+
+                {/* Current value label */}
+                <circle cx={lastX} cy={lastY} r="4" fill={colors.primary} stroke={colors.bg} strokeWidth="1.5" />
+
+                {/* MA label */}
+                {ma && (
+                    <text
+                        x={W - PAD_R - 2} y={toY(ma) - 4}
+                        textAnchor="end" fill={colors.primary} fontSize="7.5"
+                        fontFamily='"JetBrains Mono", monospace' fontWeight="600"
+                    >MA {formatValue(ma)}</text>
+                )}
+
+                {/* Band labels */}
+                {ma && sigma && (
+                    <>
+                        <text
+                            x={W - PAD_R - 2} y={toY(ma + 2 * sigma) - 3}
+                            textAnchor="end" fill={`${colors.error}90`} fontSize="7"
+                            fontFamily='"JetBrains Mono", monospace'
+                        >+2σ</text>
+                        <text
+                            x={W - PAD_R - 2} y={toY(Math.max(0, ma - 2 * sigma)) + 10}
+                            textAnchor="end" fill={`${colors.success}90`} fontSize="7"
+                            fontFamily='"JetBrains Mono", monospace'
+                        >-2σ</text>
+                    </>
+                )}
+
+                {/* X-axis labels (first, middle, last) */}
+                {[0, Math.floor(data.length / 2), data.length - 1].map((idx, i) => (
+                    <text
+                        key={i}
+                        x={toX(idx)} y={H - 4}
+                        textAnchor={i === 0 ? 'start' : i === 2 ? 'end' : 'middle'}
+                        fill={colors.textSubtle} fontSize="7.5"
+                        fontFamily='"JetBrains Mono", monospace'
+                    >{(data[idx]?.date || '').slice(5)}</text>
+                ))}
+            </svg>
         </div>
     );
 }

@@ -248,18 +248,23 @@ export function calculateTrendVsAverage(dailyMetrics: DailyMetric[]): TrendAnaly
 }
 
 /**
- * Phát hiện tất cả issues của một campaign
+ * Phát hiện issues dựa trên Metric Bands (Z-Score) + absolute checks
+ * 
+ * Thay thế hoàn toàn thuật toán cũ (3-day hardcoded).
+ * Giờ chỉ giữ 2 absolute checks + auto-convert từ metricTags (Bands).
  */
 export function detectIssues(campaign: CampaignData): Issue[] {
     const issues: Issue[] = [];
     const metrics = campaign.dailyMetrics;
     const totals = campaign.totals;
-    const timeContext = getTimeContext();
-    const benchmark = calculateWeeklyBenchmark(metrics);
 
     if (metrics.length === 0) return issues;
 
-    // 1. Đốt tiền không ra gì
+    // ============================================
+    // 1. ABSOLUTE CHECKS (không phụ thuộc Bands)
+    // ============================================
+
+    // 1a. Đốt tiền không ra đơn
     const todayMetric = metrics[metrics.length - 1];
     if (todayMetric && todayMetric.spend >= THRESHOLDS.BURN_MONEY_SPEND && todayMetric.purchases === 0) {
         issues.push({
@@ -271,133 +276,54 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         });
     }
 
-    // 2. CPP tăng liên tục (điều chỉnh theo time context + benchmark)
-    if (metrics.length >= THRESHOLDS.CPP_INCREASE_DAYS) {
-        const recentMetrics = metrics.slice(-THRESHOLDS.CPP_INCREASE_DAYS);
-        const allIncreasing = recentMetrics.every((m, i) => {
-            if (i === 0) return true;
-            return m.cpp > 0 && recentMetrics[i - 1].cpp > 0 && m.cpp > recentMetrics[i - 1].cpp;
-        });
-
-        if (allIncreasing && recentMetrics[0].cpp > 0) {
-            const firstCpp = recentMetrics[0].cpp;
-            const lastCpp = recentMetrics[recentMetrics.length - 1].cpp;
-            const increase = ((lastCpp - firstCpp) / firstCpp) * 100;
-
-            if (increase >= THRESHOLDS.CPP_INCREASE_PERCENT) {
-                // Giảm severity nếu cuối tháng
-                const severity = timeContext.isEndOfMonth ? 'info' : 'warning';
-                const contextNote = timeContext.isEndOfMonth
-                    ? ' [📅 Cuối tháng]'
-                    : '';
-                const benchmarkNote = benchmark.hasBenchmark
-                    ? formatBenchmarkChange(benchmark.cppChange, 'CPP')
-                    : '';
-
-                issues.push({
-                    type: 'cpp_rising',
-                    severity,
-                    message: 'CPP tăng liên tục' + (timeContext.isEndOfMonth ? ' (cuối tháng)' : ''),
-                    detail: `${THRESHOLDS.CPP_INCREASE_DAYS} ngày: ${formatMoney(firstCpp)} → ${formatMoney(lastCpp)} (+${increase.toFixed(0)}%)${benchmarkNote}${contextNote}`,
-                    action: timeContext.isEndOfMonth
-                        ? 'Theo dõi thêm, có thể ổn định đầu tháng sau'
-                        : 'Thay content mới',
-                });
-            }
-        }
-    }
-
-    // 3. Có đơn nhưng lỗ (ROAS < 1) + benchmark
+    // 1b. Có đơn nhưng lỗ (ROAS < 1)
     if (totals.purchases > 0 && totals.roas < THRESHOLDS.MIN_ROAS) {
         const loss = totals.spend - totals.revenue;
-        const benchmarkNote = benchmark.hasBenchmark
-            ? formatBenchmarkChange(benchmark.roasChange, 'ROAS')
-            : '';
         issues.push({
             type: 'losing_money',
             severity: 'critical',
             message: 'Có đơn nhưng đang lỗ',
-            detail: `ROAS ${totals.roas.toFixed(2)}x, lỗ ${formatMoney(loss)}${benchmarkNote}`,
+            detail: `ROAS ${totals.roas.toFixed(2)}x, lỗ ${formatMoney(loss)}`,
             action: 'Giảm budget 50% hoặc tắt',
         });
     }
 
-    // 4. Frequency - 3 mức cảnh báo (early warning system)
-    if (todayMetric && todayMetric.frequency) {
-        const freq = todayMetric.frequency;
+    // ============================================
+    // 2. BANDS-DERIVED ISSUES (từ Z-Score 7-day window)
+    // ============================================
+    const bandsResult = generateMetricTags(metrics, campaign.created_time);
 
-        if (freq > 3) {
-            // Critical - Audience đã mòn
-            issues.push({
-                type: 'high_frequency',
-                severity: 'critical',
-                message: 'Audience đã mòn hoàn toàn',
-                detail: `Frequency: ${freq.toFixed(1)} - Mỗi người xem > 3 lần`,
-                action: 'TẮT NGAY hoặc đổi audience mới 100%',
-            });
-        } else if (freq >= 2.5) {
-            // Warning - Cần refresh sớm
-            issues.push({
-                type: 'high_frequency',
-                severity: 'warning',
-                message: 'Cần refresh creative SỚM',
-                detail: `Frequency: ${freq.toFixed(1)} - Sắp bão hòa`,
-                action: 'Thay content mới trong 1-2 ngày',
-            });
-        } else if (freq >= 2) {
-            // Info - Theo dõi
-            issues.push({
-                type: 'high_frequency',
-                severity: 'info',
-                message: 'Frequency đang tăng',
-                detail: `Frequency: ${freq.toFixed(1)} - Theo dõi xu hướng`,
-                action: 'Chuẩn bị content mới để thay thế',
-            });
-        }
-    }
+    for (const tag of bandsResult.tags) {
+        // Chỉ tạo issue cho các tag "xấu" (direction phù hợp)
+        const isBadDirection = (
+            (tag.metric === 'CPP' && tag.direction === 'up') ||    // CPP tăng = xấu
+            (tag.metric === 'CTR' && tag.direction === 'down') ||  // CTR giảm = xấu
+            (tag.metric === 'ROAS' && tag.direction === 'down')    // ROAS giảm = xấu
+        );
 
-    // 5. CTR tốt nhưng không có đơn
-    if (totals.ctr >= THRESHOLDS.GOOD_CTR && totals.purchases === 0 && totals.spend > 200000) {
+        if (!isBadDirection) continue; // Skip good signals
+
+        // Map metric → IssueType
+        const typeMap: Record<string, IssueType> = {
+            'CPP': 'cpp_rising',
+            'CTR': 'content_worn',
+            'ROAS': 'losing_money',
+        };
+
+        // Map metric → action
+        const actionMap: Record<string, string> = {
+            'CPP': 'Xem xét thay content hoặc điều chỉnh targeting',
+            'CTR': 'Content đang mất hiệu quả, cần refresh creative',
+            'ROAS': 'Kiểm tra chi phí và tối ưu conversion',
+        };
+
         issues.push({
-            type: 'clicks_no_sales',
-            severity: 'warning',
-            message: 'Clicks nhiều nhưng không ra đơn',
-            detail: `CTR ${totals.ctr.toFixed(2)}%, 0 purchases`,
-            action: 'Kiểm tra landing page và offer',
+            type: typeMap[tag.metric] || 'no_issues',
+            severity: tag.severity,
+            message: tag.label,
+            detail: tag.detail,
+            action: actionMap[tag.metric] || 'Theo dõi thêm',
         });
-    }
-
-    // 6. CPM spike
-    if (metrics.length >= 7) {
-        const avgCpm = metrics.slice(0, -1).reduce((sum, m) => sum + m.cpm, 0) / (metrics.length - 1);
-        const todayCpm = todayMetric?.cpm || 0;
-        const cpmIncrease = ((todayCpm - avgCpm) / avgCpm) * 100;
-
-        if (cpmIncrease >= THRESHOLDS.CPM_SPIKE_PERCENT) {
-            issues.push({
-                type: 'cpm_spike',
-                severity: 'info',
-                message: 'CPM tăng đột ngột',
-                detail: `Hôm nay: ${formatMoney(todayCpm)}, TB: ${formatMoney(avgCpm)} (+${cpmIncrease.toFixed(0)}%)`,
-                action: 'Có thể do cạnh tranh cao, theo dõi thêm',
-            });
-        }
-    }
-
-    // 7. Spend spike bất thường
-    if (metrics.length >= 7) {
-        const avgSpend = metrics.slice(0, -1).reduce((sum, m) => sum + m.spend, 0) / (metrics.length - 1);
-        const todaySpend = todayMetric?.spend || 0;
-
-        if (avgSpend > 0 && todaySpend > avgSpend * (THRESHOLDS.SPEND_SPIKE_PERCENT / 100)) {
-            issues.push({
-                type: 'spend_spike',
-                severity: 'info',
-                message: 'Spend cao bất thường',
-                detail: `Hôm nay: ${formatMoney(todaySpend)}, TB: ${formatMoney(avgSpend)}`,
-                action: 'Kiểm tra xem có đang hiệu quả không',
-            });
-        }
     }
 
     return issues;

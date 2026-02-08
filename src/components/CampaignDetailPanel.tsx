@@ -1272,7 +1272,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     padding: '10px 0',
                                                     borderBottom: metric !== 'ROAS' ? `1px solid ${colors.border}30` : 'none',
                                                 }}>
-                                                    {/* Top row: metric name, value, tag, z-score, MA */}
+                                                    {/* Top row: metric name, value, tag, z-score */}
                                                     <div style={{
                                                         display: 'flex', alignItems: 'center', gap: '10px',
                                                         marginBottom: '6px',
@@ -1302,6 +1302,22 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 fontFamily: '"JetBrains Mono", monospace',
                                                             }}>{zScore > 0 ? '+' : ''}{zScore.toFixed(1)}σ</span>
                                                         )}
+                                                        {/* Action recommendation from matching issue */}
+                                                        {(() => {
+                                                            const metricIssueTypes: Record<string, string[]> = {
+                                                                'CTR': ['content_worn'],
+                                                                'CPP': ['cpp_rising'],
+                                                                'ROAS': ['losing_money'],
+                                                            };
+                                                            const matchingIssue = campaign.issues.find(i => metricIssueTypes[metric]?.includes(i.type));
+                                                            if (!matchingIssue) return null;
+                                                            return (
+                                                                <span style={{
+                                                                    fontSize: '0.6875rem', color: colors.success,
+                                                                    fontWeight: 500, marginLeft: 'auto', whiteSpace: 'nowrap',
+                                                                }}>→ {matchingIssue.action}</span>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     {/* Deviation bar */}
                                                     <div style={{
@@ -1327,34 +1343,39 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 );
                             })()}
 
-                            {/* ═══ ISSUES (compact) ═══ */}
-                            {campaign.issues.length > 0 && (
-                                <div style={{ marginBottom: '20px' }}>
-                                    {campaign.issues.map((issue, idx) => (
-                                        <div key={idx} style={{
-                                            display: 'flex', alignItems: 'flex-start', gap: '8px',
-                                            padding: '8px 12px', marginBottom: '4px',
-                                            background: colors.bgAlt,
-                                            borderLeft: `3px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
-                                            borderRadius: '0 4px 4px 0',
-                                        }}>
-                                            <div style={{ flex: 1 }}>
+                            {/* ═══ ISSUES — chỉ hiện absolute checks (không trùng với bands) ═══ */}
+                            {(() => {
+                                const bandIssueTypes = ['content_worn', 'cpp_rising'];
+                                const absoluteIssues = campaign.issues.filter(i => !bandIssueTypes.includes(i.type));
+                                if (absoluteIssues.length === 0) return null;
+                                return (
+                                    <div style={{ marginBottom: '20px' }}>
+                                        {absoluteIssues.map((issue, idx) => (
+                                            <div key={idx} style={{
+                                                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                                padding: '8px 12px', marginBottom: '4px',
+                                                background: colors.bgAlt,
+                                                borderLeft: `3px solid ${issue.severity === 'critical' ? colors.error : colors.warning}`,
+                                                borderRadius: '0 4px 4px 0',
+                                            }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{
+                                                        fontSize: '0.8125rem', fontWeight: 600,
+                                                        color: issue.severity === 'critical' ? colors.error : colors.warning,
+                                                    }}>{issue.message}</span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem', color: colors.textMuted, marginLeft: '8px',
+                                                    }}>{issue.detail}</span>
+                                                </div>
                                                 <span style={{
-                                                    fontSize: '0.8125rem', fontWeight: 600,
-                                                    color: issue.severity === 'critical' ? colors.error : colors.warning,
-                                                }}>{issue.message}</span>
-                                                <span style={{
-                                                    fontSize: '0.75rem', color: colors.textMuted, marginLeft: '8px',
-                                                }}>{issue.detail}</span>
+                                                    fontSize: '0.6875rem', color: colors.success,
+                                                    fontWeight: 500, whiteSpace: 'nowrap',
+                                                }}>→ {issue.action}</span>
                                             </div>
-                                            <span style={{
-                                                fontSize: '0.6875rem', color: colors.success,
-                                                fontWeight: 500, whiteSpace: 'nowrap',
-                                            }}>→ {issue.action}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                );
+                            })()}
 
                             {/* ═══ BANDS CHARTS ═══ */}
                             {dailyTrend.length > 0 && (() => {

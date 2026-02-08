@@ -154,6 +154,133 @@ export async function POST(
             comparison,
         };
 
+        // ===== FETCH ADS DATA FOR CONTENT ANALYSIS =====
+        try {
+            const adsRes = await fetch(
+                `${FB_API_BASE}/${campaignId}/ads?` +
+                `fields=id,name,status,` +
+                `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
+                `date_start,spend,impressions,clicks,actions,action_values,ctr` +
+                `}&limit=50&access_token=${accessToken}`
+            );
+
+            const adsData = await adsRes.json();
+
+            if (!adsData.error && adsData.data?.length > 0) {
+                const totalCampaignSpend = campaign.totals.spend;
+
+                const contentItems = adsData.data.map((ad: {
+                    id: string;
+                    name: string;
+                    status: string;
+                    insights?: {
+                        data?: Array<{
+                            date_start: string;
+                            spend: string;
+                            impressions: string;
+                            clicks: string;
+                            actions?: Array<{ action_type: string; value: string }>;
+                            action_values?: Array<{ action_type: string; value: string }>;
+                            ctr: string;
+                        }>
+                    };
+                }) => {
+                    const days = ad.insights?.data || [];
+
+                    // Compute totals
+                    const totals = days.reduce((acc, day) => {
+                        const spend = parseFloat(day.spend || '0');
+                        const clicks = parseInt(day.clicks || '0');
+                        const impressions = parseInt(day.impressions || '0');
+                        const purchases = day.actions?.find(a =>
+                            a.action_type === 'purchase' || a.action_type === 'omni_purchase'
+                        );
+                        const revenue = day.action_values?.find(a =>
+                            a.action_type === 'purchase' || a.action_type === 'omni_purchase'
+                        );
+                        return {
+                            spend: acc.spend + spend,
+                            clicks: acc.clicks + clicks,
+                            impressions: acc.impressions + impressions,
+                            purchases: acc.purchases + (purchases ? parseInt(purchases.value) : 0),
+                            revenue: acc.revenue + (revenue ? parseFloat(revenue.value) : 0),
+                        };
+                    }, { spend: 0, clicks: 0, impressions: 0, purchases: 0, revenue: 0 });
+
+                    const cpp = totals.purchases > 0 ? totals.spend / totals.purchases : 0;
+                    const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+                    const roas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
+                    const spendShare = totalCampaignSpend > 0 ? (totals.spend / totalCampaignSpend) * 100 : 0;
+
+                    // Compute Bollinger Bands z-score for CPP
+                    const dailyCpps = days
+                        .map(d => {
+                            const s = parseFloat(d.spend || '0');
+                            const p = d.actions?.find(a => a.action_type === 'purchase' || a.action_type === 'omni_purchase');
+                            const pc = p ? parseInt(p.value) : 0;
+                            return pc > 0 ? s / pc : null;
+                        })
+                        .filter((v): v is number => v !== null);
+
+                    let badge = 'Ít data';
+                    let zScoreTip = 'Chưa đủ data để đánh giá';
+
+                    if (dailyCpps.length >= 5) {
+                        const mean = dailyCpps.reduce((s, v) => s + v, 0) / dailyCpps.length;
+                        const variance = dailyCpps.reduce((s, v) => s + (v - mean) ** 2, 0) / dailyCpps.length;
+                        const sigma = Math.sqrt(variance);
+
+                        // Recent CPP (last 3 days)
+                        const recent = dailyCpps.slice(-3);
+                        const recentAvg = recent.reduce((s, v) => s + v, 0) / recent.length;
+
+                        if (sigma > 0) {
+                            const zScore = (recentAvg - mean) / sigma;
+                            if (zScore > 2) {
+                                badge = 'Bão hoà';
+                                zScoreTip = `CPP gần đây ${Math.round(recentAvg)}đ vượt +${zScore.toFixed(1)}σ so với TB ${Math.round(mean)}đ → Fatigue nghiêm trọng`;
+                            } else if (zScore > 1) {
+                                badge = 'Cảnh báo';
+                                zScoreTip = `CPP gần đây ${Math.round(recentAvg)}đ cao hơn TB ${Math.round(mean)}đ (+${zScore.toFixed(1)}σ) → Đang suy giảm`;
+                            } else if (zScore < -1) {
+                                badge = 'Đang tốt';
+                                zScoreTip = `CPP gần đây ${Math.round(recentAvg)}đ thấp hơn TB ${Math.round(mean)}đ (${zScore.toFixed(1)}σ) → Hiệu quả tốt`;
+                            } else {
+                                badge = 'Ổn';
+                                zScoreTip = `CPP gần đây ${Math.round(recentAvg)}đ ≈ TB ${Math.round(mean)}đ (${zScore.toFixed(1)}σ) → Ổn định`;
+                            }
+                        } else {
+                            badge = 'Ổn';
+                            zScoreTip = `CPP ổn định ${Math.round(mean)}đ (σ=0)`;
+                        }
+                    } else if (days.length > 0 && spendShare < 5) {
+                        badge = 'Yếu';
+                        zScoreTip = `FB chỉ chi ${spendShare.toFixed(0)}% cho content này → Ít được phân phối`;
+                    }
+
+                    return {
+                        name: ad.name,
+                        status: ad.status,
+                        badge,
+                        spendShare,
+                        spend: totals.spend,
+                        revenue: totals.revenue,
+                        purchases: totals.purchases,
+                        cpp,
+                        ctr,
+                        roas,
+                        zScoreTip,
+                    };
+                });
+
+                // Sort by spend desc, take top 10
+                contentItems.sort((a: { spend: number }, b: { spend: number }) => b.spend - a.spend);
+                context.contentAnalysis = contentItems.slice(0, 10);
+            }
+        } catch (adsError) {
+            console.warn('Failed to fetch ads for content analysis, continuing without:', adsError);
+        }
+
         // Run AI analysis
         const aiResult = await analyzeWithAI(context);
 

@@ -56,6 +56,19 @@ export interface CampaignContext {
         avgCtr: number;
         position: 'above_avg' | 'below_avg' | 'average';
     };
+    contentAnalysis?: Array<{
+        name: string;
+        status: string;
+        badge: string;
+        spendShare: number;
+        spend: number;
+        revenue: number;
+        purchases: number;
+        cpp: number;
+        ctr: number;
+        roas: number;
+        zScoreTip: string;
+    }>;
 }
 
 export interface AIAnalysisResult {
@@ -393,7 +406,7 @@ function applyGuardrails(
 // ENHANCED PROMPT BUILDER
 // ===================================================================
 function buildEnhancedPrompt(context: CampaignContext, preprocessed: PreprocessedInsights): string {
-    const { campaign, metrics, dailyTrend, issues, comparison } = context;
+    const { campaign, metrics, dailyTrend, issues, comparison, contentAnalysis } = context;
 
     const trendText = dailyTrend.map(d => {
         const dow = getDayOfWeek(d.date);
@@ -473,12 +486,26 @@ ${comparisonText}
 
 ${preprocessedSection}
 
+${contentAnalysis && contentAnalysis.length > 0 ? `===== PHÂN TÍCH TỪNG CONTENT (${contentAnalysis.length} ads) =====
+${contentAnalysis.map((c, i) => {
+        const roasText = c.roas > 0 ? c.roas.toFixed(2) + 'x' : 'N/A';
+        return `${i + 1}. [${c.badge}] "${c.name}" — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
+    }).join('\n')}
+
+LƯU Ý CONTENT:
+- Content có badge "Bão hoà" = CPP vượt +2σ so với lịch sử, CẦN TẮT hoặc THAY THẾ
+- Content có badge "Đang tốt" = metrics ổn định, nên GIỮ
+- Content có badge "Yếu" = FB chi ít, hiệu quả thấp
+- Content chiếm >40% chi tiêu = RỦI RO TẬP TRUNG, xem xét đa dạng hóa
+` : ''}
 ===== YÊU CẦU =====
 1. Đánh giá metrics theo BENCHMARK đã cho (ROAS >= 4 = xuất sắc, etc.)
 2. Tìm ROOT CAUSE cho vấn đề (nếu có)
 3. Đưa ra VERDICT dứt khoát - PHẢI nhất quán với data thực tế
 4. Dự đoán 3-5 ngày tới
-
+${contentAnalysis && contentAnalysis.length > 0 ? `5. Đánh giá TỪNG CONTENT: content nào nên tắt, content nào nên giữ/scale, có cần tạo content mới không?
+6. Nếu phát hiện content bão hoà chiếm % chi tiêu lớn → CẢNH BÁO rõ ràng
+` : ''}
 KIỂM TRA LẦN CUỐI trước khi output:
 - verdict.action có match với ROAS ${metrics.roas.toFixed(2)}x theo benchmark không?
 - Nếu ROAS >= 4: action PHẢI là SCALE hoặc MAINTAIN

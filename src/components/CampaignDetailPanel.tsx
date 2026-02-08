@@ -1241,25 +1241,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
                                                 textTransform: 'uppercase', letterSpacing: '0.08em',
                                             }}>CHỈ SỐ PHÂN TÍCH</span>
-                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                {lifeStage && (
-                                                    <span style={{
-                                                        fontSize: '0.625rem', fontWeight: 600,
-                                                        padding: '2px 8px', borderRadius: '3px',
-                                                        background: `${colors.primary}20`, color: colors.primary,
-                                                        fontFamily: '"JetBrains Mono", monospace',
-                                                    }}>{({ 'LEARNING': 'Đang học', 'EARLY': 'Mới chạy', 'MATURE': 'Ổn định', 'VETERAN': 'Lão luyện' } as Record<string, string>)[lifeStage] || lifeStage}</span>
-                                                )}
-                                                {healthScore !== undefined && (
-                                                    <span style={{
-                                                        fontSize: '0.75rem', fontWeight: 700,
-                                                        fontFamily: '"JetBrains Mono", monospace',
-                                                        color: healthScore >= 75 ? colors.success
-                                                            : healthScore >= 50 ? colors.warning
-                                                                : colors.error,
-                                                    }}>Sức khỏe: {healthScore}</span>
-                                                )}
-                                            </div>
                                         </div>
 
                                         {/* Metric Rows */}

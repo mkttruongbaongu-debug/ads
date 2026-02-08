@@ -1286,19 +1286,70 @@ export default function DashboardPage() {
                                                                 )}
                                                             </td>
                                                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <button style={{
-                                                                    background: actionColor,
-                                                                    color: action === 'WATCH' ? colors.bg : '#fff',
-                                                                    border: 'none',
-                                                                    padding: '6px 16px',
-                                                                    borderRadius: '4px',
-                                                                    fontWeight: 600,
-                                                                    fontSize: '0.8rem',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'opacity 0.15s',
-                                                                }}>
-                                                                    {actionLabel}
-                                                                </button>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                                                    <button style={{
+                                                                        background: actionColor,
+                                                                        color: action === 'WATCH' ? colors.bg : '#fff',
+                                                                        border: 'none',
+                                                                        padding: '6px 16px',
+                                                                        borderRadius: '4px',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '0.8rem',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'opacity 0.15s',
+                                                                    }}>
+                                                                        {actionLabel}
+                                                                    </button>
+                                                                    {campaign.actionRecommendation?.debugData && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const debugLog = JSON.stringify(
+                                                                                    campaign.actionRecommendation?.debugData,
+                                                                                    null,
+                                                                                    2
+                                                                                );
+                                                                                navigator.clipboard.writeText(debugLog).then(() => {
+                                                                                    const btn = e.currentTarget;
+                                                                                    btn.textContent = '✓';
+                                                                                    btn.style.color = colors.success;
+                                                                                    btn.style.borderColor = colors.success;
+                                                                                    setTimeout(() => {
+                                                                                        btn.textContent = '⚙';
+                                                                                        btn.style.color = colors.textMuted;
+                                                                                        btn.style.borderColor = colors.border;
+                                                                                    }, 1500);
+                                                                                });
+                                                                            }}
+                                                                            style={{
+                                                                                width: '28px',
+                                                                                height: '28px',
+                                                                                borderRadius: '4px',
+                                                                                fontSize: '0.85rem',
+                                                                                background: 'transparent',
+                                                                                color: colors.textMuted,
+                                                                                border: `1px solid ${colors.border}`,
+                                                                                cursor: 'pointer',
+                                                                                transition: 'all 0.2s',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                padding: 0,
+                                                                            }}
+                                                                            title="Copy debug log vào clipboard"
+                                                                            onMouseEnter={(e) => {
+                                                                                e.currentTarget.style.color = colors.primary;
+                                                                                e.currentTarget.style.borderColor = colors.primary;
+                                                                            }}
+                                                                            onMouseLeave={(e) => {
+                                                                                e.currentTarget.style.color = colors.textMuted;
+                                                                                e.currentTarget.style.borderColor = colors.border;
+                                                                            }}
+                                                                        >
+                                                                            ⚙
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );

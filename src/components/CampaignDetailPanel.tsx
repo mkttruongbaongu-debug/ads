@@ -208,7 +208,7 @@ function BandsChart({
                 <span style={{
                     fontSize: '0.6875rem', fontWeight: 600, color: colors.textMuted,
                     textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}>{label} — {data.length}D</span>
+                }}>{label} — {data.length} NGÀY</span>
                 <span style={{
                     fontSize: '0.75rem', fontWeight: 700,
                     color: lastVal > (ma || 0) ? (metricKey === 'cpp' ? colors.error : colors.success) : (metricKey === 'cpp' ? colors.success : colors.error),
@@ -1088,7 +1088,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         })}
                                         {campaign.created_time && (() => {
                                             const ageDays = Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000);
-                                            return <span style={{ fontSize: '0.5625rem', color: colors.textMuted, marginLeft: '2px' }}>({ageDays}D)</span>;
+                                            return <span style={{ fontSize: '0.5625rem', color: colors.textMuted, marginLeft: '2px' }}>({ageDays} ngày)</span>;
                                         })()}
                                     </div>
                                     {/* Action row */}

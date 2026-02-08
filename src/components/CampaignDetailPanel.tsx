@@ -361,11 +361,11 @@ const styles = {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 50,
+        zIndex: 9999,
     },
     panel: {
         width: '95%',
-        maxWidth: '680px',
+        maxWidth: '900px',
         maxHeight: '90vh',
         background: colors.bgCard,
         overflowY: 'auto' as const,

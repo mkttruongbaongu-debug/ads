@@ -143,8 +143,8 @@ const styles = {
         background: colors.bg,
         border: `1px solid ${colors.border}`,
         color: colors.text,
-        padding: '6px 10px',
-        borderRadius: '4px',
+        padding: '7px 12px',
+        borderRadius: '6px',
         fontSize: '0.8125rem',
         cursor: 'pointer',
         minWidth: '180px',
@@ -871,11 +871,11 @@ export default function DashboardPage() {
                     {/* Date Range - Fixed 60 days */}
                     <div style={styles.controlGroup}>
                         <div style={{
-                            padding: '8px 12px',
+                            padding: '7px 12px',
                             border: `1px solid ${colors.border}`,
                             borderRadius: '6px',
                             fontSize: '0.8125rem',
-                            background: 'rgba(255,255,255,0.03)',
+                            background: colors.bg,
                             color: colors.textMuted,
                             fontFamily: '"JetBrains Mono", monospace',
                             letterSpacing: '0.03em',
@@ -893,11 +893,11 @@ export default function DashboardPage() {
                             value={filterText}
                             onChange={(e) => setFilterText(e.target.value)}
                             style={{
-                                padding: '6px 10px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '4px',
+                                padding: '7px 12px',
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: '6px',
                                 fontSize: '0.8125rem',
-                                background: 'rgba(255,255,255,0.05)',
+                                background: colors.bg,
                                 color: 'white',
                                 outline: 'none',
                                 minWidth: '180px',

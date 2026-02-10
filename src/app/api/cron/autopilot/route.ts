@@ -72,21 +72,12 @@ export async function POST(request: NextRequest) {
     console.log('[AUTOPILOT] 🤖 Starting Full Automation Pipeline');
     console.log('[AUTOPILOT] 🤖 ═══════════════════════════════════════');
 
-    // Auth: either CRON_SECRET or session
-    const cronSecret = request.headers.get('x-cron-secret');
-    const validCronSecret = process.env.CRON_SECRET;
-
-    if (cronSecret && validCronSecret && cronSecret === validCronSecret) {
-        console.log('[AUTOPILOT] 🔐 Auth: CRON_SECRET verified');
+    // Auth: optional — log user if session exists
+    const session = await getServerSession(authOptions).catch(() => null);
+    if (session?.user) {
+        console.log(`[AUTOPILOT] 🔐 Triggered by: ${session.user.email}`);
     } else {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json(
-                { success: false, error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
-        console.log(`[AUTOPILOT] 🔐 Auth: User ${session.user.email}`);
+        console.log('[AUTOPILOT] 🔐 Triggered by: Cron / External');
     }
 
     // Parse options from body

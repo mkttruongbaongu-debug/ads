@@ -59,6 +59,7 @@ export interface CampaignContext {
         position: 'above_avg' | 'below_avg' | 'average';
     };
     contentAnalysis?: Array<{
+        adId: string;
         name: string;
         status: string;
         badge: string;
@@ -571,7 +572,7 @@ ${preprocessedSection}
 ${contentAnalysis && contentAnalysis.length > 0 ? `===== PHÂN TÍCH TỪNG CONTENT (${contentAnalysis.length} ads) =====
 ${contentAnalysis.map((c, i) => {
         const roasText = c.roas > 0 ? c.roas.toFixed(2) + 'x' : 'N/A';
-        const summary = `${i + 1}. [${c.badge}] "${c.name}" — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
+        const summary = `${i + 1}. [${c.badge}] "${c.name}" (ID: ${c.adId}) — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
         // Include full daily breakdown for all content
         const dailyText = c.dailyMetrics
             ? '\n   Diễn biến: ' + c.dailyMetrics.map(d => {
@@ -595,6 +596,7 @@ LƯU Ý CONTENT:
 4. Dự đoán 3-5 ngày tới
 ${contentAnalysis && contentAnalysis.length > 0 ? `5. Đánh giá TỪNG CONTENT: xác định content NÀO đang kéo hiệu quả xuống nhiều nhất
 6. actionPlan.immediate CHỈ chứa 1 HÀNH ĐỘNG DUY NHẤT — ưu tiên: tắt content xấu > thay budget > tạo creative mới
+7. ⚠️ BẮT BUỘC GHI AD ID: Khi nhắc đến content/ad trong action, LUÔN ghi kèm (ID: xxx). VD: Tắt content "3" (ID: 120215940419750361). Nếu KHÔNG ghi ID → hệ thống TẮT NHẦM khi có nhiều ad cùng tên.
 ` : ''}
 KIỂM TRA LẦN CUỐI trước khi output:
 - Verdict dựa trên 7 NGÀY GẦN NHẤT, không phải ROAS tổng

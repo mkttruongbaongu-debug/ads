@@ -272,6 +272,7 @@ export async function POST(
                     }
 
                     return {
+                        adId: ad.id,
                         name: ad.name,
                         status: ad.status,
                         badge,

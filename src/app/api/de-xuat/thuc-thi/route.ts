@@ -271,7 +271,12 @@ export async function POST(request: NextRequest) {
                         || cleaned.match(/adset\s+(\S+)/i);
                     const targetName = nameMatch ? nameMatch[1].trim() : cleaned.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm|ad|quảng cáo)\s*/i, '').trim();
 
-                    console.log(`[API:THUC_THI] 🎯 Target: "${targetName}", isContent=${isContentTarget}, isAdset=${isAdsetTarget}`);
+                    // Extract Ad ID from description if present
+                    // e.g. "Tắt content "3" (ID: 120215940419750361)" → "120215940419750361"
+                    const idMatch = moTa.match(/\(ID:\s*(\d+)\)/i);
+                    const targetAdId = idMatch ? idMatch[1] : null;
+
+                    console.log(`[API:THUC_THI] 🎯 Target: "${targetName}", adId=${targetAdId || 'N/A'}, isContent=${isContentTarget}, isAdset=${isAdsetTarget}`);
 
                     if (isContentTarget) {
                         // "Content" = individual AD within adset(s)
@@ -301,28 +306,40 @@ export async function POST(request: NextRequest) {
 
                         console.log(`[API:THUC_THI] 📋 Total ads: ${allAds.length}: [${allAds.map(a => `"${a.name}" (${a.id})`).join(', ')}]`);
 
-                        // Find matching ads
-                        const matchingAds = allAds.filter(a =>
-                            a.name === targetName ||
-                            a.id === targetName
-                        );
-
                         let targetAd: AdInfo | undefined;
 
-                        if (matchingAds.length === 1) {
-                            targetAd = matchingAds[0];
-                        } else if (matchingAds.length > 1) {
-                            // Multiple matches — prefer ACTIVE ones
-                            const activeAds = matchingAds.filter(a => a.status === 'ACTIVE');
-                            targetAd = activeAds[0] || matchingAds[0];
-                            console.log(`[API:THUC_THI] ⚠️ ${matchingAds.length} ads match "${targetName}", picked ${targetAd.id} (${targetAd.status})`);
-                        } else {
-                            // Try partial match
-                            const partialMatches = allAds.filter(a => a.name.includes(targetName));
-                            if (partialMatches.length > 0) {
-                                const activePartial = partialMatches.filter(a => a.status === 'ACTIVE');
-                                targetAd = activePartial[0] || partialMatches[0];
-                                console.log(`[API:THUC_THI] 🔍 Partial match: "${targetAd.name}" (${targetAd.id})`);
+                        // PRIORITY 1: Match by Ad ID (most reliable, prevents wrong-ad-paused bug)
+                        if (targetAdId) {
+                            targetAd = allAds.find(a => a.id === targetAdId);
+                            if (targetAd) {
+                                console.log(`[API:THUC_THI] ✅ Matched by Ad ID: "${targetAd.name}" (${targetAd.id})`);
+                            } else {
+                                console.warn(`[API:THUC_THI] ⚠️ Ad ID ${targetAdId} not found, falling back to name match`);
+                            }
+                        }
+
+                        // PRIORITY 2: Match by name (fallback when no ID)
+                        if (!targetAd) {
+                            const matchingAds = allAds.filter(a =>
+                                a.name === targetName ||
+                                a.id === targetName
+                            );
+
+                            if (matchingAds.length === 1) {
+                                targetAd = matchingAds[0];
+                            } else if (matchingAds.length > 1) {
+                                // Multiple matches — WARN: this is the dangerous case
+                                const activeAds = matchingAds.filter(a => a.status === 'ACTIVE');
+                                targetAd = activeAds[0] || matchingAds[0];
+                                console.warn(`[API:THUC_THI] ⚠️ ${matchingAds.length} ads match "${targetName}" by NAME — picked ${targetAd.id} (${targetAd.status}). AD ID MISSING from proposal, risk of wrong match!`);
+                            } else {
+                                // Try partial match
+                                const partialMatches = allAds.filter(a => a.name.includes(targetName));
+                                if (partialMatches.length > 0) {
+                                    const activePartial = partialMatches.filter(a => a.status === 'ACTIVE');
+                                    targetAd = activePartial[0] || partialMatches[0];
+                                    console.log(`[API:THUC_THI] 🔍 Partial match: "${targetAd.name}" (${targetAd.id})`);
+                                }
                             }
                         }
 

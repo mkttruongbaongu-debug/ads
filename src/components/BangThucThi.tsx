@@ -113,7 +113,19 @@ function bocTachBuoc(deXuat: DeXuat): BuocThucThi[] {
         }];
     }
 
-    return raw.map((buoc, idx) => ({
+    // Filter ra bước "Theo dõi" / monitoring — không phải hành động thực thi
+    const actionable = raw.filter(buoc => {
+        const lower = buoc.toLowerCase().trim();
+        return !lower.startsWith('theo dõi:')
+            && !lower.startsWith('theo dõi ')
+            && !lower.startsWith('monitor:')
+            && !lower.startsWith('track:');
+    });
+
+    // Nếu filter hết → fallback về bước đầu tiên gốc
+    const steps = actionable.length > 0 ? actionable : [raw[0]];
+
+    return steps.map((buoc, idx) => ({
         id: `${deXuat.id}-${idx + 1}`,
         stt: idx + 1,
         moTa: buoc,

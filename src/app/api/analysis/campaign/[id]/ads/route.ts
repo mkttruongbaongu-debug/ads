@@ -189,23 +189,30 @@ export async function GET(
             try {
                 const storyIds = Array.from(storyIdMap.keys()).join(',');
                 const postRes = await fetch(
-                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture&access_token=${accessToken}`
+                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture,attachments{media{image{src,height,width}}}&access_token=${accessToken}`
                 );
                 const postData = await postRes.json();
 
-                // Map full_picture URLs back to ads
+                // Map highest-res image URLs back to ads
+                // Priority: attachments.media.image.src (original) > full_picture (compressed)
                 for (const [storyId, adIndexes] of storyIdMap) {
-                    const fullPic = postData[storyId]?.full_picture;
-                    if (fullPic) {
+                    const postInfo = postData[storyId];
+                    if (!postInfo) continue;
+
+                    // Try attachments first — returns original upload resolution
+                    const attachmentSrc = postInfo.attachments?.data?.[0]?.media?.image?.src;
+                    const bestImage = attachmentSrc || postInfo.full_picture;
+
+                    if (bestImage) {
                         for (const idx of adIndexes) {
-                            ads[idx].thumbnail = fullPic;
+                            ads[idx].thumbnail = bestImage;
                         }
                     }
                 }
-                console.log(`[API:ADS] 🖼️ Batch fetched ${storyIdMap.size} post images`);
+                console.log(`[API:ADS] 🖼️ Batch fetched ${storyIdMap.size} post images (attachments+full_picture)`);
             } catch (err) {
                 // Non-critical: fall back to existing thumbnails
-                console.warn('[API:ADS] ⚠️ Failed to batch fetch full_picture, using fallback:', err);
+                console.warn('[API:ADS] ⚠️ Failed to batch fetch post images, using fallback:', err);
             }
         }
 

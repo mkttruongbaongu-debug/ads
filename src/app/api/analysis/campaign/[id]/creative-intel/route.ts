@@ -156,26 +156,32 @@ export async function GET(
             try {
                 const storyIds = Array.from(storyIdMap.keys()).join(',');
                 const postRes = await fetch(
-                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture&access_token=${accessToken}`
+                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture,attachments{media{image{src,height,width}}}&access_token=${accessToken}`
                 );
                 const postData = await postRes.json();
 
                 for (const [storyId, adIndexes] of storyIdMap) {
-                    const fullPic = postData[storyId]?.full_picture;
-                    if (fullPic) {
+                    const postInfo = postData[storyId];
+                    if (!postInfo) continue;
+
+                    // Priority: attachments.media.image.src (original) > full_picture (compressed)
+                    const attachmentSrc = postInfo.attachments?.data?.[0]?.media?.image?.src;
+                    const bestImage = attachmentSrc || postInfo.full_picture;
+
+                    if (bestImage) {
                         for (const idx of adIndexes) {
                             const adItem = ads[idx];
                             if (!adItem) continue;
-                            adItem.image_url = fullPic;
-                            if (adItem.image_urls && !adItem.image_urls.includes(fullPic)) {
-                                adItem.image_urls.unshift(fullPic);
+                            adItem.image_url = bestImage;
+                            if (adItem.image_urls && !adItem.image_urls.includes(bestImage)) {
+                                adItem.image_urls.unshift(bestImage);
                             }
                         }
                     }
                 }
-                console.log(`[CREATIVE_INTEL_API] 🖼️ Batch fetched ${storyIdMap.size} post images`);
+                console.log(`[CREATIVE_INTEL_API] 🖼️ Batch fetched ${storyIdMap.size} post images (attachments+full_picture)`);
             } catch (err) {
-                console.warn('[CREATIVE_INTEL_API] ⚠️ Failed to batch fetch full_picture:', err);
+                console.warn('[CREATIVE_INTEL_API] ⚠️ Failed to batch fetch post images:', err);
             }
         }
 

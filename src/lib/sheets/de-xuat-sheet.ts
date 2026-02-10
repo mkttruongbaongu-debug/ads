@@ -79,10 +79,22 @@ const COLUMNS = {
  * Lấy Sheets API client
  */
 async function getSheetsClient(): Promise<sheets_v4.Sheets> {
+    const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+    if (!email) {
+        console.error('[SHEETS] ❌ GOOGLE_SERVICE_ACCOUNT_EMAIL is not set!');
+        throw new Error('Thiếu cấu hình Google Service Account Email. Kiểm tra biến môi trường GOOGLE_SERVICE_ACCOUNT_EMAIL.');
+    }
+    if (!privateKey) {
+        console.error('[SHEETS] ❌ GOOGLE_PRIVATE_KEY is not set!');
+        throw new Error('Thiếu cấu hình Google Private Key. Kiểm tra biến môi trường GOOGLE_PRIVATE_KEY.');
+    }
+
     const auth = new google.auth.GoogleAuth({
         credentials: {
-            client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+            client_email: email,
+            private_key: privateKey.replace(/\\n/g, '\n'),
         },
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });

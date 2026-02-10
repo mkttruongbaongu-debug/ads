@@ -981,7 +981,7 @@ export default function DashboardPage() {
                                         letterSpacing: '0.05em',
                                     }}
                                 >
-                                    {autopilotRunning ? 'DANG CHAY...' : 'RUN AUTOPILOT'}
+                                    {autopilotRunning ? 'ĐANG CHẠY...' : 'CHẠY AUTOPILOT'}
                                 </button>
                             </div>
 
@@ -1070,7 +1070,7 @@ export default function DashboardPage() {
                                 border: `1px solid ${colors.primary}20`,
                             }}>
                                 <div style={{ fontSize: '0.6875rem', color: colors.textMuted }}>
-                                    <span style={{ fontWeight: 700, color: colors.primary }}>CRON SCHEDULE:</span> Moi ngay 08:00 (UTC+7) via cron-job.org
+                                    <span style={{ fontWeight: 700, color: colors.primary }}>CRON SCHEDULE:</span> Mỗi ngày 08:00 (UTC+7) qua cron-job.org
                                 </div>
                             </div>
                         </div>

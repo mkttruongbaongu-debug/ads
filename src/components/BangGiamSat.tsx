@@ -323,7 +323,7 @@ export default function BangGiamSat({ userId }: Props) {
             {/* Header */}
             <div style={{ ...styles.header, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                    <h1 style={styles.title}>BANG GIAM SAT</h1>
+                    <h1 style={styles.title}>BẢNG GIÁM SÁT</h1>
                     <p style={styles.subtitle}>
                         Theo dõi kết quả D+1 / D+3 / D+7 sau khi thực thi
                     </p>
@@ -349,7 +349,7 @@ export default function BangGiamSat({ userId }: Props) {
                         letterSpacing: '0.5px',
                     }}
                 >
-                    {isChecking ? 'DANG KIEM TRA...' : 'KIEM TRA NGAY'}
+                    {isChecking ? 'ĐANG KIỂM TRA...' : 'KIỂM TRA NGAY'}
                 </button>
             </div>
 

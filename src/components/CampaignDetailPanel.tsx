@@ -952,11 +952,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 return { background: '#fee2e2', color: '#991b1b' };
         }
     };
-
     // ===================================================================
     // CONTENT SCORE /10
     // ===================================================================
-    // Điểm = ROAS (4đ) + CPP absolute (3đ) + CPP trend (2đ) + CTR trend (1đ)
+    // Điểm = ROAS×confidence (3đ) + CPP absolute (3đ) + CPP trend (2đ) + CTR trend (1đ) + FB Trust (1đ)
     const getContentScore = (ad: Ad, totalCampaignSpend: number, campaignAvgCpp: number) => {
         const daily = ad.dailyMetrics || [];
         const spendShare = totalCampaignSpend > 0 ? (ad.totals.spend / totalCampaignSpend) * 100 : 0;
@@ -969,6 +968,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 color: colors.textMuted,
                 spendShare,
                 tip: `Chưa đủ dữ liệu (${ad.totals.purchases} đơn, ${daily.length} ngày)`,
+                tags: [] as string[],
             };
         }
 
@@ -980,11 +980,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         if (historyDays.length < 3) {
             // Content mới — chấm dựa trên ROAS + CPP absolute only
             let earlyScore = 0;
-            // ROAS (4đ)
-            if (totalROAS >= 15) earlyScore += 4;
-            else if (totalROAS >= 10) earlyScore += 3;
-            else if (totalROAS >= 5) earlyScore += 2;
-            else if (totalROAS >= 2) earlyScore += 1;
+            const confidence = Math.min(1, Math.max(0.4, ad.totals.purchases / 30));
+            // ROAS (3đ) × confidence
+            let rawRoas = 0;
+            if (totalROAS >= 15) rawRoas = 3;
+            else if (totalROAS >= 10) rawRoas = 2.5 + (totalROAS - 10) / 10;
+            else if (totalROAS >= 5) rawRoas = 1.5 + (totalROAS - 5) / 5;
+            else if (totalROAS >= 2) rawRoas = 0.5 + (totalROAS - 2) / 3;
+            else rawRoas = Math.max(0, totalROAS / 4);
+            earlyScore += rawRoas * confidence;
             // CPP absolute (3đ) — simplified
             const overallCpp = ad.totals.purchases > 0 ? ad.totals.spend / ad.totals.purchases : 0;
             if (campaignAvgCpp > 0 && overallCpp > 0) {
@@ -993,13 +997,16 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 else if (ratio < 1.0) earlyScore += 2;
                 else if (ratio < 1.5) earlyScore += 1;
             }
-            // Trend unknown → give neutral 1.5/3
-            earlyScore += 1.5;
+            // Trend unknown → give neutral 2.5/4 (CPP trend 1/2 + CTR 0.5/1 + FB Trust 1/1)
+            earlyScore += 2.5;
+            const tags: string[] = [];
+            if (spendShare < 3 && totalROAS > 10) tags.push('CHERRY-PICKED');
             return {
                 score: Math.min(10, Math.round(earlyScore * 10) / 10),
                 color: getScoreColor(earlyScore),
                 spendShare,
                 tip: `Content mới (${daily.length} ngày). ROAS: ${totalROAS.toFixed(1)}x`,
+                tags,
             };
         }
 
@@ -1007,41 +1014,48 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         const histCPP = historyDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
         const winCPP = windowDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
 
-        let cppZ = 0, cppMA = 0, cppWindowAvg = 0;
+        let cppZRaw = 0, cppMA = 0, cppWindowAvg = 0;
         if (histCPP.length >= 3 && winCPP.length > 0) {
             cppMA = histCPP.reduce((s, v) => s + v, 0) / histCPP.length;
             const cppVariance = histCPP.reduce((s, v) => s + Math.pow(v - cppMA, 2), 0) / histCPP.length;
             const cppSigma = Math.sqrt(cppVariance);
             cppWindowAvg = winCPP.reduce((s, v) => s + v, 0) / winCPP.length;
-            cppZ = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
+            cppZRaw = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
         }
+        // CAP z-score ±3σ — tránh giá trị cực đoan phá hoại điểm
+        const cppZ = Math.max(-3, Math.min(3, cppZRaw));
 
         // --- CTR z-score ---
         const histCTR = historyDays.map(d => d.ctr).filter(v => v > 0);
         const winCTR = windowDays.map(d => d.ctr).filter(v => v > 0);
 
-        let ctrZ = 0, ctrMA = 0, ctrWindowAvg = 0;
+        let ctrZRaw = 0, ctrMA = 0, ctrWindowAvg = 0;
         if (histCTR.length >= 3 && winCTR.length > 0) {
             ctrMA = histCTR.reduce((s, v) => s + v, 0) / histCTR.length;
             const ctrVariance = histCTR.reduce((s, v) => s + Math.pow(v - ctrMA, 2), 0) / histCTR.length;
             const ctrSigma = Math.sqrt(ctrVariance);
             ctrWindowAvg = winCTR.reduce((s, v) => s + v, 0) / winCTR.length;
-            ctrZ = ctrSigma > 0 ? (ctrWindowAvg - ctrMA) / ctrSigma : 0;
+            ctrZRaw = ctrSigma > 0 ? (ctrWindowAvg - ctrMA) / ctrSigma : 0;
         }
+        // CAP z-score ±3σ
+        const ctrZ = Math.max(-3, Math.min(3, ctrZRaw));
 
         // =====================================================
         // SCORING (tổng 10 điểm)
         // =====================================================
 
-        // 1. ROAS Score (0-4 điểm) — yếu tố quan trọng nhất
-        let roasScore = 0;
-        if (totalROAS >= 15) roasScore = 4;
-        else if (totalROAS >= 10) roasScore = 3 + (totalROAS - 10) / 5;  // 3.0 → 4.0
-        else if (totalROAS >= 5) roasScore = 2 + (totalROAS - 5) / 5;    // 2.0 → 3.0
-        else if (totalROAS >= 2) roasScore = 1 + (totalROAS - 2) / 3;    // 1.0 → 2.0
-        else roasScore = Math.max(0, totalROAS / 2);                      // 0.0 → 1.0
+        // === 1. ROAS Score (0-3 điểm) × confidence ===
+        // Confidence: ít đơn = metrics không đáng tin (anti cherry-pick)
+        const confidence = Math.min(1, Math.max(0.4, ad.totals.purchases / 30));
+        let rawRoasScore = 0;
+        if (totalROAS >= 15) rawRoasScore = 3;
+        else if (totalROAS >= 10) rawRoasScore = 2.5 + (totalROAS - 10) / 10;  // 2.5 → 3.0
+        else if (totalROAS >= 5) rawRoasScore = 1.5 + (totalROAS - 5) / 5;     // 1.5 → 2.5
+        else if (totalROAS >= 2) rawRoasScore = 0.5 + (totalROAS - 2) / 3;     // 0.5 → 1.5
+        else rawRoasScore = Math.max(0, totalROAS / 4);                          // 0.0 → 0.5
+        const roasScore = Math.round(rawRoasScore * confidence * 10) / 10;
 
-        // 2. CPP Absolute Score (0-3 điểm) — CPP 7d vs TB campaign
+        // === 2. CPP Absolute Score (0-3 điểm) — CPP 7d vs TB campaign ===
         let cppAbsScore = 1.5; // default neutral
         if (campaignAvgCpp > 0 && cppWindowAvg > 0) {
             const ratio = cppWindowAvg / campaignAvgCpp;
@@ -1053,7 +1067,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             else cppAbsScore = 0;
         }
 
-        // 3. CPP Trend Score (0-2 điểm) — z-score (âm = tốt, dương = xấu)
+        // === 3. CPP Trend Score (0-2 điểm) — z-score (âm = tốt, dương = xấu) ===
         let cppTrendScore = 1; // neutral
         if (cppZ <= -2) cppTrendScore = 2;
         else if (cppZ <= -1) cppTrendScore = 1.5 + (-1 - cppZ) / 2 * 0.5;
@@ -1061,33 +1075,67 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         else if (cppZ <= 2) cppTrendScore = Math.max(0, 1 - (cppZ - 0.5) / 1.5);
         else cppTrendScore = 0;
 
-        // 4. CTR Trend Score (0-1 điểm) — z-score (dương = tốt, âm = xấu)
+        // === 4. CTR Trend Score (0-1 điểm) — z-score (dương = tốt, âm = xấu) ===
         let ctrTrendScore = 0.5; // neutral
         if (ctrZ >= 1) ctrTrendScore = 1;
         else if (ctrZ >= 0) ctrTrendScore = 0.5 + ctrZ / 2;
         else if (ctrZ >= -1) ctrTrendScore = 0.5 + ctrZ / 2;
         else ctrTrendScore = 0;
 
-        const totalScore = Math.min(10, Math.round((roasScore + cppAbsScore + cppTrendScore + ctrTrendScore) * 10) / 10);
+        // === 5. FB Trust Score (0-1 điểm) — CÓ ĐIỀU KIỆN ===
+        // FB phân bổ chi tiêu = FB "bỏ phiếu" content scale tốt
+        // NHƯNG: chỉ tin khi trend lành mạnh (tránh FB momentum bias)
+        const trendHealth = (cppTrendScore / 2 + ctrTrendScore / 1) / 2; // 0-1 normalized
+        let fbTrustScore = 0;
+        if (trendHealth >= 0.4) {
+            // Trend OK → FB Trust applies
+            if (spendShare >= 25) fbTrustScore = 1.0;
+            else if (spendShare >= 15) fbTrustScore = 0.6 + (spendShare - 15) / 10 * 0.4;
+            else if (spendShare >= 5) fbTrustScore = 0.2 + (spendShare - 5) / 10 * 0.4;
+            else if (spendShare >= 2) fbTrustScore = (spendShare - 2) / 3 * 0.2;
+            else fbTrustScore = 0;
+        }
+        // else: trend xấu → FB Trust = 0 (FB đang đổ tiền mù)
+
+        const totalScore = Math.min(10, Math.round((roasScore + cppAbsScore + cppTrendScore + ctrTrendScore + fbTrustScore) * 10) / 10);
+
+        // === WARNING TAGS ===
+        const tags: string[] = [];
+        // FB MOMENTUM: content chiếm >15% budget nhưng trend xấu
+        if (spendShare > 15 && trendHealth < 0.4) {
+            tags.push('FB MOMENTUM');
+        }
+        // CHERRY-PICKED: content <3% budget, metrics đẹp nhưng chưa chứng minh scale
+        if (spendShare < 3 && totalROAS > 8 && ad.totals.purchases < 15) {
+            tags.push('CHERRY-PICKED');
+        }
 
         // --- Tooltip ---
-        const fmtZ = (z: number) => `${z > 0 ? '+' : ''}${z.toFixed(1)}σ`;
+        const fmtZ = (z: number, raw: number) => {
+            const display = `${z > 0 ? '+' : ''}${z.toFixed(1)}σ`;
+            return Math.abs(raw) > 3 ? `${display} [raw: ${raw > 0 ? '+' : ''}${raw.toFixed(1)}σ]` : display;
+        };
         const tipLines = [
             `📊 Điểm: ${totalScore}/10`,
-            `   ROAS: ${roasScore.toFixed(1)}/4 (${totalROAS.toFixed(1)}x)`,
+            `   ROAS: ${roasScore.toFixed(1)}/3 (${totalROAS.toFixed(1)}x × conf ${(confidence * 100).toFixed(0)}%)`,
             `   CPP vs TB: ${cppAbsScore.toFixed(1)}/3 (7d: ${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} vs TB: ${formatMoney(campaignAvgCpp)})`,
-            `   CPP trend: ${cppTrendScore.toFixed(1)}/2 (${fmtZ(cppZ)})`,
-            `   CTR trend: ${ctrTrendScore.toFixed(1)}/1 (${fmtZ(ctrZ)})`,
+            `   CPP trend: ${cppTrendScore.toFixed(1)}/2 (${fmtZ(cppZ, cppZRaw)})`,
+            `   CTR trend: ${ctrTrendScore.toFixed(1)}/1 (${fmtZ(ctrZ, ctrZRaw)})`,
+            `   FB Trust: ${fbTrustScore.toFixed(1)}/1 (share: ${spendShare.toFixed(1)}%${trendHealth < 0.4 && spendShare > 5 ? ' ⚠️ trend xấu' : ''})`,
             ``,
             `Lịch sử (${historyDays.length}d): CPP MA=${cppMA > 0 ? formatMoney(cppMA) : 'N/A'} · CTR MA=${ctrMA.toFixed(2)}%`,
             `7 ngày gần đây: CPP=${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} · CTR=${ctrWindowAvg.toFixed(2)}%`,
         ];
+        if (tags.length > 0) {
+            tipLines.push(``, `⚠️ ${tags.join(' | ')}`);
+        }
 
         return {
             score: totalScore,
             color: getScoreColor(totalScore),
             spendShare,
             tip: tipLines.join('\n'),
+            tags,
         };
     };
 
@@ -1864,6 +1912,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
                                                         FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
                                                     </span>
+                                                    {ev.tags?.includes('FB MOMENTUM') && (
+                                                        <span style={{ fontSize: '0.5rem', fontWeight: 700, color: colors.error }}>⚠️MOM</span>
+                                                    )}
+                                                    {ev.tags?.includes('CHERRY-PICKED') && (
+                                                        <span style={{ fontSize: '0.5rem', fontWeight: 700, color: colors.warning }}>🍒CP</span>
+                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -2013,6 +2067,28 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 color: colors.textMuted,
                                                             }}>
                                                                 {ad.status}
+                                                            </span>
+                                                        )}
+                                                        {evaluation.tags?.includes('FB MOMENTUM') && (
+                                                            <span style={{
+                                                                fontSize: '0.5625rem', fontWeight: 700,
+                                                                padding: '1px 6px', borderRadius: '3px',
+                                                                background: `${colors.error}20`,
+                                                                color: colors.error,
+                                                                letterSpacing: '0.03em',
+                                                            }}>
+                                                                FB MOMENTUM
+                                                            </span>
+                                                        )}
+                                                        {evaluation.tags?.includes('CHERRY-PICKED') && (
+                                                            <span style={{
+                                                                fontSize: '0.5625rem', fontWeight: 700,
+                                                                padding: '1px 6px', borderRadius: '3px',
+                                                                background: `${colors.warning}20`,
+                                                                color: colors.warning,
+                                                                letterSpacing: '0.03em',
+                                                            }}>
+                                                                CHERRY-PICKED
                                                             </span>
                                                         )}
                                                     </div>

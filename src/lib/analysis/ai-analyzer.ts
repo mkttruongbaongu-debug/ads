@@ -300,15 +300,14 @@ OUTPUT FORMAT (JSON):
   },
   "actionPlan": {
     "immediate": {
-      "action": "Giữ budget, bắt đầu làm creative mới",
-      "reason": "Creative đang fatigue, scale lúc này sẽ tăng CPP",
-      "metric_to_watch": "CTR và Frequency hàng ngày"
+      "action": "Tắt content \"CUU GIA HUE - V3 REEL\" (bão hoà, CPP +2.1σ). Giữ nguyên \"CUU GIA HUE - V7 STATIC\" (đang tốt).",
+      "reason": "V3 REEL: CTR giảm từ 8.5% xuống 4.2% trong 5 ngày, CPP tăng 34%",
+      "metric_to_watch": "CTR của V7 STATIC trong 48h tới"
     },
     "shortTerm": {
-      "action": "Test creative mới",
-      "trigger": "Khi creative mới ready"
-    },
-    "prevention": "Luôn có 2-3 creative backup"
+      "action": "Tạo 2 creative mới dạng Carousel và Video ngắn 15s, test song song với V7",
+      "trigger": "Ngay lập tức — không chờ V7 suy giảm mới bắt đầu"
+    }
   },
   "prediction": {
     "noAction": "CTR giảm về 1.8%, CPP tăng 250K trong 5 ngày",
@@ -322,7 +321,30 @@ OUTPUT FORMAT (JSON):
     }
   ],
   "reasoning": "Phân tích reasoning chi tiết..."
-}`;
+}
+
+═══════════════════════════════════════════
+QUY TẮC actionPlan (TUYỆT ĐỐI TUÂN THỦ)
+═══════════════════════════════════════════
+
+1. immediate.action PHẢI NÊU TÊN CONTENT CỤ THỂ từ data contentAnalysis đã cung cấp.
+   ✅ ĐÚNG: "Tắt content \"CUU GIA HUE - V3 REEL\" (bão hoà)"
+   ❌ SAI: "Tắt 2 creative hàng đầu đang bão hoà" (KHÔNG CỤ THỂ)
+
+2. shortTerm.action PHẢI CỤ THỂ: bao nhiêu creative, loại gì (video/static/carousel), test như thế nào.
+   ✅ ĐÚNG: "Tạo 2 creative: 1 Video 15s + 1 Carousel, A/B test với content đang chạy tốt nhất"
+   ❌ SAI: "Test creative mới" (QUÁ CHUNG CHUNG)
+   ❌ SAI: "Thiết kế và test 3-5 creative mới" (MƠ HỒ)
+
+3. KHÔNG ĐƯỢC đưa lời khuyên chung chung kiểu sách giáo khoa:
+   ❌ SAI: "Luôn duy trì 5 creative thay thế"
+   ❌ SAI: "Theo dõi CTR & CPP hàng ngày" (hiển nhiên, vô nghĩa)
+   → Chỉ đưa HÀNH ĐỘNG CỤ THỂ mà người dùng có thể THỰC HIỆN NGAY
+
+4. Nếu không cần thay đổi gì (campaign đang tốt), KHÔNG liệt kê bước thực thi:
+   ✅ ĐÚNG: immediate.action = "Không cần thay đổi. Campaign đang hoạt động tốt."
+   ❌ SAI: Liệt kê 4 bước nhưng không bước nào thực sự thay đổi gì`;
+
 
 // ===================================================================
 // MAIN FUNCTION

@@ -145,9 +145,9 @@ function mapToLoaiHanhDong(
         case 'MAINTAIN':
         default:
             return {
-                loai: 'THAY_DOI_NGAN_SACH',
+                loai: 'GIU_NGUYEN',
                 moTa: aiAnalysis?.verdict?.headline || 'Giữ nguyên chiến lược',
-                giaTri_DeXuat: 'Giữ nguyên budget hiện tại',
+                giaTri_DeXuat: immediateText || 'Duy trì chiến lược hiện tại',
             };
     }
 }
@@ -234,9 +234,6 @@ export async function POST(request: NextRequest) {
                 cacBuoc.push(`${shortTerm.action} (trigger: ${shortTerm.trigger})`);
             }
 
-            if (aiAnalysis.actionPlan.prevention) {
-                cacBuoc.push(aiAnalysis.actionPlan.prevention);
-            }
         }
 
         // Build kết quả kỳ vọng từ prediction

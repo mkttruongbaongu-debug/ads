@@ -86,6 +86,7 @@ const actionTypeLabels: Record<string, string> = {
     DUNG_VINH_VIEN: 'DỪNG VĨNH VIỄN',
     TANG_NGAN_SACH: 'TĂNG NGÂN SÁCH',
     GIAM_NGAN_SACH: 'GIẢM NGÂN SÁCH',
+    GIU_NGUYEN: 'GIỮ NGUYÊN',
     TIEP_TUC: 'TIẾP TỤC',
     THEO_DOI: 'THEO DÕI',
 };

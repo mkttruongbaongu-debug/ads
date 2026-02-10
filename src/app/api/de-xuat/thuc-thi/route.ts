@@ -251,106 +251,96 @@ export async function POST(request: NextRequest) {
         try {
             switch (effectiveAction) {
                 case 'TAM_DUNG': {
-                    // Detect target: adset or campaign?
-                    // If step description mentions content/adset → pause adset
-                    // Otherwise pause campaign
+                    // Detect target level: content (= ad), adset, or campaign?
                     const moTa = buocMoTa || '';
                     const lower = moTa.toLowerCase();
-                    const isAdsetTarget = lower.includes('content') || lower.includes('adset') || lower.includes('nhóm');
+                    const isContentTarget = lower.includes('content') || lower.includes('ad ') || lower.includes('quảng cáo');
+                    const isAdsetTarget = lower.includes('adset') || lower.includes('nhóm');
 
-                    if (isAdsetTarget) {
-                        // Find matching adset by name/number from step description
-                        console.log(`[API:THUC_THI] ⏸️ Pausing adset (from step: "${moTa}")...`);
+                    // Extract target name from step description
+                    // e.g. "Tắt content "3" (chi 5%, spend 181.039đ, ROAS 0)" → "3"
+                    const cleaned = moTa
+                        .replace(/\s*\(FB\s+chi\b.*$/, '')
+                        .replace(/\s*\(chi\s+\d.*$/, '')
+                        .replace(/\s*\(CPP\b.*$/, '')
+                        .replace(/\s*\(ROAS\b.*$/, '')
+                        .replace(/\s*\(spend\b.*$/i, '')
+                        .trim();
+                    const nameMatch = cleaned.match(/[\u0022\u201C\u201D\u201E\u2018\u2019']([^\u0022\u201C\u201D\u201E\u2018\u2019']+)[\u0022\u201C\u201D\u201E\u2018\u2019']/)
+                        || cleaned.match(/content\s+(\S+)/i)
+                        || cleaned.match(/adset\s+(\S+)/i);
+                    const targetName = nameMatch ? nameMatch[1].trim() : cleaned.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm|ad|quảng cáo)\s*/i, '').trim();
+
+                    console.log(`[API:THUC_THI] 🎯 Target: "${targetName}", isContent=${isContentTarget}, isAdset=${isAdsetTarget}`);
+
+                    if (isContentTarget) {
+                        // "Content" = individual AD within adset(s)
+                        // Step 1: Get all adsets, then get all ads from each
                         const adsets = await fb.getAdsets(deXuat.campaignId);
+                        console.log(`[API:THUC_THI] 📦 Found ${adsets.length} adsets in campaign`);
 
-                        // Extract target identifier from step description
-                        // e.g. "Tắt content "3" (FB chi 33%, CPP 111.939₫, ROAS 1.54x)." → "3"
-                        // Step 1: Strip trailing stats "(FB chi ...)" or "(CPP ...)" 
-                        const cleaned = moTa.replace(/\s*\(FB\s+chi\b.*$/, '').replace(/\s*\(CPP\b.*$/, '').replace(/\s*\(ROAS\b.*$/, '').trim();
-                        // Step 2: Extract quoted content (ASCII " or smart quotes "" or ")
-                        const match = cleaned.match(/[\u0022\u201C\u201D\u201E]([^\u0022\u201C\u201D\u201E]+)[\u0022\u201C\u201D\u201E]/)
-                            || cleaned.match(/content\s+(\S+)/i)
-                            || cleaned.match(/adset\s+(\S+)/i);
-                        const targetName = match ? match[1].trim() : cleaned.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm)\s*/i, '').trim();
-
-                        console.log(`[API:THUC_THI] 🎯 Looking for adset named "${targetName}" among ${adsets.length} adsets`);
-
-                        // Find all matching adsets (may have duplicates)
-                        const matchingAdsets = adsets.filter(a =>
-                            a.name === targetName ||
-                            a.name.includes(targetName) ||
-                            a.id === targetName
-                        );
-
-                        let targetAdset: typeof adsets[0] | undefined;
-
-                        if (matchingAdsets.length === 1) {
-                            // Exact single match
-                            targetAdset = matchingAdsets[0];
-                        } else if (matchingAdsets.length > 1) {
-                            // Multiple matches — disambiguate
-                            console.log(`[API:THUC_THI] ⚠️ Found ${matchingAdsets.length} adsets named "${targetName}", disambiguating...`);
-
-                            // Strategy 1: Prefer ACTIVE adset (skip already-paused ones)
-                            const activeMatches = matchingAdsets.filter(a => a.status === 'ACTIVE');
-                            if (activeMatches.length === 1) {
-                                targetAdset = activeMatches[0];
-                                console.log(`[API:THUC_THI] ✅ Disambiguated by status: only 1 ACTIVE adset (${targetAdset.id})`);
-                            } else {
-                                // Strategy 2: Extract CPP from step description and match via insights
-                                const cppMatch = moTa.match(/CPP\s*([\d.,]+)/i);
-                                const roasMatch = moTa.match(/ROAS\s*([\d.,]+)/i);
-
-                                if (cppMatch || roasMatch) {
-                                    const stepCPP = cppMatch ? parseFloat(cppMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
-                                    const stepROAS = roasMatch ? parseFloat(roasMatch[1].replace(',', '.')) : 0;
-                                    console.log(`[API:THUC_THI] 📊 Step metrics: CPP=${stepCPP}, ROAS=${stepROAS}`);
-
-                                    // Fetch adset-level insights to compare
-                                    try {
-                                        const candidatePool = activeMatches.length > 0 ? activeMatches : matchingAdsets;
-                                        let bestMatch: typeof adsets[0] | undefined;
-                                        let bestDiff = Infinity;
-
-                                        for (const adset of candidatePool) {
-                                            const now = new Date();
-                                            const weekAgo = new Date(now);
-                                            weekAgo.setDate(weekAgo.getDate() - 7);
-                                            const dateRange = {
-                                                startDate: weekAgo.toISOString().split('T')[0],
-                                                endDate: now.toISOString().split('T')[0],
-                                            };
-                                            const insights = await fb.getInsights(adset.id, dateRange, 'adset');
-                                            if (insights.length > 0) {
-                                                const adsetCPP = insights[0].cost_per_action_type?.find(
-                                                    (a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase'
-                                                )?.value || 0;
-                                                const adsetROAS = insights[0].purchase_roas?.[0]?.value || 0;
-                                                const diff = stepCPP ? Math.abs(Number(adsetCPP) - stepCPP) : Math.abs(Number(adsetROAS) - stepROAS);
-                                                console.log(`[API:THUC_THI] 📊 Adset ${adset.id} (${adset.name}): CPP=${adsetCPP}, ROAS=${adsetROAS}, diff=${diff.toFixed(0)}`);
-                                                if (diff < bestDiff) {
-                                                    bestDiff = diff;
-                                                    bestMatch = adset;
-                                                }
-                                            }
-                                        }
-                                        if (bestMatch) {
-                                            targetAdset = bestMatch;
-                                            console.log(`[API:THUC_THI] ✅ Disambiguated by metrics: ${targetAdset.id}`);
-                                        }
-                                    } catch (insightErr) {
-                                        console.error('[API:THUC_THI] ⚠️ Insight disambiguation failed, using first active match:', insightErr);
-                                    }
+                        // Gather all ads from all adsets
+                        type AdInfo = { id: string; name: string; status: string; adsetId: string; adsetName: string };
+                        const allAds: AdInfo[] = [];
+                        for (const adset of adsets) {
+                            try {
+                                const ads = await fb.getAds(adset.id);
+                                for (const ad of ads) {
+                                    allAds.push({
+                                        id: ad.id,
+                                        name: ad.name,
+                                        status: ad.status,
+                                        adsetId: adset.id,
+                                        adsetName: adset.name,
+                                    });
                                 }
-
-                                // Strategy 3: Fallback to first active or first match
-                                if (!targetAdset) {
-                                    targetAdset = activeMatches[0] || matchingAdsets[0];
-                                    console.log(`[API:THUC_THI] ⚠️ Fallback: using first match ${targetAdset.id}`);
-                                }
+                            } catch (e) {
+                                console.error(`[API:THUC_THI] ⚠️ Failed to get ads for adset ${adset.id}: ${e}`);
                             }
                         }
 
+                        console.log(`[API:THUC_THI] 📋 Total ads: ${allAds.length}: [${allAds.map(a => `"${a.name}" (${a.id})`).join(', ')}]`);
+
+                        // Find matching ads
+                        const matchingAds = allAds.filter(a =>
+                            a.name === targetName ||
+                            a.id === targetName
+                        );
+
+                        let targetAd: AdInfo | undefined;
+
+                        if (matchingAds.length === 1) {
+                            targetAd = matchingAds[0];
+                        } else if (matchingAds.length > 1) {
+                            // Multiple matches — prefer ACTIVE ones
+                            const activeAds = matchingAds.filter(a => a.status === 'ACTIVE');
+                            targetAd = activeAds[0] || matchingAds[0];
+                            console.log(`[API:THUC_THI] ⚠️ ${matchingAds.length} ads match "${targetName}", picked ${targetAd.id} (${targetAd.status})`);
+                        } else {
+                            // Try partial match
+                            const partialMatches = allAds.filter(a => a.name.includes(targetName));
+                            if (partialMatches.length > 0) {
+                                const activePartial = partialMatches.filter(a => a.status === 'ACTIVE');
+                                targetAd = activePartial[0] || partialMatches[0];
+                                console.log(`[API:THUC_THI] 🔍 Partial match: "${targetAd.name}" (${targetAd.id})`);
+                            }
+                        }
+
+                        if (targetAd) {
+                            thanhCong = await fb.updateAdStatus(targetAd.id, 'PAUSED');
+                            thongDiep = thanhCong
+                                ? `Ad "${targetAd.name}" (ID: ${targetAd.id}) trong adset "${targetAd.adsetName}" đã được tạm dừng`
+                                : `Không thể tạm dừng ad "${targetAd.name}"`;
+                            fbResponse = { success: thanhCong, adId: targetAd.id, adName: targetAd.name, adsetId: targetAd.adsetId, status: 'PAUSED' };
+                        } else {
+                            thanhCong = false;
+                            thongDiep = `Không tìm thấy content "${targetName}" trong campaign. Ads có sẵn: ${allAds.map(a => `"${a.name}"`).join(', ')}`;
+                            fbResponse = { error: thongDiep, availableAds: allAds.map(a => ({ name: a.name, id: a.id, status: a.status })) };
+                        }
+                    } else if (isAdsetTarget) {
+                        // Pause adset
+                        const adsets = await fb.getAdsets(deXuat.campaignId);
+                        const targetAdset = adsets.find(a => a.name === targetName || a.id === targetName);
                         if (targetAdset) {
                             thanhCong = await fb.updateAdsetStatus(targetAdset.id, 'PAUSED');
                             thongDiep = thanhCong
@@ -363,6 +353,7 @@ export async function POST(request: NextRequest) {
                             fbResponse = { error: thongDiep, availableAdsets: adsets.map(a => `${a.name} (${a.id})`) };
                         }
                     } else {
+                        // Pause entire campaign
                         console.log('[API:THUC_THI] ⏸️ Pausing campaign...');
                         thanhCong = await fb.updateCampaignStatus(deXuat.campaignId, 'PAUSED');
                         fbResponse = { success: thanhCong, status: 'PAUSED' };

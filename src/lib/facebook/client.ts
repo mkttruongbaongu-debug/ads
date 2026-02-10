@@ -188,6 +188,20 @@ export class FacebookAdsClient {
         return response.ok;
     }
 
+    // Tắt/Bật Ad (individual creative)
+    async updateAdStatus(adId: string, status: 'ACTIVE' | 'PAUSED'): Promise<boolean> {
+        const response = await fetch(`${FB_GRAPH_URL}/${adId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                access_token: this.accessToken,
+                status,
+            }),
+        });
+
+        return response.ok;
+    }
+
     // Lấy thông tin budget hiện tại của campaign
     async getCampaignBudgetInfo(campaignId: string): Promise<{
         budgetType: 'CBO' | 'ABO';

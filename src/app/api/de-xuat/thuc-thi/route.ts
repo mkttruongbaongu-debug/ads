@@ -29,7 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getFacebookClient } from '@/lib/facebook/client';
+import { getDynamicFacebookClient } from '@/lib/facebook/client';
 
 // ===================================================================
 // TYPES
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
         // ===================================================================
         // STEP 4: Execute via Facebook API
         // ===================================================================
-        const fb = getFacebookClient();
+        const fb = await getDynamicFacebookClient();
         let fbResponse: any;
         let thanhCong = false;
         let thongDiep = '';

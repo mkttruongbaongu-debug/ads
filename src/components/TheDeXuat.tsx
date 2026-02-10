@@ -254,10 +254,6 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
     // HANDLERS
     // ===================================================================
     const handleApprove = async () => {
-        if (!confirm(`Xác nhận duyệt đề xuất cho campaign "${deXuat.tenCampaign}"?`)) {
-            return;
-        }
-
         setIsProcessing(true);
 
         try {
@@ -318,10 +314,6 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
     };
 
     const handleExecute = async () => {
-        if (!confirm(`Xác nhận THỰC THI đề xuất? Action: ${deXuat.hanhDong.loai}`)) {
-            return;
-        }
-
         setIsProcessing(true);
 
         try {

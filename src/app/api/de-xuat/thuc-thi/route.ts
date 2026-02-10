@@ -37,6 +37,9 @@ import { getDynamicFacebookClient } from '@/lib/facebook/client';
 
 interface RequestBody {
     deXuatId: string;
+    buocIndex?: number;
+    buocMoTa?: string;
+    buocLoai?: string;
 }
 
 // ===================================================================
@@ -127,6 +130,36 @@ async function capNhatDeXuatViaAppsScript(
 }
 
 // ===================================================================
+// HELPER: Detect effective action type from step info
+// ===================================================================
+
+function detectEffectiveAction(buocLoai?: string, buocMoTa?: string, proposalAction?: string): string {
+    // Priority 1: Step-level type from frontend (buocLoai)
+    if (buocLoai) {
+        const loai = buocLoai.toUpperCase();
+        if (loai === 'PAUSE') return 'TAM_DUNG';
+        if (loai === 'BUDGET') return 'THAY_DOI_NGAN_SACH';
+        if (loai === 'CREATIVE') return 'LAM_MOI_CREATIVE';
+        if (loai === 'TARGET') return 'DIEU_CHINH_DOI_TUONG';
+        if (loai === 'MANUAL') return 'THU_CONG';
+    }
+
+    // Priority 2: Detect from step description (buocMoTa)
+    if (buocMoTa) {
+        const lower = buocMoTa.toLowerCase();
+        if (lower.includes('tắt') || lower.includes('dừng') || lower.includes('pause') || lower.includes('tạm dừng')) {
+            return 'TAM_DUNG';
+        }
+        if (lower.includes('budget') || lower.includes('ngân sách') || lower.includes('tăng') && lower.includes('%')) {
+            return 'THAY_DOI_NGAN_SACH';
+        }
+    }
+
+    // Priority 3: Fallback to proposal-level action
+    return proposalAction || 'UNKNOWN';
+}
+
+// ===================================================================
 // POST HANDLER
 // ===================================================================
 
@@ -162,7 +195,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { deXuatId } = body;
+        const { deXuatId, buocLoai, buocMoTa } = body;
 
         if (!deXuatId) {
             return NextResponse.json(
@@ -171,7 +204,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log(`[API:THUC_THI] 🎯 Proposal ID: ${deXuatId}`);
+        console.log(`[API:THUC_THI] 🎯 Proposal ID: ${deXuatId}, Step: ${buocLoai || 'N/A'}, Desc: ${buocMoTa || 'N/A'}`);
 
         // ===================================================================
         // STEP 3: Verify proposal via Apps Script
@@ -203,8 +236,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const actionType = deXuat.hanhDong?.loai || deXuat.loaiHanhDong || 'UNKNOWN';
-        console.log(`[API:THUC_THI] ⚡ Action: ${actionType}`);
+        const proposalAction = deXuat.hanhDong?.loai || deXuat.loaiHanhDong || 'UNKNOWN';
+        const effectiveAction = detectEffectiveAction(buocLoai, buocMoTa, proposalAction);
+        console.log(`[API:THUC_THI] ⚡ Proposal action: ${proposalAction}, Effective step action: ${effectiveAction}`);
 
         // ===================================================================
         // STEP 4: Execute via Facebook API
@@ -215,13 +249,49 @@ export async function POST(request: NextRequest) {
         let thongDiep = '';
 
         try {
-            switch (actionType) {
-                case 'TAM_DUNG':
-                    console.log('[API:THUC_THI] ⏸️ Pausing campaign...');
-                    thanhCong = await fb.updateCampaignStatus(deXuat.campaignId, 'PAUSED');
-                    fbResponse = { success: thanhCong, status: 'PAUSED' };
-                    thongDiep = 'Campaign đã được tạm dừng';
+            switch (effectiveAction) {
+                case 'TAM_DUNG': {
+                    // Detect target: adset or campaign?
+                    // If step description mentions content/adset → pause adset
+                    // Otherwise pause campaign
+                    const moTa = buocMoTa || '';
+                    const lower = moTa.toLowerCase();
+                    const isAdsetTarget = lower.includes('content') || lower.includes('adset') || lower.includes('nhóm');
+
+                    if (isAdsetTarget) {
+                        // Find matching adset by name/number from step description
+                        console.log(`[API:THUC_THI] ⏸️ Pausing adset (from step: "${moTa}")...`);
+                        const adsets = await fb.getAdsets(deXuat.campaignId);
+
+                        // Extract target identifier from step description (e.g. "Tắt content "3"" → "3")
+                        const match = moTa.match(/[""]([^""]+)[""]/) || moTa.match(/"([^"]+)"/);
+                        const targetName = match ? match[1] : moTa.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm)\s*/i, '').trim();
+
+                        const targetAdset = adsets.find(a =>
+                            a.name === targetName ||
+                            a.name.includes(targetName) ||
+                            a.id === targetName
+                        );
+
+                        if (targetAdset) {
+                            thanhCong = await fb.updateAdsetStatus(targetAdset.id, 'PAUSED');
+                            thongDiep = thanhCong
+                                ? `Adset "${targetAdset.name}" đã được tạm dừng`
+                                : `Không thể tạm dừng adset "${targetAdset.name}"`;
+                            fbResponse = { success: thanhCong, adsetId: targetAdset.id, adsetName: targetAdset.name, status: 'PAUSED' };
+                        } else {
+                            thanhCong = false;
+                            thongDiep = `Không tìm thấy adset "${targetName}" trong campaign`;
+                            fbResponse = { error: thongDiep, availableAdsets: adsets.map(a => a.name) };
+                        }
+                    } else {
+                        console.log('[API:THUC_THI] ⏸️ Pausing campaign...');
+                        thanhCong = await fb.updateCampaignStatus(deXuat.campaignId, 'PAUSED');
+                        fbResponse = { success: thanhCong, status: 'PAUSED' };
+                        thongDiep = thanhCong ? 'Campaign đã được tạm dừng' : 'Không thể tạm dừng campaign';
+                    }
                     break;
+                }
 
                 case 'THAY_DOI_NGAN_SACH': {
                     const newBudget = typeof deXuat.hanhDong?.giaTri_DeXuat === 'number'
@@ -251,6 +321,7 @@ export async function POST(request: NextRequest) {
 
                 case 'LAM_MOI_CREATIVE':
                 case 'DIEU_CHINH_DOI_TUONG':
+                case 'THU_CONG':
                     thanhCong = true;
                     thongDiep = 'Đã ghi nhận. Action này cần thực hiện manual trong Facebook Ads Manager.';
                     fbResponse = { note: 'Manual action required' };
@@ -264,8 +335,8 @@ export async function POST(request: NextRequest) {
 
                 default:
                     thanhCong = false;
-                    thongDiep = `Action type "${actionType}" chưa được hỗ trợ tự động.`;
-                    fbResponse = { unsupported: actionType };
+                    thongDiep = `Action type "${effectiveAction}" chưa được hỗ trợ tự động.`;
+                    fbResponse = { unsupported: effectiveAction };
             }
         } catch (error: any) {
             console.error('[API:THUC_THI] ❌ Facebook API error:', error);
@@ -300,7 +371,7 @@ export async function POST(request: NextRequest) {
                     message: thongDiep,
                     deXuatId,
                     campaign: deXuat.tenCampaign,
-                    action: actionType,
+                    action: effectiveAction,
                     facebook_response: fbResponse,
                     monitoring_until: thanhCong ? giamSatDenNgayStr : null,
                 },

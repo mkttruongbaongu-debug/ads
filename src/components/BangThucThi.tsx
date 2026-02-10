@@ -186,7 +186,7 @@ export default function BangThucThi() {
         const buoc = item.cacBuoc[buocIdx];
         const stepId = buoc.id;
 
-        if (!confirm(`Xác nhận thực thi bước ${buoc.stt}: "${buoc.moTa}"?`)) return;
+
 
         setExecutingStep(stepId);
 

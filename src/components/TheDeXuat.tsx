@@ -411,37 +411,47 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                     </p>
                 )}
 
-                {/* Budget values - round to nearest 100K */}
-                <div style={styles.actionMeta}>
-                    {deXuat.hanhDong.giaTri_HienTai && (
-                        <span>Hiện tại: {formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_HienTai)))} → </span>
-                    )}
-                    <span>Đề xuất: {typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
-                        ? formatCurrency(roundBudget(deXuat.hanhDong.giaTri_DeXuat))
-                        : typeof deXuat.hanhDong.giaTri_DeXuat === 'string' && !isNaN(Number(deXuat.hanhDong.giaTri_DeXuat))
-                            ? formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_DeXuat)))
-                            : deXuat.hanhDong.giaTri_DeXuat
-                    }</span>
-                    {deXuat.hanhDong.phanTram_ThayDoi && (
-                        <span> ({deXuat.hanhDong.phanTram_ThayDoi > 0 ? '+' : ''}{deXuat.hanhDong.phanTram_ThayDoi}%)</span>
-                    )}
-                </div>
-
-                {/* Các bước thực thi */}
-                {deXuat.hanhDong.cacBuoc && deXuat.hanhDong.cacBuoc.length > 0 && (
+                {/* Các bước thực thi (bao gồm budget suggestion) */}
+                {(deXuat.hanhDong.cacBuoc?.length > 0 || deXuat.hanhDong.giaTri_DeXuat) && (
                     <div style={{ marginTop: '16px' }}>
                         <p style={{ ...styles.actionTitle, marginBottom: '8px' }}>Các bước thực thi</p>
-                        <ol style={{
-                            margin: 0,
-                            paddingLeft: '20px',
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            lineHeight: 1.8,
-                        }}>
-                            {deXuat.hanhDong.cacBuoc.map((buoc, idx) => (
-                                <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
-                            ))}
-                        </ol>
+
+                        {/* Budget suggestion - nằm VỚI các bước */}
+                        {deXuat.hanhDong.giaTri_DeXuat && (
+                            <div style={{
+                                marginBottom: '10px', padding: '8px 14px',
+                                background: 'rgba(255, 193, 7, 0.08)', borderRadius: '4px',
+                                border: `1px solid rgba(255, 193, 7, 0.2)`,
+                                fontSize: '0.8125rem', color: colors.warning,
+                            }}>
+                                {deXuat.hanhDong.giaTri_HienTai && (
+                                    <span>Hiện tại: {formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_HienTai)))} → </span>
+                                )}
+                                <span style={{ fontWeight: 700 }}>Đề xuất: {typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
+                                    ? formatCurrency(roundBudget(deXuat.hanhDong.giaTri_DeXuat))
+                                    : typeof deXuat.hanhDong.giaTri_DeXuat === 'string' && !isNaN(Number(deXuat.hanhDong.giaTri_DeXuat))
+                                        ? formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_DeXuat)))
+                                        : deXuat.hanhDong.giaTri_DeXuat
+                                }</span>
+                                {deXuat.hanhDong.phanTram_ThayDoi && (
+                                    <span> ({deXuat.hanhDong.phanTram_ThayDoi > 0 ? '+' : ''}{deXuat.hanhDong.phanTram_ThayDoi}%)</span>
+                                )}
+                            </div>
+                        )}
+
+                        {deXuat.hanhDong.cacBuoc && deXuat.hanhDong.cacBuoc.length > 0 && (
+                            <ol style={{
+                                margin: 0,
+                                paddingLeft: '20px',
+                                color: colors.text,
+                                fontSize: '0.875rem',
+                                lineHeight: 1.8,
+                            }}>
+                                {deXuat.hanhDong.cacBuoc.map((buoc, idx) => (
+                                    <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
+                                ))}
+                            </ol>
+                        )}
                     </div>
                 )}
 

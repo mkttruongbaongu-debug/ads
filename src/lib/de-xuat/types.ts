@@ -207,6 +207,17 @@ export interface DeXuat {
     /** Metrics tại thời điểm tạo đề xuất */
     metrics_TruocKhi: MetricsTaiThoiDiem;
 
+    /** Daily metrics 7 ngày trước thực thi (trend baseline) */
+    dailyTrend_TruocKhi?: Array<{
+        date: string;
+        spend: number;
+        purchases: number;
+        revenue: number;
+        cpp: number;
+        ctr: number;
+        roas: number;
+    }>;
+
     // ============ Workflow State ============
     /** Trạng thái hiện tại */
     trangThai: TrangThaiDeXuat;
@@ -266,6 +277,28 @@ export interface QuanSat {
 
     /** Metrics trước khi thực thi (reference) */
     metrics_TruocKhi: MetricsTaiThoiDiem;
+
+    /** Daily metrics kể từ ngày thực thi (trend sau) */
+    dailyTrend_SauKhi?: Array<{
+        date: string;
+        spend: number;
+        purchases: number;
+        revenue: number;
+        cpp: number;
+        ctr: number;
+        roas: number;
+    }>;
+
+    /** Daily metrics trước thực thi (reference from DeXuat) */
+    dailyTrend_TruocKhi?: Array<{
+        date: string;
+        spend: number;
+        purchases: number;
+        revenue: number;
+        cpp: number;
+        ctr: number;
+        roas: number;
+    }>;
 
     // ============ Comparison ============
     /** % thay đổi CPP */

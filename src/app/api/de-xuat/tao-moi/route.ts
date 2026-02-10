@@ -35,6 +35,15 @@ interface RequestBody {
             ctr: number;
             doanhThu: number;
         };
+        dailyMetrics?: Array<{
+            date: string;
+            spend: number;
+            purchases: number;
+            revenue: number;
+            cpp: number;
+            ctr: number;
+            roas: number;
+        }>;
     };
     aiAnalysis?: {
         verdict?: {
@@ -284,6 +293,17 @@ export async function POST(request: NextRequest) {
 
             // Metrics snapshot
             metrics_TruocKhi: campaignData?.metrics_HienTai || {},
+
+            // Daily trend baseline (7 ngày trước thực thi)
+            dailyTrend_TruocKhi: (campaignData?.dailyMetrics || []).slice(-7).map((d: any) => ({
+                date: d.date || d.date_start || '',
+                spend: d.spend || 0,
+                purchases: d.purchases || 0,
+                revenue: d.revenue || 0,
+                cpp: d.cpp || (d.purchases > 0 ? d.spend / d.purchases : 0),
+                ctr: d.ctr || 0,
+                roas: d.roas || (d.spend > 0 ? d.revenue / d.spend : 0),
+            })),
 
             // Summary
             summary: aiAnalysis.verdict.headline,

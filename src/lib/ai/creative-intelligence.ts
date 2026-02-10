@@ -22,8 +22,9 @@ export interface AdPerformanceData {
     caption: string;
     title?: string;
     cta?: string;
-    content_type: 'IMAGE' | 'VIDEO' | 'UNKNOWN';
+    content_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL' | 'UNKNOWN';
     image_url?: string;
+    image_urls?: string[];
     metrics: {
         spend: number;
         purchases: number;
@@ -77,10 +78,12 @@ function buildAnalysisPrompt(ads: AdPerformanceData[]): string {
     const bottom = sorted.slice(-5).reverse();
 
     const formatAd = (ad: AdPerformanceData, rank: number) => {
+        const imgCount = ad.image_urls?.length || (ad.image_url ? 1 : 0);
+        const imgInfo = imgCount > 1 ? `(${imgCount} ảnh)` : imgCount === 1 ? '(1 ảnh)' : '(không có ảnh)';
         return `
 #${rank}: "${ad.ad_name}"
-- Content Type: ${ad.content_type}
-- Caption: "${ad.caption?.slice(0, 300) || '(trống)'}"
+- Content Type: ${ad.content_type} ${imgInfo}
+- Caption: "${ad.caption?.slice(0, 400) || '(trống)'}"
 - CTA: ${ad.cta || 'N/A'}
 - Metrics: CPP=${Math.round(ad.metrics.cpp).toLocaleString()}₫, ROAS=${ad.metrics.roas.toFixed(2)}x, CTR=${ad.metrics.ctr.toFixed(2)}%, Spend=${Math.round(ad.metrics.spend).toLocaleString()}₫, Purchases=${ad.metrics.purchases}
 `;
@@ -134,6 +137,14 @@ LƯU Ý:
 - Phân tích DỰA TRÊN DATA thực tế, không đoán mò.
 - So sánh TOP vs BOTTOM để tìm pattern khác biệt.
 - Caption examples phải viết bằng tiếng Việt, phù hợp ngành F&B.
+- Nếu có ẢNH đính kèm, hãy PHÂN TÍCH VISUAL:
+  + Bố cục ảnh (composition, góc chụp, khoảng cách)
+  + Màu sắc chủ đạo, tone ảnh (warm/cool/natural)
+  + Food styling (cách sắp xếp món ăn, dụng cụ, background)
+  + Text overlay (chữ trên ảnh, font, size, vị trí)
+  + Số lượng ảnh tối ưu (1 ảnh đơn, 2 ảnh, 4 ảnh carousel)
+  + So sánh visual giữa top ads vs bottom ads
+- visual_direction trong creative_brief phải CỤ THỂ: mô tả chính xác ảnh nên trông như thế nào
 - Trả lời HOÀN TOÀN bằng JSON, không thêm text.`;
 }
 
@@ -180,10 +191,43 @@ export async function analyzeCreativeIntelligence(
 
     const prompt = buildAnalysisPrompt(meaningfulAds);
 
+    // Build vision messages: text prompt + top ad images
+    const sorted = [...meaningfulAds].sort((a, b) => b.metrics.roas - a.metrics.roas);
+    const topAdsWithImages = sorted.slice(0, 5).filter(a => a.image_url || (a.image_urls && a.image_urls.length > 0));
+    const bottomAdsWithImages = sorted.slice(-3).filter(a => a.image_url || (a.image_urls && a.image_urls.length > 0));
+
+    // Build multimodal content: text + images
+    const contentParts: any[] = [{ type: 'text', text: prompt }];
+
+    // Add top ad images for AI vision analysis
+    const addedImages: string[] = [];
+    for (const ad of [...topAdsWithImages, ...bottomAdsWithImages]) {
+        const urls = ad.image_urls?.length ? ad.image_urls : (ad.image_url ? [ad.image_url] : []);
+        for (const url of urls.slice(0, 2)) { // Max 2 images per ad
+            if (addedImages.length >= 8) break; // Max 8 images total
+            if (url && !addedImages.includes(url)) {
+                contentParts.push({
+                    type: 'image_url',
+                    image_url: { url, detail: 'low' },
+                });
+                contentParts.push({
+                    type: 'text',
+                    text: `↑ Ảnh của ad "${ad.ad_name}" (ROAS: ${ad.metrics.roas.toFixed(2)}x, CPP: ${Math.round(ad.metrics.cpp).toLocaleString()}₫)`,
+                });
+                addedImages.push(url);
+            }
+        }
+    }
+
+    console.log(`[CREATIVE_INTEL] 📸 Gửi ${addedImages.length} ảnh cho AI vision`);
+
     const response = await client.chat.completions.create({
         model,
         messages: [
-            { role: 'user', content: prompt },
+            {
+                role: 'user',
+                content: addedImages.length > 0 ? contentParts : prompt,
+            },
         ],
     });
 
@@ -202,8 +246,7 @@ export async function analyzeCreativeIntelligence(
         throw new Error('AI trả về format không hợp lệ');
     }
 
-    // Map to result type
-    const sorted = [...meaningfulAds].sort((a, b) => b.metrics.roas - a.metrics.roas);
+    // Map to result type (sorted was defined above for vision)
 
     const result: CreativeIntelligenceResult = {
         winningPatterns: (parsed.winning_patterns || []).map((p: any) => ({

@@ -87,7 +87,14 @@ Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
 1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào
 2. **Thiết bị chụp**: LUÔN LÀ smartphone (VD: "Casual photo taken with iPhone", "Quick snap from Samsung Galaxy")
 3. **Góc chụp**: POV (first-person), selfie angle, slightly tilted, off-center — KHÔNG bao giờ perfectly centered hoặc symmetrical
-4. **Ánh sáng**: Ánh sáng THỰC TẾ của môi trường — đèn tuýp nhà hàng bình dân, ánh sáng cửa sổ ban ngày, đèn LED phòng khách, ánh đèn đường ban đêm. KHÔNG BAO GIỜ dùng softbox, studio light, rim light, hay bất kỳ thiết bị chiếu sáng chuyên nghiệp nào.
+4. **Ánh sáng**: Ánh sáng THỰC TẾ phù hợp với bối cảnh sử dụng sản phẩm. TUỲ NGÀNH mà chọn ánh sáng khác nhau:
+   - Đồ ăn bình dân: đèn tuýp, đèn LED trắng quán ăn
+   - Đồ ăn cao cấp/café: ánh đèn vàng ấm 3000K, nến, đèn trang trí
+   - Mỹ phẩm/skincare: ánh sáng cửa sổ ban ngày mềm mại, đèn bàn trang điểm
+   - Thời trang: ánh sáng tự nhiên ngoài trời, golden hour, ánh đèn fitting room
+   - Nội thất/gia dụng: đèn phòng khách ấm, đèn bếp, ánh sáng ban công
+   - Ngoài trời: sunlight tự nhiên, ánh đèn đường, đèn quán vỉa hè
+   → Quy tắc duy nhất: KHÔNG BAO GIỜ dùng softbox, studio light, rim light, hay thiết bị chiếu sáng chuyên nghiệp. Ánh sáng phải là ánh sáng MÔI TRƯỜNG có sẵn.
 5. **Bối cảnh (Setting)**: Môi trường THẬT, SỐNG ĐỘNG, có chi tiết "lộn xộn" tự nhiên — bàn ăn có ly nước dùng dở, khăn giấy, điện thoại để bên cạnh, túi xách, bàn làm việc có giấy tờ, phòng khách có remote TV
 6. **Sản phẩm**: Sản phẩm trong bối cảnh sử dụng thực tế, KHÔNG phải trưng bày. Đang dùng, đang mở, đang cầm trên tay.
 7. **Con người (nếu có)**: Chỉ thấy tay/cánh tay đang tương tác với sản phẩm (POV style). Da tay tự nhiên, có thể thấy móng tay, đồng hồ, vòng tay.

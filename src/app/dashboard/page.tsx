@@ -949,28 +949,29 @@ export default function DashboardPage() {
                         bottom: '20px',
                         left: '20px',
                         zIndex: 1000,
-                        padding: '10px 18px',
+                        width: '44px',
+                        height: '44px',
+                        padding: 0,
                         background: autopilotRunning ? `${colors.accent}25` : showAutopilot ? `${colors.accent}15` : colors.bgCard,
                         border: `1px solid ${autopilotRunning ? colors.accent : colors.border}`,
-                        borderRadius: '8px',
+                        borderRadius: '50%',
                         color: autopilotRunning ? colors.accent : colors.textMuted,
-                        fontSize: '0.6875rem',
-                        fontWeight: 700,
                         cursor: 'pointer',
-                        letterSpacing: '0.05em',
-                        transition: 'all 0.2s',
+                        transition: 'all 0.3s',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        justifyContent: 'center',
                         boxShadow: autopilotRunning
-                            ? `0 0 16px ${colors.accent}40`
+                            ? `0 0 20px ${colors.accent}40`
                             : '0 2px 12px rgba(0,0,0,0.4)',
+                        animation: autopilotRunning ? 'pulse 2s infinite' : 'none',
                     }}
-                    title="Chạy pipeline tự động"
+                    title="AUTOPILOT"
                     onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = colors.accent;
                         e.currentTarget.style.color = colors.accent;
-                        e.currentTarget.style.boxShadow = `0 0 16px ${colors.accent}30`;
+                        e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}30`;
+                        e.currentTarget.style.transform = 'scale(1.08)';
                     }}
                     onMouseLeave={(e) => {
                         if (!showAutopilot && !autopilotRunning) {
@@ -978,12 +979,14 @@ export default function DashboardPage() {
                             e.currentTarget.style.color = colors.textMuted;
                             e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.4)';
                         }
+                        e.currentTarget.style.transform = 'scale(1)';
                     }}
                 >
-                    {autopilotRunning && (
-                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors.accent, animation: 'pulse 1.5s infinite' }} />
-                    )}
-                    AUTOPILOT
+                    {/* Radar/Compass SVG — tượng hình autopilot */}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="currentColor" stroke="none" opacity="0.9" />
+                    </svg>
                 </button>
 
                 {/* AUTOPILOT OVERLAY PANEL */}

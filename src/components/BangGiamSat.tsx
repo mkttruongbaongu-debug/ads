@@ -377,7 +377,11 @@ export default function BangGiamSat({ userId }: Props) {
             {/* Empty State */}
             {!isLoading && !error && proposals.length === 0 && (
                 <div style={styles.emptyState}>
-                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>👁️</div>
+                    <div style={{ marginBottom: '16px', opacity: 0.4 }}>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                    </div>
                     <p style={{ fontSize: '1.1rem', fontWeight: 500, color: colors.text }}>
                         Chưa có đề xuất nào đang được giám sát
                     </p>

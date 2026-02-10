@@ -23,12 +23,12 @@ import OpenAI from 'openai';
 function buildCaptionPrompt(briefData: any): string {
     const { creativeBrief, winningPatterns, topAds, campaignName } = briefData;
 
-    return `Bạn là CHUYÊN GIA CREATIVE cho quảng cáo Facebook thị trường Việt Nam, chuyên về ngành F&B (đồ ăn, thức uống).
+    return `Bạn là CHUYÊN GIA CREATIVE cấp Director cho quảng cáo Facebook F&B Việt Nam, với 15 năm kinh nghiệm food photography chuyên nghiệp.
 
 ## NHIỆM VỤ
-Dựa vào Creative Brief và phân tích Winning Patterns bên dưới, hãy tạo:
-1. **Caption** quảng cáo chất lượng cao 
-2. **Image prompts** mô tả CHI TIẾT ảnh cần tạo 
+Dựa vào Creative Brief và Winning Patterns, tạo:
+1. **Caption** quảng cáo chất lượng cao
+2. **Image prompts CHUYÊN SÂU** — mức độ chi tiết như brief cho photographer chuyên nghiệp
 
 ## CHIẾN DỊCH: ${campaignName}
 
@@ -37,14 +37,17 @@ Dựa vào Creative Brief và phân tích Winning Patterns bên dưới, hãy t�
 - Target Audience: ${creativeBrief?.targetAudience || 'N/A'}
 - Content Format: ${creativeBrief?.contentFormat || 'N/A'}
 - Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
-- Visual Direction: ${creativeBrief?.visualDirection || 'N/A'} 
+- Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
 - CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}
 
 ## CAPTION MẪU TỪ ADS THẮNG
 ${creativeBrief?.captionExamples?.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n') || 'Không có'}
 
 ## WINNING PATTERNS
-${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern}`).join('\n') || 'N/A'}
+${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}
+
+## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
+${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}
 
 ## NÊN LÀM
 ${creativeBrief?.doList?.map((d: string) => `✓ ${d}`).join('\n') || 'N/A'}
@@ -52,40 +55,54 @@ ${creativeBrief?.doList?.map((d: string) => `✓ ${d}`).join('\n') || 'N/A'}
 ## KHÔNG NÊN
 ${creativeBrief?.dontList?.map((d: string) => `✕ ${d}`).join('\n') || 'N/A'}
 
-## TOP ADS THẮNG
-${topAds?.map((ad: any) => `- "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x): ${ad.whyItWorks}`).join('\n') || 'N/A'}
-
 ## YÊU CẦU OUTPUT
 
 ### Caption:
-- Viết bằng tiếng Việt, phong cách MỀM MẠI, GỢI CẢM GIÁC, tạo cảm xúc
-- Học 99% phong cách từ caption mẫu winning ads (cách dùng từ, nhịp câu, cảm xúc)
-- Điểm khác biệt: sáng tạo nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone
-- Không lặp lại caption cũ, phải có ý tưởng mới
+- Viết bằng tiếng Việt, phong cách MỀM MẠI, GỢI CẢM GIÁC
+- Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)
+- Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone
 - Có CTA phù hợp ở cuối
 
-### Image Prompts:
-- Mỗi prompt mô tả 1 ảnh cụ thể cần tạo
-- Số lượng ảnh: 1, 2, hoặc 4 (tuỳ key message và content format)
-- MÔ TẢ CỰC KỸ: bố cục, góc chụp, ánh sáng, màu sắc, food styling, background, props
-- Phong cách ảnh PHẢI GIỐNG 99% top ads (warm tone, close-up, natural light, v.v.)
-- Nếu có text overlay: ghi rõ nội dung text, font style, vị trí trên ảnh
-- DÙNG TIẾNG ANH cho image prompt
+### Image Prompts — ⚠️ YÊU CẦU CHUYÊN SÂU ⚠️:
+Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
+
+1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào (VD: "Inspired by Ad #1 - mâm cơm cận cảnh, ROAS 16x")
+2. **Thiết bị chụp**: Camera cụ thể (VD: "Shot on iPhone 15 Pro Max" hoặc "Nikon D850 with 105mm f/2.8 Macro")
+3. **Focal length & Aperture**: VD: "85mm, f/2.0 shallow depth of field" hoặc "35mm, f/5.6 wide shot"
+4. **Góc chụp (Camera angle)**: overhead flat lay, 45-degree angle, eye-level, low angle, close-up macro
+5. **Ánh sáng (Lighting)**: natural window light from left, golden hour warm light, softbox key light with fill, backlit with rim light
+6. **Color grading**: warm orange tones, desaturated moody, vibrant saturated, film-like grain, VSCO A6 preset style
+7. **Bối cảnh (Setting)**: rustic wooden table, marble countertop, street food stall at night, home kitchen with steam
+8. **Food styling**: sắp xếp món ăn, steam/hơi nóng, nước sốt đang rưới, gia vị rắc
+9. **Props**: đũa, bát gốm, lá chuối, tay đang gắp, khăn vải
+10. **Mood/Atmosphere**: cozy homemade feel, premium restaurant presentation, street food authenticity
+11. **Chất lượng**: "Ultra-realistic, 4K, professional food photography, NOT AI-generated looking"
+
+❌ TUYỆT ĐỐI KHÔNG ĐƯỢC:
+- Prompt chung chung: "A delicious dish on a table" → RÁC
+- Thiếu camera specs → ảnh trông như AI tạo
+- Thiếu lighting description → flat, lifeless
+
+✅ VÍ DỤ PROMPT CHUẨN:
+"Inspired by Ad #1 (ROAS 16x, mâm cơm gia đình style). Shot on iPhone 15 Pro Max, 26mm wide-angle, f/1.78. Overhead flat-lay composition of a traditional Vietnamese family meal: steaming white rice in a clay pot (center), grilled salmon fillet with crispy skin on a ceramic plate, kimchi and pickled vegetables in small dishes, fresh herbs (rau thơm) scattered. Natural window light from the upper-left creating soft shadows. Warm color grading (orange tones, +15 warmth). Rustic dark wooden table surface with visible grain texture. Steam rising from the rice. A hand reaching with chopsticks to pick up a piece of fish. Ultra-realistic, professional food photography, 4K resolution, shallow depth of field on the main dish."
+
+Số lượng ảnh: 1, 2, hoặc 4 (tuỳ content format)
+DÙNG TIẾNG ANH cho image prompt
 
 Trả lời JSON (không markdown, không \`\`\`):
 {
   "caption": "Nội dung caption đầy đủ...",
   "imageCount": 1 | 2 | 4,
   "imagePrompts": [
-    "Detailed description of image 1...",
-    "Detailed description of image 2 (if applicable)..."
+    "Extremely detailed professional photography prompt as described above..."
   ],
-  "keyMessage": "Thông điệp chính trong 1 câu"
+  "keyMessage": "Thông điệp chính trong 1 câu",
+  "inspirationSource": "Lấy cảm hứng chính từ Ad #X (tên ad, ROAS Xx) vì: lý do"
 }`;
 }
 
 // ===================================================================
-// STEP 2: GENERATE IMAGES (Nano Banana Pro)
+// STEP 2: GENERATE IMAGES (Gemini 3 Pro Image Preview)
 // ===================================================================
 
 async function generateImage(
@@ -94,23 +111,38 @@ async function generateImage(
     referenceImageUrls: string[],
 ): Promise<string | null> {
     try {
-        // Build multimodal content: text prompt + reference images
+        // Build multimodal content: ultra-detailed photography prompt + reference images
         const contentParts: any[] = [
             {
                 type: 'text',
-                text: `Generate a high-quality food advertisement photo based on this description. Match the exact style, lighting, composition and color palette of the reference images provided. The output should look like a professional food photography for Facebook ads.
+                text: `You are a WORLD-CLASS food photographer creating an advertisement photo for Vietnamese F&B brand on Facebook.
 
-IMAGE DESCRIPTION:
+YOUR MISSION: Generate an ULTRA-REALISTIC food photograph that is INDISTINGUISHABLE from a real photo. 
+The output MUST look like it was shot by a professional photographer, NOT like AI-generated art.
+
+REFERENCE IMAGES: Study the attached reference images carefully. Match their:
+- Exact color palette and color grading
+- Lighting direction and quality (soft vs hard light)
+- Composition style (flat lay, 45-degree, etc.)
+- Overall mood and atmosphere
+- Level of food styling detail
+
+PHOTOGRAPHY SPECIFICATIONS FROM THE BRIEF:
 ${prompt}
 
-IMPORTANT RULES:
-- Match the reference images' style 99%: same color tone, lighting direction, composition style
-- Professional food photography quality
-- Vibrant, appetizing colors
-- Sharp focus on the main subject
-- Clean, uncluttered composition
-- If text overlay is mentioned, render it clearly and legibly
-- Output a single high-quality image`,
+CRITICAL QUALITY REQUIREMENTS:
+- ULTRA-REALISTIC: Must pass as a real photograph, not AI art
+- 4K resolution quality (4096x4096), sharp and detailed
+- Correct physics: realistic reflections, shadows, steam behavior, liquid dynamics
+- Food must look APPETIZING and FRESH — no uncanny valley
+- Textures must be photorealistic: wood grain, ceramic glaze, fabric weave, food surface
+- Lighting must be physically accurate: consistent direction, proper falloff, natural shadows
+- Color science: realistic skin tones if hands are present, accurate food colors
+- NO text, watermarks, logos, or overlays unless explicitly specified
+- NO surreal or fantasy elements — pure photorealism
+- Steam/smoke should look natural, not overdone
+
+OUTPUT: A single ultra-high-quality photograph.`,
             },
         ];
 

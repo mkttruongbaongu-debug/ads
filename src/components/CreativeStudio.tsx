@@ -795,6 +795,71 @@ Tổng ads: ${ads.length}`}
                                         </p>
                                     </div>
 
+                                    {/* Debug toggle for CREATIVE BRIEF */}
+                                    <button
+                                        onClick={() => setShowDebug(!showDebug)}
+                                        style={{
+                                            width: '100%', padding: '8px', marginTop: '12px', marginBottom: '4px',
+                                            background: 'transparent',
+                                            border: `1px dashed ${colors.border}`,
+                                            borderRadius: '4px',
+                                            color: colors.textSubtle, fontSize: '0.625rem',
+                                            fontWeight: 600, cursor: 'pointer',
+                                            letterSpacing: '0.05em',
+                                        }}
+                                    >
+                                        {showDebug ? '▲ ẨN DEBUG' : '▼ DEBUG: XEM RAW INTEL DATA'}
+                                    </button>
+
+                                    {showDebug && (
+                                        <div style={{
+                                            marginTop: '8px', padding: '12px',
+                                            background: '#0a0c0f',
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '6px',
+                                            fontSize: '0.625rem', fontFamily: '"JetBrains Mono", monospace',
+                                            color: colors.textMuted, lineHeight: 1.5,
+                                            maxHeight: '500px', overflowY: 'auto' as const,
+                                        }}>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <span style={{ color: colors.accent, fontWeight: 700 }}>WINNING PATTERNS ({intel.winningPatterns.length}):</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#4ade80' }}>
+                                                    {JSON.stringify(intel.winningPatterns, null, 2)}
+                                                </pre>
+                                            </div>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <span style={{ color: colors.error, fontWeight: 700 }}>LOSING PATTERNS ({intel.losingPatterns.length}):</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#f87171' }}>
+                                                    {JSON.stringify(intel.losingPatterns, null, 2)}
+                                                </pre>
+                                            </div>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <span style={{ color: colors.accent, fontWeight: 700 }}>TOP ADS:</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#4ade80' }}>
+                                                    {JSON.stringify(intel.topAds, null, 2)}
+                                                </pre>
+                                            </div>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <span style={{ color: colors.error, fontWeight: 700 }}>BOTTOM ADS:</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#f87171' }}>
+                                                    {JSON.stringify(intel.bottomAds, null, 2)}
+                                                </pre>
+                                            </div>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <span style={{ color: colors.warning, fontWeight: 700 }}>CREATIVE BRIEF:</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: colors.text }}>
+                                                    {JSON.stringify(intel.creativeBrief, null, 2)}
+                                                </pre>
+                                            </div>
+                                            <div>
+                                                <span style={{ color: colors.primary, fontWeight: 700 }}>HEALTH + URGENCY:</span>
+                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: colors.text }}>
+                                                    {JSON.stringify({ overallHealth: intel.overallHealth, refreshUrgency: intel.refreshUrgency }, null, 2)}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* ═══ TẠO CREATIVE BUTTON ═══ */}
                                     <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${colors.border}` }}>
                                         <button

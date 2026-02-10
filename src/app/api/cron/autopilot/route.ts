@@ -21,7 +21,26 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { getDynamicFacebookClient } from '@/lib/facebook/client';
 import { analyzeWithAI } from '@/lib/analysis/ai-analyzer';
 import { preprocessCampaignData } from '@/lib/analysis/data-preprocessor';
-import { layDanhSachDeXuat } from '@/lib/sheets/de-xuat-sheet';
+
+// Apps Script helper
+async function layDanhSachDeXuatViaAppsScript(filter: { trangThai?: any }): Promise<any[]> {
+    const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+    const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+    if (!scriptUrl) throw new Error('GOOGLE_APPS_SCRIPT_URL not configured');
+
+    const url = new URL(scriptUrl);
+    url.searchParams.set('secret', secret);
+    url.searchParams.set('action', 'layDanhSachDeXuat');
+    if (filter.trangThai) {
+        const statuses = Array.isArray(filter.trangThai) ? filter.trangThai : [filter.trangThai];
+        url.searchParams.set('status', statuses.join(','));
+    }
+
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Apps Script error');
+    return data.data || [];
+}
 
 // ===================================================================
 // TYPES
@@ -273,7 +292,7 @@ async function runPipeline(request: NextRequest, body: any) {
         let pendingProposals: any[] = [];
         let approvedProposals: any[] = [];
         try {
-            pendingProposals = await layDanhSachDeXuat({ trangThai: 'CHO_DUYET' });
+            pendingProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'CHO_DUYET' });
             console.log(`[AUTOPILOT] 📋 ${pendingProposals.length} proposals pending approval`);
         } catch (err) {
             const msg = `Sheets error (step3): ${err instanceof Error ? err.message : String(err)}`;
@@ -287,7 +306,7 @@ async function runPipeline(request: NextRequest, body: any) {
         console.log('[AUTOPILOT] ── Step 4: Auto-Execute ──');
 
         try {
-            approvedProposals = await layDanhSachDeXuat({ trangThai: 'DA_DUYET' as any });
+            approvedProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'DA_DUYET' });
         } catch (err) {
             const msg = `Sheets error (step4): ${err instanceof Error ? err.message : String(err)}`;
             console.warn(`[AUTOPILOT] ⚠️ ${msg}`);

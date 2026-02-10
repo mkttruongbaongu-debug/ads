@@ -17,7 +17,37 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { layDanhSachDeXuat, capNhatTrangThai } from '@/lib/sheets/de-xuat-sheet';
+// Apps Script helpers (thay vì direct Google Sheets API)
+async function layDanhSachDeXuatViaAppsScript(filter: { trangThai?: any }): Promise<any[]> {
+    const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+    const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+    if (!scriptUrl) throw new Error('GOOGLE_APPS_SCRIPT_URL not configured');
+
+    const url = new URL(scriptUrl);
+    url.searchParams.set('secret', secret);
+    url.searchParams.set('action', 'layDanhSachDeXuat');
+    if (filter.trangThai) {
+        const statuses = Array.isArray(filter.trangThai) ? filter.trangThai : [filter.trangThai];
+        url.searchParams.set('status', statuses.join(','));
+    }
+
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Apps Script error');
+    return data.data || [];
+}
+
+async function capNhatTrangThaiViaAppsScript(deXuatId: string, trangThai: string): Promise<void> {
+    const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+    const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+    if (!scriptUrl) throw new Error('GOOGLE_APPS_SCRIPT_URL not configured');
+
+    await fetch(`${scriptUrl}?action=capNhatDeXuat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'capNhatDeXuat', secret, id: deXuatId, trangThai }),
+    });
+}
 import { ghiNhanQuanSat, layQuanSatTheoDeXuat } from '@/lib/sheets/quan-sat-sheet';
 import { getDynamicFacebookClient } from '@/lib/facebook/client';
 import type { QuanSat, MetricsTaiThoiDiem, DanhGiaKetQua, DeXuat } from '@/lib/de-xuat/types';
@@ -79,8 +109,8 @@ export async function POST(request: NextRequest) {
 
     try {
         // Step 1: Lấy đề xuất cần giám sát
-        const deXuats = await layDanhSachDeXuat({
-            trangThai: ['DA_THUC_THI', 'DANG_GIAM_SAT'] as any,
+        const deXuats = await layDanhSachDeXuatViaAppsScript({
+            trangThai: ['DA_THUC_THI', 'DANG_GIAM_SAT'],
         });
 
         console.log(`[GIAM_SAT] 📋 Tìm thấy ${deXuats.length} đề xuất cần giám sát`);
@@ -161,7 +191,7 @@ export async function POST(request: NextRequest) {
             if (checkpoint === 7 && deXuat.trangThai !== 'HOAN_THANH') {
                 const d7Obs = existingObs.find(o => o.checkpoint_Ngay === 7);
                 if (d7Obs) {
-                    await capNhatTrangThai(deXuat.id, 'HOAN_THANH');
+                    await capNhatTrangThaiViaAppsScript(deXuat.id, 'HOAN_THANH');
                     console.log(`[GIAM_SAT] 🏁 ${deXuat.tenCampaign} → HOAN_THANH`);
                 }
             }
@@ -170,7 +200,7 @@ export async function POST(request: NextRequest) {
 
         // Chuyển sang DANG_GIAM_SAT nếu đang DA_THUC_THI
         if (deXuat.trangThai === 'DA_THUC_THI') {
-            await capNhatTrangThai(deXuat.id, 'DANG_GIAM_SAT');
+            await capNhatTrangThaiViaAppsScript(deXuat.id, 'DANG_GIAM_SAT');
         }
 
         // Fetch metrics hiện tại
@@ -262,7 +292,7 @@ export async function POST(request: NextRequest) {
 
         // D+7: Complete monitoring
         if (checkpoint === 7) {
-            await capNhatTrangThai(deXuat.id, 'HOAN_THANH');
+            await capNhatTrangThaiViaAppsScript(deXuat.id, 'HOAN_THANH');
             console.log(`[GIAM_SAT] 🏁 ${deXuat.tenCampaign} → HOAN_THANH (${danhGia})`);
         }
     }

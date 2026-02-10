@@ -33,8 +33,8 @@ export async function GET(
         // Fetch ads with daily insights and creative info
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
-            `fields=id,name,status,effective_object_story_id,` +
-            `creative{id,thumbnail_url,image_url,effective_image_url,body,object_story_spec,effective_object_story_id},` +
+            `fields=id,name,status,effective_object_story_id,effective_image_url,` +
+            `creative{id,thumbnail_url,image_url,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
@@ -55,11 +55,11 @@ export async function GET(
             name: string;
             status: string;
             effective_object_story_id?: string;
+            effective_image_url?: string;
             creative?: {
                 id: string;
                 thumbnail_url?: string;
                 image_url?: string;
-                effective_image_url?: string;
                 body?: string;
                 effective_object_story_id?: string;
                 object_story_spec?: {
@@ -121,9 +121,9 @@ export async function GET(
             const storyId = ad.effective_object_story_id || ad.creative?.effective_object_story_id;
             const postUrl = storyId ? `https://www.facebook.com/${storyId.replace('_', '/posts/')}` : null;
 
-            // Use full image — ưu tiên effective_image_url > image_url > thumbnail
+            // Use full image — ưu tiên effective_image_url (ad-level) > image_url > thumbnail
             // effective_image_url returns ~720px, image_url varies, thumbnail_url is only ~64px
-            let imageUrl = ad.creative?.effective_image_url
+            let imageUrl = ad.effective_image_url
                 || ad.creative?.image_url
                 || storySpec?.video_data?.image_url
                 || storySpec?.photo_data?.url

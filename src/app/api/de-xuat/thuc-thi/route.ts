@@ -273,22 +273,94 @@ export async function POST(request: NextRequest) {
                             || cleaned.match(/adset\s+(\S+)/i);
                         const targetName = match ? match[1].trim() : cleaned.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm)\s*/i, '').trim();
 
-                        const targetAdset = adsets.find(a =>
+                        console.log(`[API:THUC_THI] 🎯 Looking for adset named "${targetName}" among ${adsets.length} adsets`);
+
+                        // Find all matching adsets (may have duplicates)
+                        const matchingAdsets = adsets.filter(a =>
                             a.name === targetName ||
                             a.name.includes(targetName) ||
                             a.id === targetName
                         );
 
+                        let targetAdset: typeof adsets[0] | undefined;
+
+                        if (matchingAdsets.length === 1) {
+                            // Exact single match
+                            targetAdset = matchingAdsets[0];
+                        } else if (matchingAdsets.length > 1) {
+                            // Multiple matches — disambiguate
+                            console.log(`[API:THUC_THI] ⚠️ Found ${matchingAdsets.length} adsets named "${targetName}", disambiguating...`);
+
+                            // Strategy 1: Prefer ACTIVE adset (skip already-paused ones)
+                            const activeMatches = matchingAdsets.filter(a => a.status === 'ACTIVE');
+                            if (activeMatches.length === 1) {
+                                targetAdset = activeMatches[0];
+                                console.log(`[API:THUC_THI] ✅ Disambiguated by status: only 1 ACTIVE adset (${targetAdset.id})`);
+                            } else {
+                                // Strategy 2: Extract CPP from step description and match via insights
+                                const cppMatch = moTa.match(/CPP\s*([\d.,]+)/i);
+                                const roasMatch = moTa.match(/ROAS\s*([\d.,]+)/i);
+
+                                if (cppMatch || roasMatch) {
+                                    const stepCPP = cppMatch ? parseFloat(cppMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+                                    const stepROAS = roasMatch ? parseFloat(roasMatch[1].replace(',', '.')) : 0;
+                                    console.log(`[API:THUC_THI] 📊 Step metrics: CPP=${stepCPP}, ROAS=${stepROAS}`);
+
+                                    // Fetch adset-level insights to compare
+                                    try {
+                                        const candidatePool = activeMatches.length > 0 ? activeMatches : matchingAdsets;
+                                        let bestMatch: typeof adsets[0] | undefined;
+                                        let bestDiff = Infinity;
+
+                                        for (const adset of candidatePool) {
+                                            const now = new Date();
+                                            const weekAgo = new Date(now);
+                                            weekAgo.setDate(weekAgo.getDate() - 7);
+                                            const dateRange = {
+                                                startDate: weekAgo.toISOString().split('T')[0],
+                                                endDate: now.toISOString().split('T')[0],
+                                            };
+                                            const insights = await fb.getInsights(adset.id, dateRange, 'adset');
+                                            if (insights.length > 0) {
+                                                const adsetCPP = insights[0].cost_per_action_type?.find(
+                                                    (a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase'
+                                                )?.value || 0;
+                                                const adsetROAS = insights[0].purchase_roas?.[0]?.value || 0;
+                                                const diff = stepCPP ? Math.abs(Number(adsetCPP) - stepCPP) : Math.abs(Number(adsetROAS) - stepROAS);
+                                                console.log(`[API:THUC_THI] 📊 Adset ${adset.id} (${adset.name}): CPP=${adsetCPP}, ROAS=${adsetROAS}, diff=${diff.toFixed(0)}`);
+                                                if (diff < bestDiff) {
+                                                    bestDiff = diff;
+                                                    bestMatch = adset;
+                                                }
+                                            }
+                                        }
+                                        if (bestMatch) {
+                                            targetAdset = bestMatch;
+                                            console.log(`[API:THUC_THI] ✅ Disambiguated by metrics: ${targetAdset.id}`);
+                                        }
+                                    } catch (insightErr) {
+                                        console.error('[API:THUC_THI] ⚠️ Insight disambiguation failed, using first active match:', insightErr);
+                                    }
+                                }
+
+                                // Strategy 3: Fallback to first active or first match
+                                if (!targetAdset) {
+                                    targetAdset = activeMatches[0] || matchingAdsets[0];
+                                    console.log(`[API:THUC_THI] ⚠️ Fallback: using first match ${targetAdset.id}`);
+                                }
+                            }
+                        }
+
                         if (targetAdset) {
                             thanhCong = await fb.updateAdsetStatus(targetAdset.id, 'PAUSED');
                             thongDiep = thanhCong
-                                ? `Adset "${targetAdset.name}" đã được tạm dừng`
+                                ? `Adset "${targetAdset.name}" (ID: ${targetAdset.id}) đã được tạm dừng`
                                 : `Không thể tạm dừng adset "${targetAdset.name}"`;
                             fbResponse = { success: thanhCong, adsetId: targetAdset.id, adsetName: targetAdset.name, status: 'PAUSED' };
                         } else {
                             thanhCong = false;
                             thongDiep = `Không tìm thấy adset "${targetName}" trong campaign`;
-                            fbResponse = { error: thongDiep, availableAdsets: adsets.map(a => a.name) };
+                            fbResponse = { error: thongDiep, availableAdsets: adsets.map(a => `${a.name} (${a.id})`) };
                         }
                     } else {
                         console.log('[API:THUC_THI] ⏸️ Pausing campaign...');

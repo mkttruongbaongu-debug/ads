@@ -1385,14 +1385,17 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     }}>
                                         {/* Header */}
                                         <div style={{
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                             marginBottom: '16px', paddingBottom: '10px',
                                             borderBottom: `1px solid ${colors.border}`,
                                         }}>
                                             <span style={{
                                                 fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
                                                 textTransform: 'uppercase', letterSpacing: '0.08em',
-                                            }}>PHÂN TÍCH CHỈ SỐ (7 NGÀY GẦN NHẤT)</span>
+                                            }}>PHÂN TÍCH CHỈ SỐ</span>
+                                            <p style={{
+                                                margin: '4px 0 0', fontSize: '0.625rem', color: colors.textSubtle,
+                                                lineHeight: 1.4,
+                                            }}>Trung bình 7 ngày gần nhất so với trung bình lịch sử (khác với biểu đồ theo ngày ở trên)</p>
                                         </div>
 
                                         {/* Metric Cards */}

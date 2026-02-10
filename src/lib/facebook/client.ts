@@ -187,6 +187,185 @@ export class FacebookAdsClient {
 
         return response.ok;
     }
+
+    // Lấy thông tin budget hiện tại của campaign
+    async getCampaignBudgetInfo(campaignId: string): Promise<{
+        budgetType: 'CBO' | 'ABO';
+        dailyBudget?: number;     // VND thực tế
+        lifetimeBudget?: number;  // VND thực tế
+        adsetBudgets?: Array<{ id: string; name: string; dailyBudget: number }>;
+    }> {
+        // Fetch campaign info
+        const campaignResponse = await this.fetch<{
+            id: string;
+            daily_budget?: string;
+            lifetime_budget?: string;
+        }>(`/${campaignId}`, {
+            fields: 'id,daily_budget,lifetime_budget',
+        });
+
+        const hasCampaignBudget = !!(campaignResponse.daily_budget || campaignResponse.lifetime_budget);
+
+        if (hasCampaignBudget) {
+            // CBO: Budget ở campaign level
+            // FB API trả về VND × 100
+            return {
+                budgetType: 'CBO',
+                dailyBudget: campaignResponse.daily_budget
+                    ? parseInt(campaignResponse.daily_budget) / 100
+                    : undefined,
+                lifetimeBudget: campaignResponse.lifetime_budget
+                    ? parseInt(campaignResponse.lifetime_budget) / 100
+                    : undefined,
+            };
+        }
+
+        // ABO: Budget ở adset level
+        const adsetsResponse = await this.fetch<{
+            data: Array<{ id: string; name: string; daily_budget?: string }>;
+        }>(`/${campaignId}/adsets`, {
+            fields: 'id,name,daily_budget',
+            limit: '50',
+        });
+
+        return {
+            budgetType: 'ABO',
+            adsetBudgets: (adsetsResponse.data || []).map(a => ({
+                id: a.id,
+                name: a.name,
+                dailyBudget: a.daily_budget ? parseInt(a.daily_budget) / 100 : 0,
+            })),
+        };
+    }
+
+    // Thay đổi budget (VND thực tế, tự convert sang API units)
+    // Safety: min 50K, max 50M, change capped at 100%
+    async updateCampaignBudget(
+        campaignId: string,
+        newBudgetVND: number
+    ): Promise<{
+        success: boolean;
+        message: string;
+        before?: number;
+        after?: number;
+        budgetType?: 'CBO' | 'ABO';
+    }> {
+        // Safety checks
+        const MIN_BUDGET = 50_000;   // 50K VND
+        const MAX_BUDGET = 50_000_000; // 50M VND
+
+        if (newBudgetVND < MIN_BUDGET) {
+            return { success: false, message: `Budget ${newBudgetVND.toLocaleString()}₫ quá thấp (min ${MIN_BUDGET.toLocaleString()}₫)` };
+        }
+        if (newBudgetVND > MAX_BUDGET) {
+            return { success: false, message: `Budget ${newBudgetVND.toLocaleString()}₫ quá cao (max ${MAX_BUDGET.toLocaleString()}₫)` };
+        }
+
+        // Get current budget info
+        const budgetInfo = await this.getCampaignBudgetInfo(campaignId);
+        console.log(`[FB_BUDGET] 📊 Type: ${budgetInfo.budgetType}, Current: ${JSON.stringify(budgetInfo)}`);
+
+        // FB API expects VND × 100
+        const apiBudgetValue = Math.round(newBudgetVND * 100);
+
+        if (budgetInfo.budgetType === 'CBO') {
+            // CBO: Update campaign directly
+            const currentBudget = budgetInfo.dailyBudget || 0;
+
+            // Safety: cap change at 100%
+            if (currentBudget > 0) {
+                const changePercent = Math.abs((newBudgetVND - currentBudget) / currentBudget) * 100;
+                if (changePercent > 100) {
+                    return {
+                        success: false,
+                        message: `Thay đổi ${changePercent.toFixed(0)}% quá lớn (max 100%). Cũ: ${currentBudget.toLocaleString()}₫ → Mới: ${newBudgetVND.toLocaleString()}₫`,
+                    };
+                }
+            }
+
+            console.log(`[FB_BUDGET] 💰 CBO Update: ${currentBudget.toLocaleString()}₫ → ${newBudgetVND.toLocaleString()}₫ (API: ${apiBudgetValue})`);
+
+            const response = await fetch(`${FB_GRAPH_URL}/${campaignId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    access_token: this.accessToken,
+                    daily_budget: apiBudgetValue,
+                }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                const errMsg = error.error?.message || 'Unknown FB API error';
+                console.error(`[FB_BUDGET] ❌ Error:`, errMsg);
+                return { success: false, message: `FB API Error: ${errMsg}` };
+            }
+
+            console.log(`[FB_BUDGET] ✅ Budget updated successfully`);
+            return {
+                success: true,
+                message: `Budget đã thay đổi: ${currentBudget.toLocaleString()}₫ → ${newBudgetVND.toLocaleString()}₫`,
+                before: currentBudget,
+                after: newBudgetVND,
+                budgetType: 'CBO',
+            };
+        } else {
+            // ABO: Update all adsets proportionally
+            const adsets = budgetInfo.adsetBudgets || [];
+            if (adsets.length === 0) {
+                return { success: false, message: 'Không tìm thấy adset nào' };
+            }
+
+            const totalCurrent = adsets.reduce((s, a) => s + a.dailyBudget, 0);
+            if (totalCurrent === 0) {
+                return { success: false, message: 'Tổng budget adset hiện tại = 0' };
+            }
+
+            const ratio = newBudgetVND / totalCurrent;
+
+            // Safety: cap change at 100%
+            const changePercent = Math.abs((ratio - 1) * 100);
+            if (changePercent > 100) {
+                return {
+                    success: false,
+                    message: `Thay đổi ${changePercent.toFixed(0)}% quá lớn (max 100%). Cũ: ${totalCurrent.toLocaleString()}₫ → Mới: ${newBudgetVND.toLocaleString()}₫`,
+                };
+            }
+
+            console.log(`[FB_BUDGET] 💰 ABO Update: ${adsets.length} adsets, ratio ${ratio.toFixed(2)}x`);
+
+            let successCount = 0;
+            for (const adset of adsets) {
+                const newAdsetBudget = Math.round(adset.dailyBudget * ratio * 100);
+                if (newAdsetBudget < MIN_BUDGET * 100) continue; // Skip if too low
+
+                const response = await fetch(`${FB_GRAPH_URL}/${adset.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: this.accessToken,
+                        daily_budget: newAdsetBudget,
+                    }),
+                });
+
+                if (response.ok) {
+                    successCount++;
+                    console.log(`[FB_BUDGET] ✅ Adset ${adset.name}: ${adset.dailyBudget.toLocaleString()}₫ → ${Math.round(adset.dailyBudget * ratio).toLocaleString()}₫`);
+                } else {
+                    const error = await response.json();
+                    console.error(`[FB_BUDGET] ❌ Adset ${adset.name}: ${error.error?.message}`);
+                }
+            }
+
+            return {
+                success: successCount > 0,
+                message: `ABO: ${successCount}/${adsets.length} adsets đã update. ${totalCurrent.toLocaleString()}₫ → ${newBudgetVND.toLocaleString()}₫`,
+                before: totalCurrent,
+                after: newBudgetVND,
+                budgetType: 'ABO',
+            };
+        }
+    }
     // Lấy ads với creative content đầy đủ
     async getAdsWithCreative(accountId: string): Promise<{
         id: string;

@@ -147,15 +147,23 @@ export async function POST(request: NextRequest) {
                     break;
 
                 case 'THAY_DOI_NGAN_SACH':
-                    // Update daily budget
-                    const newBudget = deXuat.hanhDong.giaTri_DeXuat;
-                    console.log(`[API:THUC_THI_DE_XUAT] 💰 Updating budget to ${newBudget}...`);
+                    // Update daily budget via Facebook API
+                    const newBudget = typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
+                        ? deXuat.hanhDong.giaTri_DeXuat
+                        : parseFloat(String(deXuat.hanhDong.giaTri_DeXuat));
 
-                    // NOTE: Budget update not yet implemented in FacebookAdsClient
-                    // Would need to add updateCampaignBudget() method
-                    thanhCong = false;
-                    thongDiep = 'Chức năng thay đổi ngân sách chưa được implement. Vui lòng thực hiện manual trên Ads Manager.';
-                    fbResponse = { error: 'Not implemented' };
+                    if (!newBudget || isNaN(newBudget)) {
+                        thanhCong = false;
+                        thongDiep = `Giá trị budget không hợp lệ: ${deXuat.hanhDong.giaTri_DeXuat}`;
+                        break;
+                    }
+
+                    console.log(`[API:THUC_THI_DE_XUAT] 💰 Updating budget to ${newBudget.toLocaleString()}₫...`);
+
+                    const budgetResult = await fb.updateCampaignBudget(deXuat.campaignId, newBudget);
+                    thanhCong = budgetResult.success;
+                    thongDiep = budgetResult.message;
+                    fbResponse = budgetResult;
                     break;
 
                 case 'DUNG_VINH_VIEN':

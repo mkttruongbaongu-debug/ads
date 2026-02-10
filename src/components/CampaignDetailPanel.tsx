@@ -1403,6 +1403,24 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             {dailyTrend.length > 0 && (() => {
                                 const bands = campaign.actionRecommendation?.debugData?.processing?.bands;
                                 const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
+
+                                // Fallback: compute ma/sigma locally when AI bands not yet available
+                                const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas') => {
+                                    if (bands?.[key]?.ma) return bands[key];
+                                    const vals = dailyTrend
+                                        .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
+                                        .filter((v: number) => v > 0);
+                                    if (vals.length < 3) return { ma: undefined, sigma: undefined };
+                                    const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
+                                    const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                    const sigma = Math.sqrt(variance);
+                                    return { ma, sigma };
+                                };
+
+                                const cppBand = computeLocalBand('cpp');
+                                const ctrBand = computeLocalBand('ctr');
+                                const roasBand = computeLocalBand('roas');
+
                                 return (
                                     <div style={{
                                         background: colors.bgAlt,
@@ -1416,8 +1434,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             metricKey="cpp"
                                             label="CPP (Chi phí/đơn)"
                                             formatValue={(v) => formatMoney(v)}
-                                            ma={bands?.cpp?.ma}
-                                            sigma={bands?.cpp?.sigma}
+                                            ma={cppBand.ma}
+                                            sigma={cppBand.sigma}
                                             windowDays={windowDays}
                                         />
                                         <BandsChart
@@ -1425,8 +1443,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             metricKey="ctr"
                                             label="CTR (Click rate)"
                                             formatValue={(v) => v.toFixed(2) + '%'}
-                                            ma={bands?.ctr?.ma}
-                                            sigma={bands?.ctr?.sigma}
+                                            ma={ctrBand.ma}
+                                            sigma={ctrBand.sigma}
                                             windowDays={windowDays}
                                         />
                                         <BandsChart
@@ -1434,8 +1452,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             metricKey="roas"
                                             label="ROAS (Return on Ad Spend)"
                                             formatValue={(v) => v.toFixed(2) + 'x'}
-                                            ma={bands?.roas?.ma}
-                                            sigma={bands?.roas?.sigma}
+                                            ma={roasBand.ma}
+                                            sigma={roasBand.sigma}
                                             windowDays={windowDays}
                                         />
                                     </div>

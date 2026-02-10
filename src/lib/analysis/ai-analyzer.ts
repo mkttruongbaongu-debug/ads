@@ -521,6 +521,18 @@ ${preprocessed.dayOfWeekPattern.insight}
 - Level: ${preprocessed.volatility.level.toUpperCase()}
 - ${preprocessed.volatility.insight}
 
+💰 PHÂN TÍCH NGÂN SÁCH (BUDGET vs HIỆU SUẤT):
+- Chi tiêu TB/ngày: ${formatMoney(preprocessed.budgetAnalysis.avgDailySpend)}
+- Khoảng: ${formatMoney(preprocessed.budgetAnalysis.minDailySpend)} - ${formatMoney(preprocessed.budgetAnalysis.maxDailySpend)}/ngày
+${preprocessed.budgetAnalysis.optimalSpendRange
+            ? `- 🎯 VÙNG TỐI ƯU: ${formatMoney(preprocessed.budgetAnalysis.optimalSpendRange.min)}-${formatMoney(preprocessed.budgetAnalysis.optimalSpendRange.max)}/ngày (CPP ${formatMoney(preprocessed.budgetAnalysis.optimalSpendRange.avgCpp)})`
+            : '- Chưa xác định vùng tối ưu'}
+- Tương quan Spend↔CPP: ${preprocessed.budgetAnalysis.spendCppCorrelation === 'positive' ? '⚠️ DƯƠNG (chi nhiều → CPP tăng)' : preprocessed.budgetAnalysis.spendCppCorrelation === 'negative' ? '✅ ÂM (chi nhiều → CPP giảm)' : 'Không rõ ràng'}
+${preprocessed.budgetAnalysis.budgetSpikes.length > 0
+            ? `- Budget Spikes: ${preprocessed.budgetAnalysis.budgetSpikes.map(s => `${s.date}: +${s.changePercent.toFixed(0)}% → CPP ${s.cppImpact > 0 ? '+' : ''}${s.cppImpact.toFixed(0)}%`).join(', ')}`
+            : '- Không có budget spike'}
+- ${preprocessed.budgetAnalysis.insight}
+
 ⚠️ WARNING SIGNALS:
 ${preprocessed.warningSignals.length > 0
             ? preprocessed.warningSignals.map(w => `- [${w.severity.toUpperCase()}] ${w.type}: ${w.evidence}`).join('\n')

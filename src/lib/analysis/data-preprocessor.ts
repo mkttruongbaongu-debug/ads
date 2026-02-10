@@ -114,6 +114,23 @@ export interface PreprocessedInsights {
         recommendation: string;
     }>;
 
+    // Budget/Spend analysis — tương quan ngân sách vs hiệu suất
+    budgetAnalysis: {
+        avgDailySpend: number;
+        minDailySpend: number;
+        maxDailySpend: number;
+        optimalSpendRange: { min: number; max: number; avgCpp: number } | null;
+        spendCppCorrelation: 'positive' | 'negative' | 'none';  // positive = spend↑ → CPP↑ (bad)
+        budgetSpikes: Array<{
+            date: string;
+            spend: number;
+            previousSpend: number;
+            changePercent: number;
+            cppImpact: number;  // CPP change % after spike
+        }>;
+        insight: string;
+    };
+
     // Prediction
     prediction: {
         noAction: string;
@@ -178,9 +195,12 @@ export function preprocessCampaignData(dailyMetrics: DailyMetric[]): Preprocesse
     // Volatility
     const volatility = calculateVolatility(sorted, basics);
 
+    // Budget/Spend analysis
+    const budgetAnalysis = analyzeBudgetImpact(sorted);
+
     // Warning signals
     const warningSignals = detectWarningSignals({
-        basics, creativeFatigue, trend, volatility, sorted
+        basics, creativeFatigue, trend, volatility, sorted, budgetAnalysis
     });
 
     // Prediction
@@ -198,6 +218,7 @@ export function preprocessCampaignData(dailyMetrics: DailyMetric[]): Preprocesse
         phases,
         volatility,
         warningSignals,
+        budgetAnalysis,
         prediction,
     };
 }
@@ -584,8 +605,9 @@ function detectWarningSignals(params: {
     trend: PreprocessedInsights['trend'];
     volatility: PreprocessedInsights['volatility'];
     sorted: DailyMetric[];
+    budgetAnalysis: PreprocessedInsights['budgetAnalysis'];
 }) {
-    const { basics, creativeFatigue, trend, volatility, sorted } = params;
+    const { basics, creativeFatigue, trend, volatility, sorted, budgetAnalysis } = params;
     const signals: PreprocessedInsights['warningSignals'] = [];
 
     // 1. Low ROAS
@@ -650,6 +672,21 @@ function detectWarningSignals(params: {
         });
     }
 
+    // 6. Budget spike detected
+    if (budgetAnalysis.budgetSpikes.length > 0) {
+        const recentSpike = budgetAnalysis.budgetSpikes[budgetAnalysis.budgetSpikes.length - 1];
+        if (recentSpike.cppImpact > 20) {
+            signals.push({
+                type: 'budget_spike',
+                severity: recentSpike.cppImpact > 50 ? 'high' : 'medium',
+                evidence: `Ngày ${recentSpike.date}: Budget tăng ${recentSpike.changePercent.toFixed(0)}% (${formatMoney(recentSpike.previousSpend)} → ${formatMoney(recentSpike.spend)}) → CPP tăng ${recentSpike.cppImpact.toFixed(0)}%`,
+                recommendation: budgetAnalysis.optimalSpendRange
+                    ? `Giảm về vùng tối ưu ${formatMoney(budgetAnalysis.optimalSpendRange.min)}-${formatMoney(budgetAnalysis.optimalSpendRange.max)}/ngày`
+                    : 'Giảm budget về mức trước khi tăng',
+            });
+        }
+    }
+
     return signals;
 }
 
@@ -686,6 +723,147 @@ function generatePrediction(params: {
     return { noAction, withAction };
 }
 
+// ===================================================================
+// BUDGET IMPACT ANALYSIS
+// ===================================================================
+
+function analyzeBudgetImpact(data: DailyMetric[]): PreprocessedInsights['budgetAnalysis'] {
+    const spends = data.map(d => d.spend).filter(s => s > 0);
+
+    if (spends.length < 3) {
+        return {
+            avgDailySpend: spends.length > 0 ? spends.reduce((a, b) => a + b, 0) / spends.length : 0,
+            minDailySpend: spends.length > 0 ? Math.min(...spends) : 0,
+            maxDailySpend: spends.length > 0 ? Math.max(...spends) : 0,
+            optimalSpendRange: null,
+            spendCppCorrelation: 'none',
+            budgetSpikes: [],
+            insight: 'Chưa đủ dữ liệu để phân tích ngân sách',
+        };
+    }
+
+    const avgDailySpend = spends.reduce((a, b) => a + b, 0) / spends.length;
+    const minDailySpend = Math.min(...spends);
+    const maxDailySpend = Math.max(...spends);
+
+    // --- Tìm vùng ngân sách tối ưu (CPP thấp nhất) ---
+    // Chia spend thành 3 buckets: thấp, trung bình, cao
+    const daysWithPurchases = data.filter(d => d.spend > 0 && d.purchases > 0);
+    let optimalSpendRange: PreprocessedInsights['budgetAnalysis']['optimalSpendRange'] = null;
+
+    if (daysWithPurchases.length >= 5) {
+        // Sort by spend to find 3 tiers
+        const sortedBySpend = [...daysWithPurchases].sort((a, b) => a.spend - b.spend);
+        const third = Math.ceil(sortedBySpend.length / 3);
+
+        const tiers = [
+            sortedBySpend.slice(0, third),
+            sortedBySpend.slice(third, third * 2),
+            sortedBySpend.slice(third * 2),
+        ].map(tier => {
+            const totalSpend = tier.reduce((s, d) => s + d.spend, 0);
+            const totalPurchases = tier.reduce((s, d) => s + d.purchases, 0);
+            return {
+                minSpend: tier[0].spend,
+                maxSpend: tier[tier.length - 1].spend,
+                avgCpp: totalPurchases > 0 ? totalSpend / totalPurchases : Infinity,
+                days: tier.length,
+            };
+        });
+
+        // Best tier = lowest CPP
+        const bestTier = tiers.reduce((best, t) =>
+            t.avgCpp < best.avgCpp ? t : best
+        );
+
+        if (bestTier.avgCpp < Infinity) {
+            optimalSpendRange = {
+                min: bestTier.minSpend,
+                max: bestTier.maxSpend,
+                avgCpp: bestTier.avgCpp,
+            };
+        }
+    }
+
+    // --- Detect budget spikes (tăng > 40% so với ngày trước) ---
+    const budgetSpikes: PreprocessedInsights['budgetAnalysis']['budgetSpikes'] = [];
+    for (let i = 1; i < data.length; i++) {
+        const prevSpend = data[i - 1].spend;
+        const currSpend = data[i].spend;
+        if (prevSpend > 0 && currSpend > 0) {
+            const changePercent = ((currSpend - prevSpend) / prevSpend) * 100;
+            if (changePercent > 40) {
+                // Tính CPP impact: so sánh CPP ngày spike vs CPP ngày trước
+                const prevCpp = data[i - 1].purchases > 0 ? data[i - 1].spend / data[i - 1].purchases : 0;
+                const currCpp = data[i].purchases > 0 ? data[i].spend / data[i].purchases : 0;
+                const cppImpact = prevCpp > 0 ? ((currCpp - prevCpp) / prevCpp) * 100 : 0;
+
+                budgetSpikes.push({
+                    date: data[i].date,
+                    spend: currSpend,
+                    previousSpend: prevSpend,
+                    changePercent,
+                    cppImpact,
+                });
+            }
+        }
+    }
+
+    // --- Spend-CPP correlation ---
+    // Pearson correlation giữa daily spend và daily CPP
+    let spendCppCorrelation: 'positive' | 'negative' | 'none' = 'none';
+    if (daysWithPurchases.length >= 5) {
+        const n = daysWithPurchases.length;
+        const spendVals = daysWithPurchases.map(d => d.spend);
+        const cppVals = daysWithPurchases.map(d => d.cpp);
+        const meanSpend = spendVals.reduce((a, b) => a + b, 0) / n;
+        const meanCpp = cppVals.reduce((a, b) => a + b, 0) / n;
+
+        let numerator = 0, denomSpend = 0, denomCpp = 0;
+        for (let i = 0; i < n; i++) {
+            const ds = spendVals[i] - meanSpend;
+            const dc = cppVals[i] - meanCpp;
+            numerator += ds * dc;
+            denomSpend += ds * ds;
+            denomCpp += dc * dc;
+        }
+        const denom = Math.sqrt(denomSpend * denomCpp);
+        const r = denom > 0 ? numerator / denom : 0;
+
+        if (r > 0.3) spendCppCorrelation = 'positive';       // spend↑ → CPP↑
+        else if (r < -0.3) spendCppCorrelation = 'negative';  // spend↑ → CPP↓ (hiếm)
+    }
+
+    // --- Insight ---
+    let insight = '';
+    if (spendCppCorrelation === 'positive' && optimalSpendRange) {
+        insight = `CẢNH BÁO NGÂN SÁCH: Chi nhiều hơn → CPP tăng. Vùng tối ưu: ${formatMoney(optimalSpendRange.min)}-${formatMoney(optimalSpendRange.max)}/ngày (CPP ${formatMoney(optimalSpendRange.avgCpp)}).`;
+    } else if (spendCppCorrelation === 'positive') {
+        insight = `Chi nhiều hơn → CPP tăng. Campaign nhạy cảm với ngân sách — không nên scale budget nhanh.`;
+    } else if (optimalSpendRange) {
+        insight = `Vùng ngân sách tối ưu: ${formatMoney(optimalSpendRange.min)}-${formatMoney(optimalSpendRange.max)}/ngày (CPP tốt nhất ${formatMoney(optimalSpendRange.avgCpp)}).`;
+    } else {
+        insight = `Chưa đủ dữ liệu để xác định vùng ngân sách tối ưu.`;
+    }
+
+    if (budgetSpikes.length > 0) {
+        const badSpikes = budgetSpikes.filter(s => s.cppImpact > 20);
+        if (badSpikes.length > 0) {
+            insight += ` Phát hiện ${badSpikes.length} lần tăng budget đột ngột gây CPP tăng.`;
+        }
+    }
+
+    return {
+        avgDailySpend,
+        minDailySpend,
+        maxDailySpend,
+        optimalSpendRange,
+        spendCppCorrelation,
+        budgetSpikes,
+        insight,
+    };
+}
+
 function getEmptyInsights(): PreprocessedInsights {
     return {
         basics: { totalDays: 0, totalSpend: 0, totalPurchases: 0, avgCpp: 0, avgRoas: 0, avgCtr: 0 },
@@ -697,6 +875,7 @@ function getEmptyInsights(): PreprocessedInsights {
         phases: [],
         volatility: { level: 'low', cppStdDev: 0, cppCoeffVar: 0, insight: 'Chưa có dữ liệu' },
         warningSignals: [],
+        budgetAnalysis: { avgDailySpend: 0, minDailySpend: 0, maxDailySpend: 0, optimalSpendRange: null, spendCppCorrelation: 'none', budgetSpikes: [], insight: 'Chưa có dữ liệu' },
         prediction: { noAction: '', withAction: '' },
     };
 }

@@ -127,7 +127,7 @@ function BandsChart({
     windowDays = 7,
 }: {
     data: Array<{ date: string;[key: string]: number | string }>;
-    metricKey: 'cpp' | 'ctr' | 'roas';
+    metricKey: 'cpp' | 'ctr' | 'roas' | 'spend';
     label: string;
     formatValue: (v: number) => string;
     ma?: number;
@@ -145,7 +145,7 @@ function BandsChart({
     const lowerColor = isInverse ? colors.success : colors.error;   // CPP low=good, CTR/ROAS low=bad
 
     // CPP/ROAS: giá trị 0 = không có đơn → null (chart đứt đoạn)
-    // CTR: 0 vẫn là giá trị hợp lệ
+    // CTR/Spend: 0 vẫn là giá trị hợp lệ
     const skipZero = metricKey === 'cpp' || metricKey === 'roas';
     const values: (number | null)[] = data.map(d => {
         const v = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
@@ -781,6 +781,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         purchases: number;
         cpp: number;
         ctr: number;
+        roas: number;
     }>>([]);
     const [isLoadingTrend, setIsLoadingTrend] = useState(false);
 
@@ -1479,7 +1480,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
 
                                 // Fallback: compute ma/sigma locally when AI bands not yet available
-                                const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas') => {
+                                const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas' | 'spend') => {
                                     if (bands?.[key]?.ma) return bands[key];
                                     const vals = dailyTrend
                                         .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
@@ -1494,6 +1495,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 const cppBand = computeLocalBand('cpp');
                                 const ctrBand = computeLocalBand('ctr');
                                 const roasBand = computeLocalBand('roas');
+                                const spendBand = computeLocalBand('spend');
 
                                 return (
                                     <div style={{
@@ -1503,6 +1505,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         padding: '16px',
                                         marginBottom: '20px',
                                     }}>
+                                        <BandsChart
+                                            data={dailyTrend}
+                                            metricKey="spend"
+                                            label="CHI TIÊU (Ngân sách/ngày)"
+                                            formatValue={(v) => formatMoney(v)}
+                                            ma={spendBand.ma}
+                                            sigma={spendBand.sigma}
+                                            windowDays={windowDays}
+                                        />
                                         <BandsChart
                                             data={dailyTrend}
                                             metricKey="cpp"

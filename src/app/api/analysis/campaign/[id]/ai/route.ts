@@ -306,21 +306,63 @@ export async function POST(
             console.warn('Failed to fetch ads for content analysis, continuing without:', adsError);
         }
 
-        // Run AI analysis
-        const aiResult = await analyzeWithAI(context);
+        // ===== STREAMING RESPONSE =====
+        // o4-mini reasoning model có thể mất 30-60s+
+        // Stream heartbeat để giữ connection sống, tránh 504 Gateway Timeout
+        const encoder = new TextEncoder();
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                campaign: {
-                    id: campaign.id,
-                    name: campaign.name,
-                    status: campaign.status,
-                },
-                metrics: context.metrics,
-                dailyTrend: context.dailyTrend,
-                issues,
-                aiAnalysis: aiResult,
+        const stream = new ReadableStream({
+            async start(controller) {
+                // Heartbeat interval: gửi newline mỗi 5s để giữ connection
+                const heartbeat = setInterval(() => {
+                    try {
+                        controller.enqueue(encoder.encode('\n'));
+                    } catch (e) {
+                        // Stream already closed
+                        clearInterval(heartbeat);
+                    }
+                }, 5000);
+
+                try {
+                    // Run AI analysis (có thể mất 30-60s)
+                    const aiResult = await analyzeWithAI(context);
+
+                    // Gửi JSON result
+                    const responseData = JSON.stringify({
+                        success: true,
+                        data: {
+                            campaign: {
+                                id: campaign.id,
+                                name: campaign.name,
+                                status: campaign.status,
+                            },
+                            metrics: context.metrics,
+                            dailyTrend: context.dailyTrend,
+                            issues,
+                            aiAnalysis: aiResult,
+                        },
+                    });
+
+                    controller.enqueue(encoder.encode(responseData));
+                } catch (error) {
+                    console.error('AI Analysis streaming error:', error);
+                    const errorData = JSON.stringify({
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Internal server error',
+                    });
+                    controller.enqueue(encoder.encode(errorData));
+                } finally {
+                    clearInterval(heartbeat);
+                    controller.close();
+                }
+            },
+        });
+
+        return new Response(stream, {
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Cache-Control': 'no-cache',
+                'Transfer-Encoding': 'chunked',
             },
         });
 

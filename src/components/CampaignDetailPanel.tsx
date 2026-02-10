@@ -816,20 +816,34 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 }),
             });
 
-            if (!res.ok) {
-                if ((res.status === 504 || res.status === 502 || res.status === 503) && retryCount < 1) {
-                    // Auto-retry 1 lần sau 2s
-                    console.warn(`[AI_ANALYSIS] ⚠️ Got ${res.status}, auto-retrying in 2s... (attempt ${retryCount + 1}/2)`);
+            // Response is a stream (heartbeat + JSON)
+            // Read full stream, strip heartbeat newlines, parse JSON
+            const reader = res.body?.getReader();
+            if (!reader) {
+                throw new Error('No response body');
+            }
+
+            const decoder = new TextDecoder();
+            let fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                fullText += decoder.decode(value, { stream: true });
+            }
+
+            // Strip heartbeat newlines, find JSON
+            const jsonText = fullText.trim();
+            if (!jsonText) {
+                if (retryCount < 1) {
+                    console.warn(`[AI_ANALYSIS] ⚠️ Empty response, auto-retrying in 2s... (attempt ${retryCount + 1}/2)`);
                     await new Promise(r => setTimeout(r, 2000));
                     return handleAnalyzeAI(retryCount + 1);
                 }
-                if (res.status === 504 || res.status === 502 || res.status === 503) {
-                    throw new Error('Server quá tải, vui lòng thử lại sau ít phút');
-                }
-                throw new Error(`Lỗi server (${res.status}). Vui lòng thử lại`);
+                throw new Error('Server trả về response rỗng');
             }
 
-            const json = await res.json();
+            const json = JSON.parse(jsonText);
 
             if (!json.success) {
                 throw new Error(json.error);

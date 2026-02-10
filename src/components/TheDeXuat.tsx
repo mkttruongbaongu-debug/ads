@@ -530,17 +530,7 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                 </div>
             )}
 
-            {deXuat.trangThai === 'DA_DUYET' && (
-                <div style={styles.buttonsRow}>
-                    <button
-                        style={isProcessing ? { ...styles.button('execute'), ...styles.disabledButton } : styles.button('execute')}
-                        onClick={handleExecute}
-                        disabled={isProcessing}
-                    >
-                        ⚡ Thực thi ngay
-                    </button>
-                </div>
-            )}
+
 
             {(deXuat.trangThai === 'BI_TU_CHOI' || deXuat.trangThai === 'DA_THUC_THI' || deXuat.trangThai === 'DANG_GIAM_SAT') && deXuat.ghiChu_NguoiDung && (
                 <div style={{ ...styles.agentsSection, borderTop: `1px solid ${colors.border}` }}>

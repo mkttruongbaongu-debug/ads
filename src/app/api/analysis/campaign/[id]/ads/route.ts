@@ -34,7 +34,7 @@ export async function GET(
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
             `fields=id,name,status,effective_object_story_id,` +
-            `creative{id,thumbnail_url,image_url,effective_image_url,body,object_story_spec,effective_object_story_id},` +
+            `creative{id,thumbnail_url,image_url,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
@@ -59,7 +59,6 @@ export async function GET(
                 id: string;
                 thumbnail_url?: string;
                 image_url?: string;
-                effective_image_url?: string;
                 body?: string;
                 effective_object_story_id?: string;
                 object_story_spec?: {
@@ -121,9 +120,8 @@ export async function GET(
             const storyId = ad.effective_object_story_id || ad.creative?.effective_object_story_id;
             const postUrl = storyId ? `https://www.facebook.com/${storyId.replace('_', '/posts/')}` : null;
 
-            // Use full image — ưu tiên effective_image_url (full-size) > image_url > thumbnail
-            const imageUrl = ad.creative?.effective_image_url
-                || ad.creative?.image_url
+            // Use full image — ưu tiên image_url > thumbnail
+            const imageUrl = ad.creative?.image_url
                 || storySpec?.video_data?.image_url
                 || storySpec?.photo_data?.url
                 || ad.creative?.thumbnail_url

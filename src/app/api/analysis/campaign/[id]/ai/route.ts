@@ -6,6 +6,9 @@ import { detectIssues, CampaignData, DailyMetric } from '@/lib/analysis/pattern-
 const FB_API_VERSION = 'v21.0';
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
+// Netlify/Vercel: cho phép function chạy tối đa 60s (thay vì 10s mặc định)
+export const maxDuration = 60;
+
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -31,13 +34,30 @@ export async function POST(
         }
         const accessToken = tokenResult.accessToken;
 
-        // Fetch campaign with daily insights
-        const campaignRes = await fetch(
-            `${FB_API_BASE}/${campaignId}?` +
-            `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
-            `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,frequency` +
-            `}&access_token=${accessToken}`
-        );
+        // ===== PARALLEL: Fetch campaign insights + ads data ĐỒNG THỜI =====
+        // Tiết kiệm 3-5s so với tuần tự
+        console.log(`[AI_ROUTE] ⚡ Fetching campaign insights + ads data in PARALLEL...`);
+        const t0 = Date.now();
+
+        const [campaignRes, adsRes] = await Promise.all([
+            // Stream 1: Campaign daily insights
+            fetch(
+                `${FB_API_BASE}/${campaignId}?` +
+                `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
+                `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,frequency` +
+                `}&access_token=${accessToken}`
+            ),
+            // Stream 2: Ads data for content analysis
+            fetch(
+                `${FB_API_BASE}/${campaignId}/ads?` +
+                `fields=id,name,status,` +
+                `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
+                `date_start,spend,impressions,clicks,actions,action_values,ctr` +
+                `}&limit=50&access_token=${accessToken}`
+            ),
+        ]);
+
+        console.log(`[AI_ROUTE] ✅ Facebook data fetched in ${Date.now() - t0}ms`);
 
         const campaignData = await campaignRes.json();
 
@@ -155,16 +175,8 @@ export async function POST(
             comparison,
         };
 
-        // ===== FETCH ADS DATA FOR CONTENT ANALYSIS =====
+        // ===== PROCESS ADS DATA (already fetched in parallel) =====
         try {
-            const adsRes = await fetch(
-                `${FB_API_BASE}/${campaignId}/ads?` +
-                `fields=id,name,status,` +
-                `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
-                `date_start,spend,impressions,clicks,actions,action_values,ctr` +
-                `}&limit=50&access_token=${accessToken}`
-            );
-
             const adsData = await adsRes.json();
 
             if (!adsData.error && adsData.data?.length > 0) {

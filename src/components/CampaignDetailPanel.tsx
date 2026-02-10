@@ -801,11 +801,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
-    const handleAnalyzeAI = async () => {
+    const handleAnalyzeAI = async (retryCount = 0) => {
         setIsLoadingAI(true);
         setAiError(null);
 
         try {
+            console.log(`[AI_ANALYSIS] 🧠 Calling AI analysis (attempt ${retryCount + 1})...`);
             const res = await fetch(`/api/analysis/campaign/${campaign.id}/ai`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -816,6 +817,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             });
 
             if (!res.ok) {
+                if ((res.status === 504 || res.status === 502 || res.status === 503) && retryCount < 1) {
+                    // Auto-retry 1 lần sau 2s
+                    console.warn(`[AI_ANALYSIS] ⚠️ Got ${res.status}, auto-retrying in 2s... (attempt ${retryCount + 1}/2)`);
+                    await new Promise(r => setTimeout(r, 2000));
+                    return handleAnalyzeAI(retryCount + 1);
+                }
                 if (res.status === 504 || res.status === 502 || res.status === 503) {
                     throw new Error('Server quá tải, vui lòng thử lại sau ít phút');
                 }
@@ -1655,7 +1662,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             {!aiAnalysis && !isLoadingAI && !aiError && (
                                 <button
                                     style={styles.aiButton}
-                                    onClick={handleAnalyzeAI}
+                                    onClick={() => handleAnalyzeAI()}
                                 >
                                     Phân tích sâu với AI
                                 </button>
@@ -1674,7 +1681,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 <div style={{ textAlign: 'center', padding: '20px', color: '#dc2626' }}>
                                     <p>{aiError}</p>
                                     <button
-                                        onClick={handleAnalyzeAI}
+                                        onClick={() => handleAnalyzeAI()}
                                         style={{ ...styles.aiButton, marginTop: '12px', background: '#dc2626' }}
                                     >
                                         Thử lại

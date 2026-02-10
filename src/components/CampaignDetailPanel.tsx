@@ -1122,9 +1122,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
         // === WARNING TAGS ===
         const tags: string[] = [];
-        // FB MOMENTUM: content chiếm >15% budget nhưng trend xấu
+        // FB ĐỔ TIỀN MÙ: content chiếm >15% budget nhưng trend xấu
         if (spendShare > 15 && trendHealth < 0.4) {
-            tags.push('FB MOMENTUM');
+            tags.push('FB ĐỔ TIỀN MÙ');
         }
         // CHERRY-PICKED: content <3% budget, metrics đẹp nhưng chưa chứng minh scale
         if (spendShare < 3 && totalROAS > 8 && ad.totals.purchases < 15) {
@@ -1933,8 +1933,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
                                                         FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
                                                     </span>
-                                                    {ev.tags?.includes('FB MOMENTUM') && (
-                                                        <span style={{ fontSize: '0.5rem', fontWeight: 700, color: colors.error }}>⚠️MOM</span>
+                                                    {ev.tags?.includes('FB ĐỔ TIỀN MÙ') && (
+                                                        <span style={{ fontSize: '0.5rem', fontWeight: 700, color: colors.error }}>⚠️ĐỔ MÙ</span>
                                                     )}
                                                     {ev.tags?.includes('CHERRY-PICKED') && (
                                                         <span style={{ fontSize: '0.5rem', fontWeight: 700, color: colors.warning }}>🍒CP</span>
@@ -2090,7 +2090,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 {ad.status}
                                                             </span>
                                                         )}
-                                                        {evaluation.tags?.includes('FB MOMENTUM') && (
+                                                        {evaluation.tags?.includes('FB ĐỔ TIỀN MÙ') && (
                                                             <span style={{
                                                                 fontSize: '0.5625rem', fontWeight: 700,
                                                                 padding: '1px 6px', borderRadius: '3px',
@@ -2098,7 +2098,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                                 color: colors.error,
                                                                 letterSpacing: '0.03em',
                                                             }}>
-                                                                FB MOMENTUM
+                                                                FB ĐỔ TIỀN MÙ
                                                             </span>
                                                         )}
                                                         {evaluation.tags?.includes('CHERRY-PICKED') && (

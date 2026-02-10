@@ -1884,7 +1884,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             if ((window as any).__creativeIntelLoading) return;
                                             (window as any).__creativeIntelLoading = true;
                                             const btn = document.getElementById('creative-intel-btn');
-                                            if (btn) btn.textContent = 'DANG PHAN TICH...';
+                                            if (btn) btn.textContent = 'ĐANG PHÂN TÍCH...';
                                             try {
                                                 const res = await fetch(
                                                     `/api/analysis/campaign/${campaign.id}/creative-intel?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
@@ -1901,7 +1901,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 alert('Lỗi kết nối');
                                             } finally {
                                                 (window as any).__creativeIntelLoading = false;
-                                                if (btn) btn.textContent = 'PHAN TICH CREATIVE';
+                                                if (btn) btn.textContent = 'PHÂN TÍCH CREATIVE';
                                             }
                                         }}
                                         id="creative-intel-btn"
@@ -1911,7 +1911,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             padding: '4px 10px', borderRadius: '3px', cursor: 'pointer',
                                             letterSpacing: '0.05em',
                                         }}
-                                    >PHAN TICH CREATIVE</button>
+                                    >PHÂN TÍCH CREATIVE</button>
                                 </div>
 
                                 {/* Results */}

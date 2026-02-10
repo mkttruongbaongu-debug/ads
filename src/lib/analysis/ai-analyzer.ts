@@ -152,6 +152,14 @@ export interface AIAnalysisResult {
     diagnosis?: string;
     marketContext?: string;
     confidence?: 'high' | 'medium' | 'low';
+    // Guard Rail tracking
+    _guardrail?: {
+        originalVerdict: string;
+        finalVerdict: string;
+        overrideReason: string;
+        wasOverridden: boolean;
+        trendDetail: string;
+    };
 }
 
 // ===================================================================
@@ -405,6 +413,8 @@ function applyGuardrails(
 ): AIAnalysisResult {
     const roas = metrics.roas;
     let action = result.verdict?.action;
+    const originalVerdict = action || 'N/A'; // Save AI's original verdict
+    let overrideReason = '';
 
     // --- Calculate window vs history trends ---
     const windowSize = Math.min(7, Math.floor(dailyTrend.length / 3));
@@ -451,7 +461,8 @@ function applyGuardrails(
 
     // RULE 1: SCALE blocked when trends are bad
     if (action === 'SCALE' && badTrends >= 2) {
-        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: AI nói SCALE nhưng ${badTrends}/3 trends xấu → force MAINTAIN`);
+        overrideReason = `AI nói SCALE nhưng ${badTrends}/3 trends xấu → MAINTAIN`;
+        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'MAINTAIN',
             headline: `ROAS tốt nhưng ${badTrends}/3 trends đang giảm — ổn định trước, scale sau`,
@@ -461,9 +472,10 @@ function applyGuardrails(
     }
 
     // RULE 2: Force REDUCE when window ROAS is bad
-    action = result.verdict?.action; // re-read after possible override
+    action = result.verdict?.action;
     if (windowRoas < 2.0 && action !== 'REDUCE' && action !== 'STOP') {
-        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: Window ROAS ${windowRoas.toFixed(2)}x < 2 → force REDUCE`);
+        overrideReason = `Window ROAS ${windowRoas.toFixed(2)}x < 2 → REDUCE`;
+        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
             headline: `ROAS gần đây ${windowRoas.toFixed(1)}x quá thấp — Giảm budget ngay`,
@@ -475,7 +487,8 @@ function applyGuardrails(
     // RULE 3: Force REDUCE when ALL trends bad + weak window ROAS
     action = result.verdict?.action;
     if (badTrends === 3 && windowRoas < 4.0 && action !== 'REDUCE' && action !== 'STOP') {
-        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: 3/3 trends xấu + window ROAS ${windowRoas.toFixed(2)}x < 4 → force REDUCE`);
+        overrideReason = `3/3 trends xấu + window ROAS ${windowRoas.toFixed(2)}x < 4 → REDUCE`;
+        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
             headline: `Tất cả metrics suy giảm, ROAS gần đây ${windowRoas.toFixed(1)}x — Giảm budget`,
@@ -487,7 +500,8 @@ function applyGuardrails(
     // RULE 4: ROAS < 1 → CANNOT be SCALE
     action = result.verdict?.action;
     if (roas < 1 && action === 'SCALE') {
-        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x < 1 nhưng AI nói SCALE → force REDUCE`);
+        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 (lỗ) → REDUCE`;
+        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
             headline: `ROAS ${roas.toFixed(1)}x - Campaign đang lỗ, cần giảm budget`,
@@ -503,6 +517,22 @@ function applyGuardrails(
     }
     if (roas >= 2 && roas < 4 && result.dimensions?.financial?.status === 'critical') {
         result.dimensions.financial.status = 'good';
+    }
+
+    // --- Track guardrail result ---
+    const finalVerdict = result.verdict?.action || 'N/A';
+    result._guardrail = {
+        originalVerdict,
+        finalVerdict,
+        overrideReason: overrideReason || 'Không can thiệp',
+        wasOverridden: originalVerdict !== finalVerdict,
+        trendDetail: trendDetail || 'Không đủ data để tính trend',
+    };
+
+    if (result._guardrail.wasOverridden) {
+        console.warn(`[GUARDRAIL_v2] 🔴 OVERRIDDEN: ${originalVerdict} → ${finalVerdict} | ${overrideReason}`);
+    } else {
+        console.log(`[GUARDRAIL_v2] 🟢 PASSED: AI verdict ${finalVerdict} matches safety checks`);
     }
 
     return result;

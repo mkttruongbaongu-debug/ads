@@ -1592,6 +1592,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             issues: campaign.issues,
                                             dailyTrend: campaign.dailyMetrics?.slice(-14),
                                             aiAnalysis: aiAnalysis || null,
+                                            guardrail: (aiAnalysis as any)?._guardrail || null,
                                         };
                                         navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
                                     }}
@@ -1673,6 +1674,35 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     {aiAnalysis.verdict.condition}
                                                 </p>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {/* Guard Rail Override Warning */}
+                                    {(aiAnalysis as any)?._guardrail?.wasOverridden && (
+                                        <div style={{
+                                            padding: '8px 12px',
+                                            marginBottom: '12px',
+                                            background: '#dc262610',
+                                            border: '1px solid #dc262640',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: '8px',
+                                        }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>GUARD RAIL</span>
+                                            <div style={{ fontSize: '0.6875rem', color: colors.textMuted, lineHeight: 1.5 }}>
+                                                <div>
+                                                    AI gốc: <span style={{ fontWeight: 700, color: '#dc2626' }}>{(aiAnalysis as any)._guardrail.originalVerdict}</span>
+                                                    {' → '}
+                                                    Sửa thành: <span style={{ fontWeight: 700, color: colors.success }}>{(aiAnalysis as any)._guardrail.finalVerdict}</span>
+                                                </div>
+                                                <div style={{ marginTop: '2px', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
+                                                    {(aiAnalysis as any)._guardrail.overrideReason}
+                                                </div>
+                                                <div style={{ marginTop: '2px', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.5625rem', color: colors.textSubtle }}>
+                                                    {(aiAnalysis as any)._guardrail.trendDetail}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 

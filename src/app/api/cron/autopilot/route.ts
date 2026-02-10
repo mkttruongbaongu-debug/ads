@@ -144,8 +144,16 @@ async function runPipeline(request: NextRequest, body: any) {
         const campaigns = await fb.getCampaigns(primaryAccount.id);
         result.pipeline.step1_scan.campaigns_found = campaigns.length;
 
+        // Log status distribution for debugging
+        const statusCounts: Record<string, number> = {};
+        campaigns.forEach((c: any) => {
+            const s = c.status || 'UNKNOWN';
+            statusCounts[s] = (statusCounts[s] || 0) + 1;
+        });
+        console.log(`[AUTOPILOT] 📊 Status distribution:`, JSON.stringify(statusCounts));
+
         const activeCampaigns = campaigns.filter(
-            (c: any) => c.status === 'ACTIVE' && c.effective_status === 'ACTIVE'
+            (c: any) => c.status === 'ACTIVE'
         );
         result.pipeline.step1_scan.active_campaigns = activeCampaigns.length;
         console.log(`[AUTOPILOT] 📊 ${activeCampaigns.length}/${campaigns.length} active campaigns`);
@@ -262,21 +270,34 @@ async function runPipeline(request: NextRequest, body: any) {
         // ===============================================================
         console.log('[AUTOPILOT] ── Step 3: Pending Proposals ──');
 
-        const pendingProposals = await layDanhSachDeXuat({ trangThai: 'CHO_DUYET' });
-        console.log(`[AUTOPILOT] 📋 ${pendingProposals.length} proposals pending approval`);
+        let pendingProposals: any[] = [];
+        let approvedProposals: any[] = [];
+        try {
+            pendingProposals = await layDanhSachDeXuat({ trangThai: 'CHO_DUYET' });
+            console.log(`[AUTOPILOT] 📋 ${pendingProposals.length} proposals pending approval`);
+        } catch (err) {
+            const msg = `Sheets error (step3): ${err instanceof Error ? err.message : String(err)}`;
+            console.warn(`[AUTOPILOT] ⚠️ ${msg}`);
+            errors.push(msg);
+        }
 
         // ===============================================================
         // STEP 4: AUTO-EXECUTE APPROVED PROPOSALS
         // ===============================================================
         console.log('[AUTOPILOT] ── Step 4: Auto-Execute ──');
 
-        const approvedProposals = await layDanhSachDeXuat({ trangThai: 'DA_DUYET' as any });
+        try {
+            approvedProposals = await layDanhSachDeXuat({ trangThai: 'DA_DUYET' as any });
+        } catch (err) {
+            const msg = `Sheets error (step4): ${err instanceof Error ? err.message : String(err)}`;
+            console.warn(`[AUTOPILOT] ⚠️ ${msg}`);
+            errors.push(msg);
+        }
 
         for (const deXuat of approvedProposals) {
             try {
                 console.log(`[AUTOPILOT] 🚀 Executing: ${deXuat.tenCampaign} (${deXuat.hanhDong.loai})`);
 
-                // Call thuc-thi API internally
                 const baseUrl = request.nextUrl.origin;
                 const res = await fetch(`${baseUrl}/api/de-xuat/thuc-thi`, {
                     method: 'POST',

@@ -61,10 +61,20 @@ interface AutopilotResult {
 }
 
 // ===================================================================
-// POST HANDLER
+// GET + POST HANDLER (cron-job.org sends GET by default)
 // ===================================================================
 
+export async function GET(request: NextRequest) {
+    return runPipeline(request, {});
+}
+
 export async function POST(request: NextRequest) {
+    let body = {};
+    try { body = await request.json().catch(() => ({})); } catch { }
+    return runPipeline(request, body);
+}
+
+async function runPipeline(request: NextRequest, body: any) {
     const startTime = Date.now();
     const errors: string[] = [];
 
@@ -88,12 +98,7 @@ export async function POST(request: NextRequest) {
         dryRun: false,            // Log only, don't write anything?
     };
 
-    try {
-        const body = await request.json().catch(() => ({}));
-        options = { ...options, ...body };
-    } catch (e) {
-        // Use defaults
-    }
+    options = { ...options, ...body };
 
     console.log(`[AUTOPILOT] ⚙️ Options:`, JSON.stringify(options));
 

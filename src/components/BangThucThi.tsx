@@ -147,7 +147,7 @@ export default function BangThucThi() {
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetch('/api/de-xuat/danh-sach?trangThai=DA_DUYET');
+            const res = await fetch('/api/de-xuat/danh-sach?status=DA_DUYET');
             const json = await res.json();
             if (!json.success) throw new Error(json.error || 'Lỗi tải dữ liệu');
 

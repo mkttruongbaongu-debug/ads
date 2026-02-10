@@ -186,7 +186,12 @@ Tổng hợp 3 phân tích trên và đưa ra 1 HÀNH ĐỘNG CỤ THỂ duy nh�
 Quy tắc quan trọng:
 - ACTIONABLE: Hành động phải CỤ THỂ, có thể execute ngay qua Facebook API
 - CONCRETE STEPS: Mỗi bước phải rõ ràng, có số liệu
-- NO MONITORING TASKS: ❌ "Theo dõi daily" → System tự làm (D+1, D+3, D+7)
+- ⛔ TUYỆT ĐỐI CẤM BƯỚC "THEO DÕI" / "GIÁM SÁT":
+  Hệ thống GIÁM SÁT tự động sẽ theo dõi D+1, D+3, D+7 sau khi thực thi.
+  ❌ CẤM: "Theo dõi CTR hàng ngày", "Giám sát CPP trong 3 ngày", "Check performance sau 2 giờ"
+  ❌ CẤM: "Monitor", "Track", "Observe", "Review sau X ngày"  
+  Bất kỳ bước nào chứa từ "theo dõi", "giám sát", "check lại", "monitor" → LOẠI BỎ NGAY
+  Chỉ giữ các bước THỰC THI được qua Facebook API: tắt ad, đổi budget, tạo creative, tạo adset
 - SAFE: Không recommend actions quá extreme (VD: giảm > 70% budget)
 - PRIORITIZE: Chọn action quan trọng NHẤT
 

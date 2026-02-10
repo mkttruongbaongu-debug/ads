@@ -95,7 +95,14 @@ Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
    - Nội thất/gia dụng: đèn phòng khách ấm, đèn bếp, ánh sáng ban công
    - Ngoài trời: sunlight tự nhiên, ánh đèn đường, đèn quán vỉa hè
    → Quy tắc duy nhất: KHÔNG BAO GIỜ dùng softbox, studio light, rim light, hay thiết bị chiếu sáng chuyên nghiệp. Ánh sáng phải là ánh sáng MÔI TRƯỜNG có sẵn.
-5. **Bối cảnh (Setting)**: Môi trường THẬT, SỐNG ĐỘNG, có chi tiết "lộn xộn" tự nhiên — bàn ăn có ly nước dùng dở, khăn giấy, điện thoại để bên cạnh, túi xách, bàn làm việc có giấy tờ, phòng khách có remote TV
+5. **Bối cảnh (Setting)**: Môi trường THẬT nơi sản phẩm được SỬ DỤNG, có chi tiết "lộn xộn" tự nhiên phù hợp bối cảnh. TUỲ NGÀNH:
+   - Đồ ăn: bàn ăn có ly nước dùng dở, khăn giấy, chai nước mắm, bát đũa lung tung
+   - Mỹ phẩm/skincare: bàn trang điểm có gương, bông tẩy trang, vài lọ khác bày bừa, điện thoại
+   - Thời trang: phòng thử đồ có gương, tủ quần áo, sàn có giày dép, túi shopping
+   - Nội thất/gia dụng: phòng khách/bếp thật có remote TV, ly cà phê, sách báo, dép đi trong nhà
+   - Đồ công nghệ: bàn làm việc có dây sạc, ly cà phê, sticky note, chuột bàn phím
+   - Ngoài trời: quán cà phê vỉa hè, công viên, xe máy đậu gần, ghế nhựa
+   → Luôn có 2-3 vật dụng "thừa" không liên quan sản phẩm để tạo cảm giác đời thường
 6. **Sản phẩm**: Sản phẩm trong bối cảnh sử dụng thực tế, KHÔNG phải trưng bày. Đang dùng, đang mở, đang cầm trên tay.
 7. **Con người (nếu có)**: Chỉ thấy tay/cánh tay đang tương tác với sản phẩm (POV style). Da tay tự nhiên, có thể thấy móng tay, đồng hồ, vòng tay.
 8. **Texture & Grain**: Slight phone camera noise, not tack-sharp everywhere, natural depth of field from phone lens

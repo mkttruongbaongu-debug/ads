@@ -380,13 +380,36 @@ export async function POST(request: NextRequest) {
                 }
 
                 case 'THAY_DOI_NGAN_SACH': {
-                    const newBudget = typeof deXuat.hanhDong?.giaTri_DeXuat === 'number'
-                        ? deXuat.hanhDong.giaTri_DeXuat
-                        : parseFloat(String(deXuat.hanhDong?.giaTri_DeXuat || deXuat.giaTriDeXuat || '0'));
+                    // Smart budget parser: handle both numbers and text
+                    const rawBudgetValue = deXuat.hanhDong?.giaTri_DeXuat ?? deXuat.giaTriDeXuat ?? '0';
+                    let newBudget = 0;
 
-                    if (!newBudget || isNaN(newBudget)) {
+                    if (typeof rawBudgetValue === 'number') {
+                        newBudget = rawBudgetValue;
+                    } else {
+                        const budgetStr = String(rawBudgetValue);
+                        // Try direct parse first: "600000" → 600000
+                        newBudget = parseFloat(budgetStr);
+
+                        if (isNaN(newBudget)) {
+                            // Try extracting number from text: "từ 500k lên 600k" → 600000
+                            // Pick the LAST number found (= target budget)
+                            const numbers = budgetStr.match(/[\d,.]+k?/gi) || [];
+                            if (numbers.length > 0) {
+                                const lastNum = numbers[numbers.length - 1];
+                                newBudget = parseFloat(lastNum.replace(/[,]/g, ''));
+                                // Handle "k" suffix: 600k → 600000
+                                if (lastNum.toLowerCase().endsWith('k')) {
+                                    newBudget *= 1000;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!newBudget || isNaN(newBudget) || newBudget <= 0) {
                         thanhCong = false;
-                        thongDiep = `Giá trị budget không hợp lệ: ${deXuat.hanhDong?.giaTri_DeXuat}`;
+                        thongDiep = `Giá trị budget không hợp lệ: "${rawBudgetValue}". Cần con số cụ thể (VD: 500000).`;
+                        console.error(`[API:THUC_THI] ❌ Budget parse failed. Raw: "${rawBudgetValue}", Parsed: ${newBudget}`);
                         break;
                     }
 

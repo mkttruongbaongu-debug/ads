@@ -44,6 +44,7 @@ interface RequestBody {
             ctr: number;
             roas: number;
         }>;
+        daily_budget_estimated?: number;
     };
     aiAnalysis?: {
         verdict?: {
@@ -91,9 +92,13 @@ interface RequestBody {
 /**
  * Map AI Analyzer action → LoaiHanhDong
  * Dựa trên context (creative health, dimensions) để quyết định chính xác
+ * 
+ * @param aiAnalysis - Kết quả phân tích AI
+ * @param dailyBudget - Ngân sách hàng ngày thật (VND). Nếu có → tính con số cụ thể.
  */
 function mapToLoaiHanhDong(
-    aiAnalysis: RequestBody['aiAnalysis']
+    aiAnalysis: RequestBody['aiAnalysis'],
+    dailyBudget?: number
 ): { loai: string; moTa: string; giaTri_DeXuat: string } {
     const action = aiAnalysis?.verdict?.action || 'MAINTAIN';
     const creativeStatus = aiAnalysis?.creativeHealth?.status;
@@ -104,6 +109,9 @@ function mapToLoaiHanhDong(
     const immediateText = typeof immediate === 'string'
         ? immediate
         : immediate?.action || '';
+
+    // Helper: làm tròn budget về bội số 100.000₫
+    const roundBudget = (n: number) => Math.round(n / 100000) * 100000;
 
     switch (action) {
         case 'STOP':
@@ -123,10 +131,20 @@ function mapToLoaiHanhDong(
                     giaTri_DeXuat: immediateText || 'Refresh creative ngay',
                 };
             }
+            // Có budget thật → tính con số cụ thể
+            if (dailyBudget && dailyBudget > 0) {
+                const newBudget = roundBudget(dailyBudget * 0.7);
+                return {
+                    loai: 'THAY_DOI_NGAN_SACH',
+                    moTa: aiAnalysis?.verdict?.headline || 'Giảm ngân sách 30%',
+                    giaTri_DeXuat: String(newBudget),
+                };
+            }
+            // Không có budget → THỦ CÔNG
             return {
-                loai: 'THAY_DOI_NGAN_SACH',
+                loai: 'THU_CONG',
                 moTa: aiAnalysis?.verdict?.headline || 'Giảm ngân sách',
-                giaTri_DeXuat: 'Giảm 30% daily budget',
+                giaTri_DeXuat: 'Giảm 30% daily budget qua Ads Manager',
             };
 
         case 'WATCH':
@@ -145,10 +163,20 @@ function mapToLoaiHanhDong(
             };
 
         case 'SCALE':
+            // Có budget thật → tính con số cụ thể (tăng 20%)
+            if (dailyBudget && dailyBudget > 0) {
+                const newBudget = roundBudget(dailyBudget * 1.2);
+                return {
+                    loai: 'THAY_DOI_NGAN_SACH',
+                    moTa: aiAnalysis?.verdict?.headline || `Tăng budget lên ${newBudget.toLocaleString()}₫/ngày`,
+                    giaTri_DeXuat: String(newBudget),
+                };
+            }
+            // Không có budget → THỦ CÔNG
             return {
-                loai: 'THAY_DOI_NGAN_SACH',
+                loai: 'THU_CONG',
                 moTa: aiAnalysis?.verdict?.headline || 'Scale campaign',
-                giaTri_DeXuat: 'Tăng 20-30% daily budget',
+                giaTri_DeXuat: 'Tăng 20% daily budget qua Ads Manager',
             };
 
         case 'MAINTAIN':
@@ -220,7 +248,9 @@ export async function POST(request: NextRequest) {
         console.log(`[API:TAO_DE_XUAT_V2] 📋 Verdict: ${aiAnalysis.verdict.action} - ${aiAnalysis.verdict.headline}`);
 
         // STEP 3: Map AI Analyzer → Đề xuất (ĐỒNG BỘ 100%)
-        const hanhDongMapping = mapToLoaiHanhDong(aiAnalysis);
+        const dailyBudget = campaignData?.daily_budget_estimated || 0;
+        console.log(`[API:TAO_DE_XUAT_V2] 💰 Daily budget: ${dailyBudget > 0 ? dailyBudget.toLocaleString() + '₫' : 'KHÔNG CÓ'}`);
+        const hanhDongMapping = mapToLoaiHanhDong(aiAnalysis, dailyBudget);
         const uuTien = mapToUuTien(aiAnalysis);
 
         // Build các bước thực thi từ actionPlan

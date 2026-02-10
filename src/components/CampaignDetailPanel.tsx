@@ -109,6 +109,8 @@ interface Props {
             debugData?: Record<string, any>;
         };
         created_time?: string;
+        daily_budget?: number;
+        daily_budget_estimated?: number;
     };
     dateRange: { startDate: string; endDate: string };
     onClose: () => void;
@@ -995,6 +997,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         doanhThu: campaign.totals.revenue,
                     },
                     dailyMetrics: campaign.dailyMetrics || [],
+                    daily_budget_estimated: campaign.daily_budget_estimated || campaign.daily_budget || 0,
                 },
                 // CRITICAL: Send the FRESH AI analysis passed as parameter!
                 // This ensures the proposal matches what the user sees on screen

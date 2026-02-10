@@ -263,9 +263,15 @@ export async function POST(request: NextRequest) {
                         console.log(`[API:THUC_THI] ⏸️ Pausing adset (from step: "${moTa}")...`);
                         const adsets = await fb.getAdsets(deXuat.campaignId);
 
-                        // Extract target identifier from step description (e.g. "Tắt content "3"" → "3")
-                        const match = moTa.match(/[""]([^""]+)[""]/) || moTa.match(/"([^"]+)"/);
-                        const targetName = match ? match[1] : moTa.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm)\s*/i, '').trim();
+                        // Extract target identifier from step description
+                        // e.g. "Tắt content "3" (FB chi 33%, CPP 111.939₫, ROAS 1.54x)." → "3"
+                        // Step 1: Strip trailing stats "(FB chi ...)" or "(CPP ...)" 
+                        const cleaned = moTa.replace(/\s*\(FB\s+chi\b.*$/, '').replace(/\s*\(CPP\b.*$/, '').replace(/\s*\(ROAS\b.*$/, '').trim();
+                        // Step 2: Extract quoted content (ASCII " or smart quotes "" or ")
+                        const match = cleaned.match(/[\u0022\u201C\u201D\u201E]([^\u0022\u201C\u201D\u201E]+)[\u0022\u201C\u201D\u201E]/)
+                            || cleaned.match(/content\s+(\S+)/i)
+                            || cleaned.match(/adset\s+(\S+)/i);
+                        const targetName = match ? match[1].trim() : cleaned.replace(/^(tắt|dừng|pause)\s+(content|adset|nhóm)\s*/i, '').trim();
 
                         const targetAdset = adsets.find(a =>
                             a.name === targetName ||

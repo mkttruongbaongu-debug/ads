@@ -7,6 +7,7 @@ import Image from 'next/image';
 import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 import HopThuDeXuat from '@/components/HopThuDeXuat';
 import BangGiamSat from '@/components/BangGiamSat';
+import BangThucThi from '@/components/BangThucThi';
 
 interface Issue {
     type: string;
@@ -355,7 +356,7 @@ export default function DashboardPage() {
     const [filterText, setFilterText] = useState('');
 
     // Tab navigation - keeps state when switching views
-    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'monitoring' | 'autopilot'>('campaigns');
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'execution' | 'monitoring' | 'autopilot'>('campaigns');
 
     // Autopilot state
     const [autopilotRunning, setAutopilotRunning] = useState(false);
@@ -670,6 +671,37 @@ export default function DashboardPage() {
                                 )}
                             </button>
 
+                            {/* THỰC THI Tab */}
+                            <button
+                                onClick={() => setActiveView('execution')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: activeView === 'execution' ? 'rgba(14, 203, 129, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'execution' ? colors.accent : colors.border}`,
+                                    borderRadius: '6px',
+                                    color: activeView === 'execution' ? colors.accent : colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                title="Thực thi từng bước hành động đã duyệt"
+                                onMouseEnter={(e) => {
+                                    if (activeView !== 'execution') {
+                                        e.currentTarget.style.background = 'rgba(14, 203, 129, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.accent;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeView !== 'execution') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
+                                }}
+                            >
+                                THỰC THI
+                            </button>
+
                             {/* GIÁM SÁT Tab */}
                             <button
                                 onClick={() => setActiveView('monitoring')}
@@ -924,6 +956,11 @@ export default function DashboardPage() {
                 {/* TAB: PROPOSALS - Show HopThuDeXuat inline */}
                 {activeView === 'proposals' && (
                     <HopThuDeXuat />
+                )}
+
+                {/* TAB: EXECUTION - Show BangThucThi inline */}
+                {activeView === 'execution' && (
+                    <BangThucThi />
                 )}
 
                 {/* TAB: MONITORING - Show BangGiamSat inline */}

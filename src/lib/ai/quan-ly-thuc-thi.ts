@@ -155,11 +155,22 @@ Tổng hợp 3 phân tích trên và đưa ra 1 HÀNH ĐỘNG CỤ THỂ duy nh�
    - VD: "CPP tăng 45% trong 3 ngày (82k → 119k), vượt ngưỡng cảnh báo 70%"
    - Rõ ràng, cụ thể (2-3 câu)
 
-5. CÁC BƯỚC THỰC THI:
-   - Danh sách các bước CỤ THỂ để execute hành động
-   - Mỗi bước phải rõ ràng, actionable
-   - ❌ KHÔNG NÓI: "Theo dõi trong X ngày" (system tự monitor)
-   - ✅ VD: ["Giảm daily budget từ 500k → 300k", "Kiểm tra CPP sau 2 giờ", "Nếu CPP vẫn > 80k → Escalate to pause"]
+5. CÁC BƯỚC THỰC THI (ATOMIC - 1 BƯỚC = 1 HÀNH ĐỘNG DUY NHẤT):
+   ⚠️ QUY TẮC TUYỆT ĐỐI: Mỗi bước chỉ chứa ĐÚNG 1 thao tác duy nhất.
+   Hệ thống Automation sẽ thực thi từng bước, KHÔNG phải con người.
+   
+   ❌ SAI (nhồi nhét nhiều thao tác):
+   - "Giảm 20-30% budget, tắt content bão hoà, bắt đầu sản xuất creative mới"
+   - "Theo dõi CTR và CPP hàng ngày"
+   - "Test tối thiểu 3 creative mới, giám sát performance 3 ngày"
+
+   ✅ ĐÚNG (mỗi bước = 1 atomic action):
+   - "Giảm daily budget 30% (từ 500k → 350k)"
+   - "Tắt ad có CPP cao nhất (ID: xxx)"
+   - "Tạo 1 creative mới dựa trên content đang win"
+   - "Tạo adset mới với creative vừa tạo"
+   
+   Phải có ít nhất 3 bước, tối đa 7 bước. Mỗi bước rõ ràng, 1 API call hoặc 1 action duy nhất.
    
 6. KẾT QUẢ KỲ VỌNG:
    - Nếu làm theo hành động này, kết quả sẽ như thế nào?

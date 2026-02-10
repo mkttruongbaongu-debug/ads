@@ -173,7 +173,7 @@ export async function analyzeCreativeIntelligence(
         : new OpenAI({ apiKey: openaiKey });
 
     const model = openrouterKey
-        ? 'google/gemini-2.5-flash-preview'  // Gemini 2.5 Flash — nhanh, mạnh phân tích media
+        ? 'google/gemini-2.5-flash'  // Gemini 2.5 Flash — nhanh, mạnh phân tích media
         : 'o4-mini';
 
     console.log(`[CREATIVE_INTEL] 🔗 Using ${openrouterKey ? 'OpenRouter' : 'OpenAI'} → ${model}`);

@@ -143,10 +143,14 @@ LƯU Ý:
 
 export async function analyzeCreativeIntelligence(
     ads: AdPerformanceData[],
-    openaiApiKey?: string
 ): Promise<CreativeIntelligenceResult> {
-    const apiKey = openaiApiKey || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+    // OpenRouter API cho phân tích media chuyên dụng
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (!openrouterKey && !openaiKey) {
+        throw new Error('Missing OPENROUTER_API_KEY or OPENAI_API_KEY');
+    }
 
     // Filter ads with meaningful spend
     const meaningfulAds = ads.filter(a => a.metrics.spend > 50000);
@@ -156,11 +160,28 @@ export async function analyzeCreativeIntelligence(
 
     console.log(`[CREATIVE_INTEL] 🎨 Phân tích ${meaningfulAds.length} ads...`);
 
-    const openai = new OpenAI({ apiKey });
+    // Ưu tiên OpenRouter (chuyên media analysis), fallback OpenAI
+    const client = openrouterKey
+        ? new OpenAI({
+            apiKey: openrouterKey,
+            baseURL: 'https://openrouter.ai/api/v1',
+            defaultHeaders: {
+                'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+                'X-Title': 'THO ADS AI - Creative Intelligence',
+            },
+        })
+        : new OpenAI({ apiKey: openaiKey });
+
+    const model = openrouterKey
+        ? 'google/gemini-2.5-flash-preview'  // Gemini 2.5 Flash — nhanh, mạnh phân tích media
+        : 'o4-mini';
+
+    console.log(`[CREATIVE_INTEL] 🔗 Using ${openrouterKey ? 'OpenRouter' : 'OpenAI'} → ${model}`);
+
     const prompt = buildAnalysisPrompt(meaningfulAds);
 
-    const response = await openai.chat.completions.create({
-        model: 'o4-mini',
+    const response = await client.chat.completions.create({
+        model,
         messages: [
             { role: 'user', content: prompt },
         ],

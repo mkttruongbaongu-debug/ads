@@ -355,7 +355,11 @@ export default function DashboardPage() {
     const [filterText, setFilterText] = useState('');
 
     // Tab navigation - keeps state when switching views
-    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'monitoring'>('campaigns');
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'monitoring' | 'autopilot'>('campaigns');
+
+    // Autopilot state
+    const [autopilotRunning, setAutopilotRunning] = useState(false);
+    const [autopilotResult, setAutopilotResult] = useState<any>(null);
 
     // Date range - fixed 60 days (optimal for pattern analysis)
     const [endDate] = useState(() => {
@@ -696,6 +700,37 @@ export default function DashboardPage() {
                             >
                                 GIÁM SÁT
                             </button>
+
+                            {/* AUTOPILOT Tab */}
+                            <button
+                                onClick={() => setActiveView('autopilot')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: activeView === 'autopilot' ? 'rgba(14, 203, 129, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'autopilot' ? colors.accent : colors.border}`,
+                                    borderRadius: '6px',
+                                    color: activeView === 'autopilot' ? colors.accent : colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                title="Chạy pipeline tự động: Scan → Phân tích → Thực thi → Giám sát"
+                                onMouseEnter={(e) => {
+                                    if (activeView !== 'autopilot') {
+                                        e.currentTarget.style.background = 'rgba(14, 203, 129, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.accent;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeView !== 'autopilot') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
+                                }}
+                            >
+                                AUTOPILOT
+                            </button>
                         </div>
                     </div>
                     {/* User Profile Dropdown - CEX Style */}
@@ -894,6 +929,152 @@ export default function DashboardPage() {
                 {/* TAB: MONITORING - Show BangGiamSat inline */}
                 {activeView === 'monitoring' && (
                     <BangGiamSat userId={session?.user?.email || ''} />
+                )}
+
+                {/* TAB: AUTOPILOT */}
+                {activeView === 'autopilot' && (
+                    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                        <div style={{
+                            background: colors.bgCard,
+                            borderRadius: '8px',
+                            border: `1px solid ${colors.border}`,
+                            padding: '32px',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <div>
+                                    <h2 style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em' }}>
+                                        AUTOPILOT PIPELINE
+                                    </h2>
+                                    <p style={{ margin: 0, fontSize: '0.8125rem', color: colors.textMuted }}>
+                                        Scan → AI Analysis → Execute → Monitor
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        if (autopilotRunning) return;
+                                        setAutopilotRunning(true);
+                                        setAutopilotResult(null);
+                                        try {
+                                            const res = await fetch('/api/cron/autopilot', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ maxCampaigns: 20 }),
+                                            });
+                                            const json = await res.json();
+                                            setAutopilotResult(json.data || json);
+                                        } catch (err) {
+                                            setAutopilotResult({ error: 'Connection failed' });
+                                        } finally {
+                                            setAutopilotRunning(false);
+                                        }
+                                    }}
+                                    disabled={autopilotRunning}
+                                    style={{
+                                        padding: '10px 24px',
+                                        background: autopilotRunning ? colors.bgAlt : colors.accent,
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        color: autopilotRunning ? colors.textMuted : '#000',
+                                        fontSize: '0.875rem',
+                                        fontWeight: 700,
+                                        cursor: autopilotRunning ? 'not-allowed' : 'pointer',
+                                        letterSpacing: '0.05em',
+                                    }}
+                                >
+                                    {autopilotRunning ? 'DANG CHAY...' : 'RUN AUTOPILOT'}
+                                </button>
+                            </div>
+
+                            {/* Pipeline Steps */}
+                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                                {[
+                                    { step: 1, label: 'SCAN CAMPAIGNS', desc: 'Quét tất cả campaigns đang active', icon: '1' },
+                                    { step: 2, label: 'AI ANALYSIS', desc: 'Phân tích hiệu suất từng campaign', icon: '2' },
+                                    { step: 3, label: 'CHECK PROPOSALS', desc: 'Kiểm tra đề xuất đang chờ duyệt', icon: '3' },
+                                    { step: 4, label: 'AUTO-EXECUTE', desc: 'Thực thi đề xuất đã duyệt', icon: '4' },
+                                    { step: 5, label: 'MONITORING', desc: 'Kiểm tra D+1/3/7 cho campaigns đang giám sát', icon: '5' },
+                                ].map(({ step, label, desc, icon }) => (
+                                    <div key={step} style={{
+                                        display: 'flex', alignItems: 'center', gap: '12px',
+                                        padding: '12px 16px',
+                                        background: colors.bg,
+                                        borderRadius: '6px',
+                                        border: `1px solid ${colors.border}`,
+                                    }}>
+                                        <span style={{
+                                            width: '28px', height: '28px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            borderRadius: '50%',
+                                            background: autopilotRunning && !autopilotResult ? `${colors.accent}30` : `${colors.textSubtle}30`,
+                                            color: autopilotRunning && !autopilotResult ? colors.accent : colors.textSubtle,
+                                            fontSize: '0.75rem', fontWeight: 700,
+                                        }}>{icon}</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em' }}>{label}</div>
+                                            <div style={{ fontSize: '0.6875rem', color: colors.textMuted }}>{desc}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Results */}
+                            {autopilotResult && (
+                                <div style={{
+                                    marginTop: '20px', padding: '16px',
+                                    background: colors.bg,
+                                    borderRadius: '6px',
+                                    border: `1px solid ${autopilotResult.error ? colors.error : colors.accent}30`,
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: autopilotResult.error ? colors.error : colors.accent, marginBottom: '8px', letterSpacing: '0.05em' }}>
+                                        {autopilotResult.error ? 'ERROR' : 'PIPELINE COMPLETED'}
+                                    </div>
+                                    {autopilotResult.error ? (
+                                        <div style={{ fontSize: '0.8125rem', color: colors.error }}>{autopilotResult.error}</div>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                                            {[
+                                                { label: 'Campaigns Active', value: autopilotResult.pipeline?.step1_scan?.active_campaigns ?? '-' },
+                                                { label: 'Analyzed', value: autopilotResult.pipeline?.step2_analyze?.campaigns_analyzed ?? '-' },
+                                                { label: 'Issues Found', value: autopilotResult.pipeline?.step2_analyze?.issues_found ?? '-', color: (autopilotResult.pipeline?.step2_analyze?.issues_found || 0) > 0 ? colors.error : colors.accent },
+                                                { label: 'Executed', value: `${autopilotResult.pipeline?.step4_execute?.success ?? 0}/${autopilotResult.pipeline?.step4_execute?.proposals_executed ?? 0}` },
+                                                { label: 'Observations', value: autopilotResult.pipeline?.step5_monitor?.observations_created ?? '-' },
+                                                { label: 'Duration', value: autopilotResult.duration_ms ? `${(autopilotResult.duration_ms / 1000).toFixed(1)}s` : '-' },
+                                            ].map(({ label, value, color }) => (
+                                                <div key={label} style={{ textAlign: 'center' as const }}>
+                                                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: color || colors.text }}>{value}</div>
+                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, letterSpacing: '0.05em' }}>{label}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {autopilotResult.summary && (
+                                        <div style={{ marginTop: '12px', fontSize: '0.75rem', color: colors.textMuted, fontFamily: '"JetBrains Mono", monospace' }}>
+                                            {autopilotResult.summary}
+                                        </div>
+                                    )}
+                                    {autopilotResult.errors?.length > 0 && (
+                                        <div style={{ marginTop: '8px' }}>
+                                            {autopilotResult.errors.map((e: string, i: number) => (
+                                                <div key={i} style={{ fontSize: '0.6875rem', color: colors.error, marginTop: '2px' }}>- {e}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Schedule Info */}
+                            <div style={{
+                                marginTop: '16px', padding: '12px',
+                                background: `${colors.primary}08`,
+                                borderRadius: '4px',
+                                border: `1px solid ${colors.primary}20`,
+                            }}>
+                                <div style={{ fontSize: '0.6875rem', color: colors.textMuted }}>
+                                    <span style={{ fontWeight: 700, color: colors.primary }}>CRON SCHEDULE:</span> Moi ngay 08:00 (UTC+7) via cron-job.org
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* TAB: CAMPAIGNS - Show campaign analysis */}

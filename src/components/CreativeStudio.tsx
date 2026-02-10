@@ -127,6 +127,10 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [generateError, setGenerateError] = useState('');
     const [generateStep, setGenerateStep] = useState('');  // progress indicator
     const [copiedCaption, setCopiedCaption] = useState(false);
+    const [generatedImagePrompts, setGeneratedImagePrompts] = useState<string[]>([]);
+    const [generatedCaptionPrompt, setGeneratedCaptionPrompt] = useState('');
+    const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
+    const [showPromptTrace, setShowPromptTrace] = useState(false);
 
     // Publish to Facebook
     const [adSets, setAdSets] = useState<{ id: string; name: string; status: string }[]>([]);
@@ -244,6 +248,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                 setGeneratedCaption(json.data.caption || '');
                 setGeneratedImages(json.data.images || []);
                 setGeneratedKeyMessage(json.data.keyMessage || '');
+                setGeneratedImagePrompts(json.data.imagePrompts || []);
+                setGeneratedCaptionPrompt(json.data.captionPrompt || '');
+                setReferenceImageUrls(json.data.referenceImageUrls || []);
                 setActiveTab('output');
             } else {
                 setGenerateError(json.error || 'Không thể tạo creative');
@@ -1072,6 +1079,96 @@ Tổng ads: ${ads.length}`}
                                             </p>
                                         </div>
                                     )}
+
+                                    {/* ═══ PROMPT TRACEABILITY ═══ */}
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <button
+                                            onClick={() => setShowPromptTrace(!showPromptTrace)}
+                                            style={{
+                                                width: '100%', padding: '10px 14px',
+                                                background: colors.bg, border: `1px solid ${colors.border}`,
+                                                borderRadius: '6px', cursor: 'pointer',
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: colors.primary, letterSpacing: '0.1em' }}>
+                                                {showPromptTrace ? '▲ ẨN PROMPT DEBUG' : '▼ XEM PROMPT ĐÃ DÙNG'}
+                                            </span>
+                                            <span style={{ fontSize: '0.5625rem', color: colors.textMuted }}>
+                                                {generatedImagePrompts.length} image prompt • {referenceImageUrls.length} ref images
+                                            </span>
+                                        </button>
+
+                                        {showPromptTrace && (
+                                            <div style={{
+                                                marginTop: '8px', padding: '14px',
+                                                background: colors.bg, border: `1px solid ${colors.border}`,
+                                                borderRadius: '6px', maxHeight: '500px', overflow: 'auto',
+                                            }}>
+                                                {/* Reference Images Used */}
+                                                {referenceImageUrls.length > 0 && (
+                                                    <div style={{ marginBottom: '16px' }}>
+                                                        <span style={{ fontSize: '0.625rem', fontWeight: 700, color: colors.accent, letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>
+                                                            ẢNH THAM KHẢO ĐÃ DÙNG ({referenceImageUrls.length})
+                                                        </span>
+                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                                                            {referenceImageUrls.map((url, i) => (
+                                                                <img
+                                                                    key={i} src={url} alt={`Ref ${i + 1}`}
+                                                                    style={{
+                                                                        width: '60px', height: '60px', objectFit: 'cover' as const,
+                                                                        borderRadius: '4px', border: `1px solid ${colors.border}`,
+                                                                    }}
+                                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Image Prompts */}
+                                                {generatedImagePrompts.map((prompt, i) => (
+                                                    <div key={i} style={{ marginBottom: '12px' }}>
+                                                        <span style={{
+                                                            fontSize: '0.625rem', fontWeight: 700, color: colors.warning,
+                                                            letterSpacing: '0.1em', display: 'block', marginBottom: '4px',
+                                                        }}>
+                                                            IMAGE PROMPT #{i + 1}
+                                                        </span>
+                                                        <div style={{
+                                                            padding: '10px 12px', borderRadius: '4px',
+                                                            background: colors.bgAlt, border: `1px solid ${colors.border}`,
+                                                            fontSize: '0.6875rem', color: colors.text,
+                                                            lineHeight: 1.5, whiteSpace: 'pre-wrap' as const,
+                                                        }}>
+                                                            {prompt}
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Full Caption Prompt (collapsed by default) */}
+                                                {generatedCaptionPrompt && (
+                                                    <details style={{ marginTop: '8px' }}>
+                                                        <summary style={{
+                                                            fontSize: '0.625rem', fontWeight: 700, color: colors.textMuted,
+                                                            letterSpacing: '0.1em', cursor: 'pointer', marginBottom: '4px',
+                                                        }}>
+                                                            FULL CAPTION PROMPT (click để xem)
+                                                        </summary>
+                                                        <div style={{
+                                                            padding: '10px 12px', borderRadius: '4px',
+                                                            background: colors.bgAlt, border: `1px solid ${colors.border}`,
+                                                            fontSize: '0.625rem', color: colors.textSubtle,
+                                                            lineHeight: 1.5, whiteSpace: 'pre-wrap' as const,
+                                                            maxHeight: '300px', overflow: 'auto',
+                                                        }}>
+                                                            {generatedCaptionPrompt}
+                                                        </div>
+                                                    </details>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {/* ═══ PUBLISH TO FACEBOOK ═══ */}
                                     {generatedImages.length > 0 && (

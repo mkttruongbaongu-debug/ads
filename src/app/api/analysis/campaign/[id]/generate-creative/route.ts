@@ -311,6 +311,8 @@ export async function POST(
                 imageCount: captionResult.imageCount,
                 imagePrompts: captionResult.imagePrompts,
                 images: generatedImages,
+                captionPrompt, // Trả về prompt gốc để debug & cải tiến
+                referenceImageUrls: referenceUrls, // URLs ảnh tham khảo đã dùng
             },
         });
 

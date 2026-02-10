@@ -61,8 +61,8 @@ export interface CreativeIntelligenceResult {
     winningPatterns: WinningPattern[];
     losingPatterns: WinningPattern[];
     creativeBrief: CreativeBrief;
-    topAds: Array<{ name: string; cpp: number; roas: number; whyItWorks: string }>;
-    bottomAds: Array<{ name: string; cpp: number; roas: number; whyItFails: string }>;
+    topAds: Array<{ name: string; cpp: number; roas: number; whyItWorks: string; image_url?: string; image_urls?: string[] }>;
+    bottomAds: Array<{ name: string; cpp: number; roas: number; whyItFails: string; image_url?: string; image_urls?: string[] }>;
     overallHealth: 'EXCELLENT' | 'GOOD' | 'NEEDS_REFRESH' | 'CRITICAL';
     refreshUrgency: string;
 }
@@ -278,6 +278,8 @@ export async function analyzeCreativeIntelligence(
             cpp: sorted[i]?.metrics.cpp || 0,
             roas: sorted[i]?.metrics.roas || 0,
             whyItWorks: a.why_it_works,
+            image_url: sorted[i]?.image_url || '',
+            image_urls: sorted[i]?.image_urls || [],
         })),
         bottomAds: (parsed.bottom_ads_analysis || []).map((a: any, i: number) => {
             const bottomAd = sorted[sorted.length - 1 - i];
@@ -286,6 +288,8 @@ export async function analyzeCreativeIntelligence(
                 cpp: bottomAd?.metrics.cpp || 0,
                 roas: bottomAd?.metrics.roas || 0,
                 whyItFails: a.why_it_fails,
+                image_url: bottomAd?.image_url || '',
+                image_urls: bottomAd?.image_urls || [],
             };
         }),
         overallHealth: parsed.overall_health || 'GOOD',

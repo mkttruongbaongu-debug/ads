@@ -952,19 +952,25 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     };
 
     // Content evaluation: 2-layer approach
-    // Layer 1: Absolute CPP vs campaign avg (is this content cheap or expensive?)
-    // Layer 2: Z-score trend (is it improving or deteriorating?)
+    // ===================================================================
+    // CONTENT BADGE LOGIC v4
+    // ===================================================================
+    // Layer 1: ROAS check (is this content profitable?)
+    // Layer 2: Absolute CPP vs campaign avg (cheap or expensive?)
+    // Layer 3: Z-score trend (improving or deteriorating?)
+    // Layer 4: Anomaly detection (extreme z-scores)
     const getContentBadge = (ad: Ad, totalCampaignSpend: number, campaignAvgCpp: number) => {
         const daily = ad.dailyMetrics || [];
         const totalSpend = ad.totals.spend;
         const spendShare = totalCampaignSpend > 0 ? (totalSpend / totalCampaignSpend) * 100 : 0;
+        const totalROAS = ad.totals.spend > 0 ? ad.totals.revenue / ad.totals.spend : 0;
 
-        // --- Not enough data ---
-        if (daily.length < 5 || totalSpend < totalCampaignSpend * 0.02 || ad.totals.purchases < 2) {
+        // --- Not enough data: dựa trên số đơn hàng (< 5 đơn = ít data) ---
+        if (ad.totals.purchases < 5 || daily.length < 5) {
             return {
                 badge: { text: 'Ít data', bg: `${colors.textSubtle}20`, color: colors.textMuted },
                 spendShare,
-                tip: 'Chưa đủ dữ liệu để đánh giá',
+                tip: `Chưa đủ dữ liệu để đánh giá (${ad.totals.purchases} đơn, ${daily.length} ngày data)`,
             };
         }
 
@@ -994,7 +1000,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             const cppVariance = histCPP.reduce((s, v) => s + Math.pow(v - cppMA, 2), 0) / histCPP.length;
             cppSigma = Math.sqrt(cppVariance);
             cppWindowAvg = winCPP.reduce((s, v) => s + v, 0) / winCPP.length;
-            // CPP: z > 0 = xấu (tăng), z < 0 = tốt (giảm)
             cppZ = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
         }
 
@@ -1011,7 +1016,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             const ctrVariance = histCTR.reduce((s, v) => s + Math.pow(v - ctrMA, 2), 0) / histCTR.length;
             ctrSigma = Math.sqrt(ctrVariance);
             ctrWindowAvg = winCTR.reduce((s, v) => s + v, 0) / winCTR.length;
-            // CTR: z > 0 = tốt (tăng), z < 0 = xấu (giảm) → invert for severity
             ctrZ = ctrSigma > 0 ? (ctrWindowAvg - ctrMA) / ctrSigma : 0;
         }
 
@@ -1019,63 +1023,96 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         const fmtZ = (z: number) => `${z > 0 ? '+' : ''}${z.toFixed(1)}σ`;
         const tipParts = [
             `Lịch sử (${historyDays.length}d): CPP MA=${cppMA > 0 ? formatMoney(cppMA) : 'N/A'} · CTR MA=${ctrMA.toFixed(2)}%`,
-            `Gần đây (${windowDays.length}d): CPP=${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} · CTR=${ctrWindowAvg.toFixed(2)}%`,
+            `7 ngày gần đây: CPP=${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} · CTR=${ctrWindowAvg.toFixed(2)}%`,
             `Z-Score: CPP ${fmtZ(cppZ)} · CTR ${fmtZ(ctrZ)}`,
+            `ROAS tổng: ${totalROAS > 0 ? totalROAS.toFixed(2) + 'x' : 'N/A'}`,
         ];
 
-        // --- 3-LAYER BADGE LOGIC v3 ---
-        // Layer 1: Absolute CPP check (recent window vs campaign average)
+        // --- KEY METRICS ---
         const recentSpend = windowDays.reduce((s, d) => s + d.spend, 0);
         const recentPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
         const absolutelyCheap = campaignAvgCpp > 0 && cppWindowAvg > 0 && cppWindowAvg < campaignAvgCpp;
-        // Layer 2: Expensive check — CPP > 1.5x avg AND not meaningfully improving
-        const absolutelyExpensive = campaignAvgCpp > 0 && cppWindowAvg > campaignAvgCpp * 1.5 && cppZ > -0.5;
+        const absolutelyExpensive = campaignAvgCpp > 0 && cppWindowAvg > campaignAvgCpp * 1.5;
+        const highROAS = totalROAS >= 8;      // ROAS >= 8x = content tốt
+        const excellentROAS = totalROAS >= 12; // ROAS >= 12x = content xuất sắc
 
+        // =====================================================
         // Priority 1: KÉM — chi tiền nhưng 0 đơn gần đây
+        // =====================================================
         if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.03) {
             return {
                 badge: { text: 'Kém', bg: '#EF444420', color: '#EF4444' },
                 spendShare,
-                tip: tipParts.join('\n') + '\n🔴 Gần đây chi tiền nhưng không có đơn',
+                tip: tipParts.join('\n') + '\n🔴 7 ngày gần đây chi tiền nhưng không có đơn',
             };
         }
 
-        // Priority 2: BÃO HOÀ — CHỈ KHI CPP đắt hơn TB campaign
-        if (!absolutelyCheap) {
+        // =====================================================
+        // Priority 2: BÃO HOÀ — CPP đắt + trend xấu + ROAS không cứu nổi
+        // =====================================================
+        if (!absolutelyCheap && !highROAS) {
             if (cppZ >= 1.5 && ctrZ <= -1.0) {
                 return {
                     badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
                     spendShare,
-                    tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
+                    tip: tipParts.join('\n') + `\n⚠️ CPP 7d vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
                 };
             }
             if (cppZ >= 2.0) {
                 return {
                     badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
                     spendShare,
-                    tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
+                    tip: tipParts.join('\n') + `\n⚠️ CPP 7d vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
                 };
             }
         }
 
-        // Priority 3: YẾU — z-score cao (khi CPP trên TB) HOẶC đắt tuyệt đối (>1.5x)
-        if (!absolutelyCheap && (cppZ >= 1.0 || ctrZ <= -1.5)) {
-            return {
-                badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + '\n⚠️ Hiệu suất suy giảm đáng kể so với lịch sử',
-            };
-        }
-        if (absolutelyExpensive) {
+        // =====================================================
+        // Priority 3: YẾU — CPP đắt + ROAS thấp
+        // =====================================================
+        if (absolutelyExpensive && !highROAS && cppZ > -0.5) {
             const ratio = (cppWindowAvg / campaignAvgCpp).toFixed(1);
             return {
                 badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
                 spendShare,
-                tip: tipParts.join('\n') + `\n⚠️ CPP cao gấp ${ratio}x so với TB campaign (${formatMoney(campaignAvgCpp)}) — Cân nhắc tối ưu hoặc phân bổ lại`,
+                tip: tipParts.join('\n') + `\n⚠️ CPP 7 ngày gần đây (${formatMoney(cppWindowAvg)}) cao gấp ${ratio}x so với TB campaign (${formatMoney(campaignAvgCpp)})`,
             };
         }
 
-        // Priority 4: ĐANG TỐT — CPP cải thiện mạnh (VÀ không quá đắt) HOẶC metrics ổn
+        // =====================================================
+        // Priority 3b: XUỐNG TREND — content vẫn ngon nhưng đang suy giảm
+        // (ROAS cao hoặc CPP rẻ, nhưng z-score tăng mạnh)
+        // =====================================================
+        if (cppZ >= 1.0 && (highROAS || absolutelyCheap)) {
+            return {
+                badge: { text: 'Xuống trend', bg: '#EAB30820', color: '#EAB308' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n📉 CPP 7d tăng ${fmtZ(cppZ)} so với lịch sử. Hiệu suất tổng vẫn tốt (ROAS ${totalROAS.toFixed(1)}x) nhưng cần theo dõi`,
+            };
+        }
+
+        // =====================================================
+        // Priority 3c: BẤT THƯỜNG — z-score > 3σ dù absolute OK
+        // =====================================================
+        if (Math.abs(cppZ) > 3) {
+            const direction = cppZ > 0 ? 'tăng' : 'giảm';
+            return {
+                badge: { text: 'Bất thường', bg: '#A855F720', color: '#A855F7' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n🔍 CPP ${direction} ${fmtZ(cppZ)} — biến động cực lớn so với lịch sử. Kiểm tra lại content/targeting`,
+            };
+        }
+
+        // =====================================================
+        // Priority 4: TỐT — ROAS xuất sắc hoặc CPP cải thiện mạnh
+        // =====================================================
+        if (excellentROAS && cppZ <= 1.0) {
+            return {
+                badge: { text: 'Tốt', bg: '#22C55E20', color: '#22C55E' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n✅ ROAS ${totalROAS.toFixed(1)}x — Content hiệu quả cao`,
+            };
+        }
         if (cppZ <= -1.0 && cppWindowAvg <= campaignAvgCpp * 1.5) {
             return {
                 badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
@@ -1083,22 +1120,27 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 tip: tipParts.join('\n') + `\n✅ CPP giảm ${fmtZ(cppZ)} so với lịch sử — Hiệu suất đang cải thiện`,
             };
         }
-        if (cppZ <= 0.5 && ctrZ >= -0.5) {
+        if (cppZ <= 0.5 && ctrZ >= -0.5 && highROAS) {
             return {
                 badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
                 spendShare,
-                tip: tipParts.join('\n') + '\n✅ Hiệu suất ổn định trong vùng cho phép',
+                tip: tipParts.join('\n') + `\n✅ Hiệu suất ổn định, ROAS ${totalROAS.toFixed(1)}x`,
             };
         }
 
-        // Priority 5: ỔN — default (kèm tooltip cảnh báo nếu content rẻ nhưng trend xấu)
-        const trendWarning = absolutelyCheap && cppZ >= 1.0
-            ? `\n📉 CPP tăng ${fmtZ(cppZ)} so với lịch sử, nhưng vẫn rẻ hơn TB campaign (${formatMoney(campaignAvgCpp)})`
-            : '';
+        // =====================================================
+        // Priority 5: ỔN — default
+        // =====================================================
+        let extraNote = '';
+        if (absolutelyCheap && cppZ >= 1.0) {
+            extraNote = `\n📉 CPP 7d tăng ${fmtZ(cppZ)} so với lịch sử, nhưng vẫn rẻ hơn TB campaign (${formatMoney(campaignAvgCpp)})`;
+        } else if (cppZ <= 0.5 && ctrZ >= -0.5) {
+            extraNote = '\n✅ Hiệu suất ổn định trong vùng cho phép';
+        }
         return {
             badge: { text: 'Ổn', bg: '#3B82F620', color: '#3B82F6' },
             spendShare,
-            tip: tipParts.join('\n') + trendWarning,
+            tip: tipParts.join('\n') + extraNote,
         };
     };
 

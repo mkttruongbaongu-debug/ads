@@ -62,8 +62,21 @@ ${creativeBrief?.dontList?.map((d: string) => `✕ ${d}`).join('\n') || 'N/A'}
 - Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)
 - Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone
 - Có CTA phù hợp ở cuối
+- ⚠️ QUY TẮC EMOJI — TUYỆT ĐỐI TUÂN THỦ:
+  + Tối đa 2-3 emoji trong TOÀN BỘ caption
+  + Chỉ dùng emoji phù hợp ngữ cảnh: 📩 🎁 ✅ 👉 💛 (ít, tinh tế)
+  + CẤM spam emoji: ❌ "🌿✨🎉🔥💯💥🍃🌟" — trông rất bị AI
+  + CẤM emoji ở đầu mỗi dòng — trông như chatbot
+  + Caption phải đọc TỰ NHIÊN như người thật viết, KHÔNG PHẢI AI
 
 ### Image Prompts — ⚠️ YÊU CẦU CHUYÊN SÂU ⚠️:
+
+#### KHỔ ẢNH THEO SỐ LƯỢNG (BẮT BUỘC):
+- **1 ảnh**: Dọc 4:5 (1080×1350px) — chiếm diện tích lớn nhất trên mobile feed
+- **2 ảnh**: Mỗi ảnh dọc 4:5 (1080×1350px) — hiển thị 2 cột dọc song song
+- **4 ảnh**: Mỗi ảnh vuông 1:1 (1080×1080px) — hiển thị grid 2×2
+→ MỌI image prompt PHẢI ghi rõ aspect ratio + resolution ở CUỐI prompt
+
 Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
 
 1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào (VD: "Inspired by Ad #1 - mâm cơm cận cảnh, ROAS 16x")
@@ -82,9 +95,10 @@ Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
 - Prompt chung chung: "A delicious dish on a table" → RÁC
 - Thiếu camera specs → ảnh trông như AI tạo
 - Thiếu lighting description → flat, lifeless
+- Thiếu aspect ratio → ảnh sai khổ, nhìn lạ
 
-✅ VÍ DỤ PROMPT CHUẨN:
-"Inspired by Ad #1 (ROAS 16x, mâm cơm gia đình style). Shot on iPhone 15 Pro Max, 26mm wide-angle, f/1.78. Overhead flat-lay composition of a traditional Vietnamese family meal: steaming white rice in a clay pot (center), grilled salmon fillet with crispy skin on a ceramic plate, kimchi and pickled vegetables in small dishes, fresh herbs (rau thơm) scattered. Natural window light from the upper-left creating soft shadows. Warm color grading (orange tones, +15 warmth). Rustic dark wooden table surface with visible grain texture. Steam rising from the rice. A hand reaching with chopsticks to pick up a piece of fish. Ultra-realistic, professional food photography, 4K resolution, shallow depth of field on the main dish."
+✅ VÍ DỤ PROMPT CHUẨN (1 ảnh = 4:5):
+"Inspired by Ad #1 (ROAS 16x, mâm cơm gia đình style). Shot on iPhone 15 Pro Max, 26mm wide-angle, f/1.78. Overhead flat-lay composition of a traditional Vietnamese family meal: steaming white rice in a clay pot (center), grilled salmon fillet with crispy skin on a ceramic plate, kimchi and pickled vegetables in small dishes, fresh herbs (rau thơm) scattered. Natural window light from the upper-left creating soft shadows. Warm color grading (orange tones, +15 warmth). Rustic dark wooden table surface with visible grain texture. Steam rising from the rice. A hand reaching with chopsticks to pick up a piece of fish. Ultra-realistic, professional food photography, 4K resolution, shallow depth of field on the main dish. Aspect ratio: 4:5 portrait (1080x1350px)."
 
 Số lượng ảnh: 1, 2, hoặc 4 (tuỳ content format)
 DÙNG TIẾNG ANH cho image prompt
@@ -94,7 +108,7 @@ Trả lời JSON (không markdown, không \`\`\`):
   "caption": "Nội dung caption đầy đủ...",
   "imageCount": 1 | 2 | 4,
   "imagePrompts": [
-    "Extremely detailed professional photography prompt as described above..."
+    "Extremely detailed professional photography prompt... Aspect ratio: 4:5 portrait (1080x1350px)."
   ],
   "keyMessage": "Thông điệp chính trong 1 câu",
   "inspirationSource": "Lấy cảm hứng chính từ Ad #X (tên ad, ROAS Xx) vì: lý do"
@@ -105,12 +119,27 @@ Trả lời JSON (không markdown, không \`\`\`):
 // STEP 2: GENERATE IMAGES (Gemini 3 Pro Image Preview)
 // ===================================================================
 
+// Xác định aspect ratio dựa trên số lượng ảnh tổng
+function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: string; instruction: string } {
+    switch (imageCount) {
+        case 2:
+            return { ratio: '4:5', resolution: '1080x1350', instruction: 'PORTRAIT 4:5 aspect ratio (1080x1350px). Two images will display as vertical columns side by side on Facebook feed.' };
+        case 4:
+            return { ratio: '1:1', resolution: '1080x1080', instruction: 'SQUARE 1:1 aspect ratio (1080x1080px). Four images will display as a 2x2 grid on Facebook feed.' };
+        default: // 1 image
+            return { ratio: '4:5', resolution: '1080x1350', instruction: 'PORTRAIT 4:5 aspect ratio (1080x1350px). Single image maximizes vertical screen real estate on mobile Facebook feed.' };
+    }
+}
+
 async function generateImage(
     client: OpenAI,
     prompt: string,
     referenceImageUrls: string[],
+    imageCount: number,
 ): Promise<string | null> {
     try {
+        const aspectSpec = getAspectRatioSpec(imageCount);
+
         // Build multimodal content: ultra-detailed photography prompt + reference images
         const contentParts: any[] = [
             {
@@ -119,6 +148,9 @@ async function generateImage(
 
 YOUR MISSION: Generate an ULTRA-REALISTIC food photograph that is INDISTINGUISHABLE from a real photo. 
 The output MUST look like it was shot by a professional photographer, NOT like AI-generated art.
+
+⚠️ MANDATORY ASPECT RATIO: ${aspectSpec.instruction}
+The image MUST be generated in ${aspectSpec.ratio} ratio (${aspectSpec.resolution}). This is NON-NEGOTIABLE.
 
 REFERENCE IMAGES: Study the attached reference images carefully. Match their:
 - Exact color palette and color grading
@@ -131,8 +163,9 @@ PHOTOGRAPHY SPECIFICATIONS FROM THE BRIEF:
 ${prompt}
 
 CRITICAL QUALITY REQUIREMENTS:
+- ASPECT RATIO: ${aspectSpec.ratio} (${aspectSpec.resolution}) — MUST FOLLOW
 - ULTRA-REALISTIC: Must pass as a real photograph, not AI art
-- 4K resolution quality (4096x4096), sharp and detailed
+- Sharp and detailed, professional quality
 - Correct physics: realistic reflections, shadows, steam behavior, liquid dynamics
 - Food must look APPETIZING and FRESH — no uncanny valley
 - Textures must be photorealistic: wood grain, ceramic glaze, fabric weave, food surface
@@ -142,7 +175,7 @@ CRITICAL QUALITY REQUIREMENTS:
 - NO surreal or fantasy elements — pure photorealism
 - Steam/smoke should look natural, not overdone
 
-OUTPUT: A single ultra-high-quality photograph.`,
+OUTPUT: A single ultra-high-quality photograph in ${aspectSpec.ratio} aspect ratio.`,
             },
         ];
 
@@ -286,7 +319,7 @@ export async function POST(
             .slice(0, captionResult.imageCount)
             .map(async (prompt, idx) => {
                 console.log(`[GENERATE_CREATIVE] 🖼️ Generating image ${idx + 1}/${captionResult.imageCount}...`);
-                const image = await generateImage(client, prompt, referenceUrls);
+                const image = await generateImage(client, prompt, referenceUrls, captionResult.imageCount);
                 return { idx, image };
             });
 

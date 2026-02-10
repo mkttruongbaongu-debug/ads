@@ -144,9 +144,16 @@ function BandsChart({
     const upperColor = isInverse ? colors.error : colors.success;   // CPP high=bad, CTR/ROAS high=good
     const lowerColor = isInverse ? colors.success : colors.error;   // CPP low=good, CTR/ROAS low=bad
 
-    const values = data.map(d => typeof d[metricKey] === 'number' ? d[metricKey] as number : 0);
-    const maxValue = Math.max(...values);
-    const minValue = Math.min(...values.filter(v => v > 0));
+    // CPP/ROAS: giá trị 0 = không có đơn → null (chart đứt đoạn)
+    // CTR: 0 vẫn là giá trị hợp lệ
+    const skipZero = metricKey === 'cpp' || metricKey === 'roas';
+    const values: (number | null)[] = data.map(d => {
+        const v = typeof d[metricKey] === 'number' ? d[metricKey] as number : 0;
+        return (skipZero && v === 0) ? null : v;
+    });
+    const validValues = values.filter((v): v is number => v !== null && v > 0);
+    const maxValue = validValues.length > 0 ? Math.max(...validValues) : 0;
+    const minValue = validValues.length > 0 ? Math.min(...validValues) : 0;
 
     // Include bands in range
     const upperBand = ma && sigma ? ma + 2 * sigma : maxValue;
@@ -171,12 +178,47 @@ function BandsChart({
 
     const historyCount = Math.max(0, data.length - windowDays);
 
-    // Build price line path
-    const linePts = values.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`);
-    const linePath = `M ${linePts.join(' L ')}`;
+    // Build line segments — skip null values (create gaps)
+    const lineSegments: string[] = [];
+    let currentSegment: string[] = [];
+    values.forEach((v, i) => {
+        if (v !== null) {
+            currentSegment.push(`${toX(i).toFixed(1)},${toY(v).toFixed(1)}`);
+        } else {
+            if (currentSegment.length > 0) {
+                lineSegments.push(`M ${currentSegment.join(' L ')}`);
+                currentSegment = [];
+            }
+        }
+    });
+    if (currentSegment.length > 0) {
+        lineSegments.push(`M ${currentSegment.join(' L ')}`);
+    }
+    const linePath = lineSegments.join(' ');
 
-    // Build area fill (under line)
-    const areaPath = `M ${toX(0).toFixed(1)},${toY(0) > H - PAD_B ? (H - PAD_B).toFixed(1) : toY(values[0]).toFixed(1)} L ${linePts.join(' L ')} L ${toX(data.length - 1).toFixed(1)},${(H - PAD_B).toFixed(1)} Z`;
+    // Build area fill segments (under line, skip nulls)
+    const areaSegments: string[] = [];
+    let areaCurrentPts: { x: number; y: number }[] = [];
+    values.forEach((v, i) => {
+        if (v !== null) {
+            areaCurrentPts.push({ x: toX(i), y: toY(v) });
+        } else {
+            if (areaCurrentPts.length > 0) {
+                const first = areaCurrentPts[0];
+                const last = areaCurrentPts[areaCurrentPts.length - 1];
+                const pts = areaCurrentPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+                areaSegments.push(`M ${first.x.toFixed(1)},${(H - PAD_B).toFixed(1)} L ${pts} L ${last.x.toFixed(1)},${(H - PAD_B).toFixed(1)} Z`);
+                areaCurrentPts = [];
+            }
+        }
+    });
+    if (areaCurrentPts.length > 0) {
+        const first = areaCurrentPts[0];
+        const last = areaCurrentPts[areaCurrentPts.length - 1];
+        const pts = areaCurrentPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+        areaSegments.push(`M ${first.x.toFixed(1)},${(H - PAD_B).toFixed(1)} L ${pts} L ${last.x.toFixed(1)},${(H - PAD_B).toFixed(1)} Z`);
+    }
+    const areaPath = areaSegments.join(' ');
 
     // Band area polygon (shaded ±2σ zone)
     let bandAreaPath = '';
@@ -192,10 +234,11 @@ function BandsChart({
     // Window region
     const windowStartX = historyCount > 0 ? toX(historyCount) : PAD_L;
 
-    // Current (last) value
-    const lastVal = values[values.length - 1];
-    const lastX = toX(data.length - 1);
-    const lastY = toY(lastVal);
+    // Current (last) value — tìm giá trị hợp lệ cuối cùng
+    const lastValidIdx = (() => { for (let i = values.length - 1; i >= 0; i--) { if (values[i] !== null) return i; } return values.length - 1; })();
+    const lastVal = values[lastValidIdx];
+    const lastX = toX(lastValidIdx);
+    const lastY = lastVal !== null ? toY(lastVal) : H - PAD_B;
 
     // Hover helpers
     const hoverVal = hoveredIdx !== null ? values[hoveredIdx] : null;
@@ -217,9 +260,11 @@ function BandsChart({
                 }}>{label} — {data.length} NGÀY</span>
                 <span style={{
                     fontSize: '0.75rem', fontWeight: 700,
-                    color: lastVal > (ma || 0) ? (metricKey === 'cpp' ? colors.error : colors.success) : (metricKey === 'cpp' ? colors.success : colors.error),
+                    color: lastVal === null ? colors.textMuted
+                        : lastVal > (ma || 0) ? (metricKey === 'cpp' ? colors.error : colors.success)
+                            : (metricKey === 'cpp' ? colors.success : colors.error),
                     fontFamily: '"JetBrains Mono", monospace',
-                }}>{formatValue(lastVal)}</span>
+                }}>{lastVal !== null ? formatValue(lastVal) : '—'}</span>
             </div>
             <svg
                 viewBox={`0 0 ${W} ${H}`}
@@ -310,7 +355,7 @@ function BandsChart({
 
                 {/* Data dots for window days */}
                 {values.map((v, i) => {
-                    if (i < historyCount) return null;
+                    if (i < historyCount || v === null) return null;
                     const isAboveUpper = ma && sigma && v > ma + 2 * sigma;
                     const isBelowLower = ma && sigma && v < ma - 2 * sigma;
                     const dotColor = isAboveUpper ? upperColor
@@ -326,8 +371,10 @@ function BandsChart({
                     );
                 })}
 
-                {/* Current value label */}
-                <circle cx={lastX} cy={lastY} r="4" fill={colors.primary} stroke={colors.bg} strokeWidth="1.5" />
+                {/* Current value dot — only if valid */}
+                {lastVal !== null && (
+                    <circle cx={lastX} cy={lastY} r="4" fill={colors.primary} stroke={colors.bg} strokeWidth="1.5" />
+                )}
 
                 {/* MA label */}
                 {ma && (
@@ -384,45 +431,72 @@ function BandsChart({
                 })}
 
                 {/* Hover crosshair + tooltip */}
-                {hoveredIdx !== null && hoverVal !== null && (
+                {hoveredIdx !== null && (
                     <g>
                         {/* Vertical crosshair */}
                         <line
                             x1={hoverX} y1={PAD_T} x2={hoverX} y2={H - PAD_B}
                             stroke={`${colors.text}40`} strokeWidth="0.8" strokeDasharray="3,2"
                         />
-                        {/* Horizontal crosshair */}
-                        <line
-                            x1={PAD_L} y1={hoverY} x2={W - PAD_R} y2={hoverY}
-                            stroke={`${colors.text}25`} strokeWidth="0.5" strokeDasharray="3,2"
-                        />
-                        {/* Highlight dot */}
-                        <circle
-                            cx={hoverX} cy={hoverY} r="4.5"
-                            fill={colors.primary} stroke={colors.text} strokeWidth="1.5"
-                        />
-                        {/* Tooltip background */}
-                        <rect
-                            x={tooltipRight ? hoverX - 90 : hoverX + 6}
-                            y={Math.max(PAD_T, hoverY - 22)}
-                            width={84} height={20} rx={3}
-                            fill={colors.bgAlt} stroke={colors.border} strokeWidth="0.8"
-                        />
-                        {/* Tooltip text - date */}
-                        <text
-                            x={tooltipRight ? hoverX - 86 : hoverX + 10}
-                            y={Math.max(PAD_T, hoverY - 22) + 13}
-                            fill={colors.textMuted} fontSize="7.5"
-                            fontFamily='"JetBrains Mono", monospace'
-                        >{(hoverDate || '').slice(5)}</text>
-                        {/* Tooltip text - value */}
-                        <text
-                            x={tooltipRight ? hoverX - 10 : hoverX + 86}
-                            y={Math.max(PAD_T, hoverY - 22) + 13}
-                            textAnchor="end"
-                            fill={colors.text} fontSize="8" fontWeight="700"
-                            fontFamily='"JetBrains Mono", monospace'
-                        >{formatValue(hoverVal)}</text>
+                        {hoverVal !== null ? (
+                            <>
+                                {/* Horizontal crosshair */}
+                                <line
+                                    x1={PAD_L} y1={hoverY} x2={W - PAD_R} y2={hoverY}
+                                    stroke={`${colors.text}25`} strokeWidth="0.5" strokeDasharray="3,2"
+                                />
+                                {/* Highlight dot */}
+                                <circle
+                                    cx={hoverX} cy={hoverY} r="4.5"
+                                    fill={colors.primary} stroke={colors.text} strokeWidth="1.5"
+                                />
+                                {/* Tooltip background */}
+                                <rect
+                                    x={tooltipRight ? hoverX - 90 : hoverX + 6}
+                                    y={Math.max(PAD_T, hoverY - 22)}
+                                    width={84} height={20} rx={3}
+                                    fill={colors.bgAlt} stroke={colors.border} strokeWidth="0.8"
+                                />
+                                {/* Tooltip text - date */}
+                                <text
+                                    x={tooltipRight ? hoverX - 86 : hoverX + 10}
+                                    y={Math.max(PAD_T, hoverY - 22) + 13}
+                                    fill={colors.textMuted} fontSize="7.5"
+                                    fontFamily='"JetBrains Mono", monospace'
+                                >{(hoverDate || '').slice(5)}</text>
+                                {/* Tooltip text - value */}
+                                <text
+                                    x={tooltipRight ? hoverX - 10 : hoverX + 86}
+                                    y={Math.max(PAD_T, hoverY - 22) + 13}
+                                    textAnchor="end"
+                                    fill={colors.text} fontSize="8" fontWeight="700"
+                                    fontFamily='"JetBrains Mono", monospace'
+                                >{formatValue(hoverVal)}</text>
+                            </>
+                        ) : (
+                            <>
+                                {/* Null value tooltip — "Không có đơn" */}
+                                <rect
+                                    x={tooltipRight ? hoverX - 110 : hoverX + 6}
+                                    y={H - PAD_B - 24}
+                                    width={104} height={20} rx={3}
+                                    fill={colors.bgAlt} stroke={`${colors.textMuted}50`} strokeWidth="0.8"
+                                />
+                                <text
+                                    x={tooltipRight ? hoverX - 106 : hoverX + 10}
+                                    y={H - PAD_B - 24 + 13}
+                                    fill={colors.textMuted} fontSize="7.5"
+                                    fontFamily='"JetBrains Mono", monospace'
+                                >{(hoverDate || '').slice(5)}</text>
+                                <text
+                                    x={tooltipRight ? hoverX - 10 : hoverX + 106}
+                                    y={H - PAD_B - 24 + 13}
+                                    textAnchor="end"
+                                    fill={colors.textMuted} fontSize="7.5" fontStyle="italic"
+                                    fontFamily='"JetBrains Mono", monospace'
+                                >Không có đơn</text>
+                            </>
+                        )}
                     </g>
                 )}
             </svg>

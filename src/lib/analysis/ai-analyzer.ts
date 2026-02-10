@@ -43,6 +43,7 @@ export interface CampaignContext {
         purchases: number;
         cpp: number;
         ctr: number;
+        revenue?: number;
     }>;
     issues: Array<{
         type: string;
@@ -163,10 +164,10 @@ QUY TẮC SỐNG CÒN (TUYỆT ĐỐI KHÔNG VI PHẠM)
 ═══════════════════════════════════════════
 
 BENCHMARK ROAS (Ngành F&B Việt Nam):
-- ROAS >= 4    → XUẤT SẮC → verdict.action PHẢI là SCALE hoặc MAINTAIN
-- ROAS 2 - 4   → TỐT     → verdict.action PHẢI là MAINTAIN hoặc WATCH
-- ROAS 1 - 2   → HÒA VỐN → verdict.action nên là WATCH hoặc REDUCE
-- ROAS < 1     → LỖ      → verdict.action PHẢI là REDUCE hoặc STOP
+- ROAS >= 4    → XUẤT SẮC
+- ROAS 2 - 4   → TỐT
+- ROAS 1 - 2   → HÒA VỐN
+- ROAS < 1     → LỖ
 
 BENCHMARK CPP (Ngành F&B Việt Nam):
 - CPP < 30.000đ   → RẤT TỐT
@@ -179,16 +180,46 @@ BENCHMARK CTR:
 - CTR 1-3%    → TRUNG BÌNH
 - CTR < 1%    → YẾU
 
+═══════════════════════════════════════════
+QUY TẮC VERDICT (TUYỆT ĐỐI KHÔNG VI PHẠM)
+═══════════════════════════════════════════
+
+VERDICT PHẢI DỰA TRÊN 7 NGÀY GẦN NHẤT (window), KHÔNG dùng ROAS tổng.
+
+SCALE chỉ được phép khi TẤT CẢ điều kiện sau:
+✅ Window ROAS >= 4x (hiệu quả GẦN ĐÂY vẫn xuất sắc)
+✅ CPP 7 ngày KHÔNG tăng đáng kể so với lịch sử (z-score <= 0.5)
+✅ CTR 7 ngày KHÔNG giảm mạnh (z-score >= -1.0)
+✅ Tối đa 1 trong 3 metrics (CPP, CTR, ROAS) có xu hướng xấu
+
+❌ KHÔNG ĐƯỢC SCALE khi:
+- CPP đang tăng VÀ CTR đang giảm (dù ROAS tổng cao)
+- 2/3 hoặc 3/3 trends đều xấu
+- Creative health = warning hoặc critical
+→ Trong các trường hợp này, verdict PHẢI là MAINTAIN hoặc thấp hơn
+
+Maintain khi:
+- ROAS window >= 4x nhưng có 2+ trends xấu → ưu tiên ổn định
+- ROAS window 2-4x và trends ổn
+
+Reduce khi:
+- ROAS window < 2x
+- HOẶC CPP tăng vượt +2σ
+- HOẶC 3/3 trends xấu VÀ ROAS window < 4x
+
+Stop khi:
+- ROAS window < 1x (đang lỗ)
+
 KIỂM TRA LOGIC (BẮT BUỘC trước khi output):
-✅ Nếu ROAS >= 4 → bạn KHÔNG ĐƯỢC nói "ROAS thấp" hay recommend STOP/REDUCE
+✅ Nếu CPP đang tăng + CTR đang giảm → bạn KHÔNG ĐƯỢC recommend SCALE
 ✅ Nếu ROAS < 1  → bạn KHÔNG ĐƯỢC recommend SCALE
-✅ verdict.headline PHẢI nhất quán với data thực tế
-✅ dimensions.financial.status PHẢI match với verdict.action
+✅ verdict.headline PHẢI nhất quán với xu hướng 7 ngày gần nhất
+✅ ROAS tổng chỉ để THAM KHẢO, quyết định dựa trên WINDOW metrics
 
 VÍ DỤ SAI (KHÔNG ĐƯỢC LÀM):
-❌ ROAS 10x → "ROAS thấp, cần cắt lỗ" (SAI VÌ 10x = xuất sắc)
+❌ ROAS tổng 10x nhưng CPP tăng 34% + CTR giảm 30% → "SCALE UP" (SAI! Phải MAINTAIN)
 ❌ ROAS 0.5x → "SCALE UP ngay" (SAI VÌ đang lỗ)
-❌ financial.status = "excellent" + verdict.action = "STOP" (MÂU THUẪN)
+❌ 3/3 trends xấu → "Tăng budget" (SAI! Đang đốt tiền)
 
 ═══════════════════════════════════════════
 NGUYÊN TẮC PHÂN TÍCH
@@ -335,9 +366,9 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
         let result = JSON.parse(content) as AIAnalysisResult;
 
         // ===================================================================
-        // GUARDRAILS: Validate verdict vs actual metrics
+        // GUARDRAILS: Validate verdict vs actual metrics + trends
         // ===================================================================
-        result = applyGuardrails(result, context.metrics);
+        result = applyGuardrails(result, context.metrics, context.dailyTrend);
 
         // Legacy fields
         result.summary = result.verdict?.headline || '';
@@ -365,40 +396,108 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
 }
 
 // ===================================================================
-// GUARDRAILS - Safety net after AI response
+// GUARDRAILS v2 - Safety net with TREND-BASED checks
 // ===================================================================
 function applyGuardrails(
     result: AIAnalysisResult,
-    metrics: CampaignContext['metrics']
+    metrics: CampaignContext['metrics'],
+    dailyTrend: CampaignContext['dailyTrend']
 ): AIAnalysisResult {
     const roas = metrics.roas;
-    const action = result.verdict?.action;
+    let action = result.verdict?.action;
 
-    // RULE 1: ROAS >= 4 → CANNOT be STOP/REDUCE
-    if (roas >= 4 && (action === 'STOP' || action === 'REDUCE')) {
-        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x nhưng AI nói ${action} → force MAINTAIN`);
-        result.verdict = {
-            action: 'MAINTAIN',
-            headline: `ROAS ${roas.toFixed(1)}x xuất sắc - Giữ nguyên chiến lược`,
-            condition: result.verdict?.condition,
+    // --- Calculate window vs history trends ---
+    const windowSize = Math.min(7, Math.floor(dailyTrend.length / 3));
+    const windowDays = dailyTrend.slice(-windowSize);
+    const historyDays = dailyTrend.slice(0, -windowSize);
+
+    let badTrends = 0;
+    let windowRoas = roas; // fallback to overall
+    let trendDetail = '';
+
+    if (historyDays.length >= 5 && windowDays.length >= 3) {
+        const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const std = (arr: number[], mean: number) => {
+            if (arr.length < 2) return 0;
+            return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
         };
-        result.reasoning = `[GHI ĐÈ] AI đề xuất ${action} nhưng ROAS ${roas.toFixed(2)}x > 4 = xuất sắc. ` + result.reasoning;
+
+        const histCtr = avg(historyDays.map(d => d.ctr));
+        const histCpp = avg(historyDays.map(d => d.cpp));
+
+        const windowCtr = avg(windowDays.map(d => d.ctr));
+        const windowCpp = avg(windowDays.map(d => d.cpp));
+
+        const windowSpend = windowDays.reduce((s, d) => s + d.spend, 0);
+        const windowPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
+        // Calculate window ROAS from daily data if revenue available
+        const windowRevenue = windowDays.reduce((s, d) => s + (d.revenue || 0), 0);
+        windowRoas = windowSpend > 0 && windowRevenue > 0 ? windowRevenue / windowSpend : roas;
+
+        const cppSigma = std(historyDays.map(d => d.cpp), histCpp) || 1;
+        const ctrSigma = std(historyDays.map(d => d.ctr), histCtr) || 1;
+
+        const cppZ = (windowCpp - histCpp) / cppSigma;
+        const ctrZ = (windowCtr - histCtr) / ctrSigma;
+
+        // Count bad trends
+        if (cppZ > 0.5) badTrends++;   // CPP rising
+        if (ctrZ < -0.5) badTrends++;  // CTR dropping
+        if (windowRoas < roas * 0.7) badTrends++; // ROAS dropping >30%
+
+        trendDetail = `cppZ=${cppZ.toFixed(2)} ctrZ=${ctrZ.toFixed(2)} windowROAS=${windowRoas.toFixed(2)}x badTrends=${badTrends}/3`;
+        console.log(`[GUARDRAIL_v2] 📊 Trends: ${trendDetail}`);
     }
 
-    // RULE 2: ROAS < 1 → CANNOT be SCALE
+    // RULE 1: SCALE blocked when trends are bad
+    if (action === 'SCALE' && badTrends >= 2) {
+        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: AI nói SCALE nhưng ${badTrends}/3 trends xấu → force MAINTAIN`);
+        result.verdict = {
+            action: 'MAINTAIN',
+            headline: `ROAS tốt nhưng ${badTrends}/3 trends đang giảm — ổn định trước, scale sau`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GHI ĐÈ: ${trendDetail}] AI đề xuất SCALE nhưng ${badTrends}/3 trends đang xấu — scale lúc này sẽ đốt tiền. ` + result.reasoning;
+    }
+
+    // RULE 2: Force REDUCE when window ROAS is bad
+    action = result.verdict?.action; // re-read after possible override
+    if (windowRoas < 2.0 && action !== 'REDUCE' && action !== 'STOP') {
+        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: Window ROAS ${windowRoas.toFixed(2)}x < 2 → force REDUCE`);
+        result.verdict = {
+            action: 'REDUCE',
+            headline: `ROAS gần đây ${windowRoas.toFixed(1)}x quá thấp — Giảm budget ngay`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GHI ĐÈ] Window ROAS ${windowRoas.toFixed(2)}x < 2 = gần hòa vốn. ` + result.reasoning;
+    }
+
+    // RULE 3: Force REDUCE when ALL trends bad + weak window ROAS
+    action = result.verdict?.action;
+    if (badTrends === 3 && windowRoas < 4.0 && action !== 'REDUCE' && action !== 'STOP') {
+        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: 3/3 trends xấu + window ROAS ${windowRoas.toFixed(2)}x < 4 → force REDUCE`);
+        result.verdict = {
+            action: 'REDUCE',
+            headline: `Tất cả metrics suy giảm, ROAS gần đây ${windowRoas.toFixed(1)}x — Giảm budget`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GHI ĐÈ] 3/3 trends xấu + window ROAS < 4. ` + result.reasoning;
+    }
+
+    // RULE 4: ROAS < 1 → CANNOT be SCALE
+    action = result.verdict?.action;
     if (roas < 1 && action === 'SCALE') {
-        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x < 1 nhưng AI nói SCALE → force REDUCE`);
+        console.warn(`[GUARDRAIL_v2] ⚠️ OVERRIDE: ROAS ${roas.toFixed(2)}x < 1 nhưng AI nói SCALE → force REDUCE`);
         result.verdict = {
             action: 'REDUCE',
             headline: `ROAS ${roas.toFixed(1)}x - Campaign đang lỗ, cần giảm budget`,
             condition: result.verdict?.condition,
         };
-        result.reasoning = `[GHI ĐÈ] AI đề xuất SCALE nhưng ROAS ${roas.toFixed(2)}x < 1 = lỗ. ` + result.reasoning;
+        result.reasoning = `[GHI ĐÈ] ROAS ${roas.toFixed(2)}x < 1 = lỗ. ` + result.reasoning;
     }
 
-    // RULE 3: Financial status must match ROAS
+    // RULE 5: Financial status must match ROAS
     if (roas >= 4 && result.dimensions?.financial?.status === 'critical') {
-        console.warn(`[GUARDRAIL] ⚠️ OVERRIDE: financial.status critical nhưng ROAS ${roas.toFixed(2)}x`);
         result.dimensions.financial.status = 'excellent';
         result.dimensions.financial.summary = `ROAS ${roas.toFixed(2)}x - XUẤT SẮC (${result.dimensions.financial.summary})`;
     }
@@ -514,17 +613,18 @@ LƯU Ý CONTENT:
 - Content chiếm >40% chi tiêu = RỦI RO TẬP TRUNG, xem xét đa dạng hóa
 ` : ''}
 ===== YÊU CẦU =====
-1. Đánh giá metrics theo BENCHMARK đã cho (ROAS >= 4 = xuất sắc, etc.)
+1. Đánh giá metrics theo BENCHMARK đã cho
 2. Tìm ROOT CAUSE cho vấn đề (nếu có)
-3. Đưa ra VERDICT dứt khoát - PHẢI nhất quán với data thực tế
+3. Đưa ra VERDICT dứt khoát - PHẢI dựa trên XU HƯỚNG 7 NGÀY GẦN NHẤT
 4. Dự đoán 3-5 ngày tới
 ${contentAnalysis && contentAnalysis.length > 0 ? `5. Đánh giá TỪNG CONTENT: content nào nên tắt, content nào nên giữ/scale, có cần tạo content mới không?
 6. Nếu phát hiện content bão hoà chiếm % chi tiêu lớn → CẢNH BÁO rõ ràng
 ` : ''}
 KIỂM TRA LẦN CUỐI trước khi output:
-- verdict.action có match với ROAS ${metrics.roas.toFixed(2)}x theo benchmark không?
-- Nếu ROAS >= 4: action PHẢI là SCALE hoặc MAINTAIN
-- headline có nói đúng sự thật không?
+- Verdict dựa trên 7 NGÀY GẦN NHẤT, không phải ROAS tổng
+- Nếu CPP đang TĂNG + CTR đang GIẢM → KHÔNG ĐƯỢC nói SCALE
+- Nếu 2/3 metrics đang xấu đi → verdict tối đa là MAINTAIN
+- headline phải phản ánh xu hướng gần đây, không phải thành tích quá khứ
 
 Trả về JSON đúng format.`;
 }

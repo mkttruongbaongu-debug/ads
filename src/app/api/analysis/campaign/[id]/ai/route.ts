@@ -144,6 +144,7 @@ export async function POST(
                 purchases: d.purchases,
                 cpp: d.cpp,
                 ctr: d.ctr,
+                revenue: d.revenue,
             })),
             issues: issues.map(i => ({
                 type: i.type,

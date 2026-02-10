@@ -221,6 +221,8 @@ export default function BangGiamSat({ userId }: Props) {
     const [proposals, setProposals] = useState<MonitoringProposal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isChecking, setIsChecking] = useState(false);
+    const [checkResult, setCheckResult] = useState<string | null>(null);
 
     // ===================================================================
     // FETCH MONITORING PROPOSALS
@@ -230,7 +232,7 @@ export default function BangGiamSat({ userId }: Props) {
         setError(null);
 
         try {
-            const res = await fetch('/api/de-xuat/danh-sach?status=DANG_GIAM_SAT');
+            const res = await fetch('/api/de-xuat/danh-sach?status=DANG_GIAM_SAT,DA_THUC_THI');
             const json = await res.json();
 
             if (!json.success) {
@@ -261,9 +263,40 @@ export default function BangGiamSat({ userId }: Props) {
         }
     }, []);
 
+    // ===================================================================
+    // AUTO-CHECK: Trigger monitoring check on load
+    // ===================================================================
+    const runMonitoringCheck = useCallback(async () => {
+        setIsChecking(true);
+        setCheckResult(null);
+        try {
+            const res = await fetch('/api/giam-sat/kiem-tra', { method: 'POST' });
+            const json = await res.json();
+            if (json.success && json.data) {
+                const { processed, observations_created, errors } = json.data;
+                if (observations_created > 0) {
+                    setCheckResult(`${observations_created} observation mới (${processed} đề xuất kiểm tra)`);
+                    // Refresh data
+                    await fetchMonitoringProposals();
+                } else {
+                    setCheckResult(`${processed} đề xuất kiểm tra, chưa có checkpoint mới`);
+                }
+                if (errors.length > 0) {
+                    console.warn('[GIAM_SAT UI] Errors:', errors);
+                }
+            }
+        } catch (err) {
+            console.error('Monitoring check failed:', err);
+        } finally {
+            setIsChecking(false);
+        }
+    }, [fetchMonitoringProposals]);
+
     useEffect(() => {
         fetchMonitoringProposals();
-    }, [fetchMonitoringProposals]);
+        // Auto-trigger monitoring check
+        runMonitoringCheck();
+    }, [fetchMonitoringProposals, runMonitoringCheck]);
 
     // ===================================================================
     // HELPERS
@@ -288,11 +321,36 @@ export default function BangGiamSat({ userId }: Props) {
     return (
         <div style={styles.container}>
             {/* Header */}
-            <div style={styles.header}>
-                <h1 style={styles.title}>Bảng Giám Sát</h1>
-                <p style={styles.subtitle}>
-                    Theo dõi kết quả của các đề xuất đã thực thi
-                </p>
+            <div style={{ ...styles.header, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1 style={styles.title}>BANG GIAM SAT</h1>
+                    <p style={styles.subtitle}>
+                        Theo dõi kết quả D+1 / D+3 / D+7 sau khi thực thi
+                    </p>
+                    {checkResult && (
+                        <p style={{ fontSize: '0.75rem', color: colors.success, marginTop: '4px' }}>
+                            {checkResult}
+                        </p>
+                    )}
+                </div>
+                <button
+                    onClick={runMonitoringCheck}
+                    disabled={isChecking}
+                    style={{
+                        padding: '8px 16px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        background: isChecking ? colors.bgAlt : 'transparent',
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '4px',
+                        color: isChecking ? colors.textMuted : colors.text,
+                        cursor: isChecking ? 'not-allowed' : 'pointer',
+                        textTransform: 'uppercase' as any,
+                        letterSpacing: '0.5px',
+                    }}
+                >
+                    {isChecking ? 'DANG KIEM TRA...' : 'KIEM TRA NGAY'}
+                </button>
             </div>
 
             {/* Loading */}

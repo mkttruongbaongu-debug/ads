@@ -1023,11 +1023,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             `Z-Score: CPP ${fmtZ(cppZ)} · CTR ${fmtZ(ctrZ)}`,
         ];
 
-        // --- 2-LAYER BADGE LOGIC ---
+        // --- 3-LAYER BADGE LOGIC v3 ---
         // Layer 1: Absolute CPP check (recent window vs campaign average)
         const recentSpend = windowDays.reduce((s, d) => s + d.spend, 0);
         const recentPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
         const absolutelyCheap = campaignAvgCpp > 0 && cppWindowAvg > 0 && cppWindowAvg < campaignAvgCpp;
+        // Layer 2: Expensive check — CPP > 1.5x avg AND not meaningfully improving
+        const absolutelyExpensive = campaignAvgCpp > 0 && cppWindowAvg > campaignAvgCpp * 1.5 && cppZ > -0.5;
 
         // Priority 1: KÉM — chi tiền nhưng 0 đơn gần đây
         if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.03) {
@@ -1056,7 +1058,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             }
         }
 
-        // Priority 3: YẾU — CHỈ KHI CPP đắt hơn TB campaign
+        // Priority 3: YẾU — z-score cao (khi CPP trên TB) HOẶC đắt tuyệt đối (>1.5x)
         if (!absolutelyCheap && (cppZ >= 1.0 || ctrZ <= -1.5)) {
             return {
                 badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
@@ -1064,9 +1066,17 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                 tip: tipParts.join('\n') + '\n⚠️ Hiệu suất suy giảm đáng kể so với lịch sử',
             };
         }
+        if (absolutelyExpensive) {
+            const ratio = (cppWindowAvg / campaignAvgCpp).toFixed(1);
+            return {
+                badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n⚠️ CPP cao gấp ${ratio}x so với TB campaign (${formatMoney(campaignAvgCpp)}) — Cân nhắc tối ưu hoặc phân bổ lại`,
+            };
+        }
 
-        // Priority 4: ĐANG TỐT — CPP cải thiện mạnh (-1σ) HOẶC metrics ổn
-        if (cppZ <= -1.0) {
+        // Priority 4: ĐANG TỐT — CPP cải thiện mạnh (VÀ không quá đắt) HOẶC metrics ổn
+        if (cppZ <= -1.0 && cppWindowAvg <= campaignAvgCpp * 1.5) {
             return {
                 badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
                 spendShare,
@@ -1081,7 +1091,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             };
         }
 
-        // Priority 5: ỔN — default (bao gồm content rẻ nhưng trend xấu)
+        // Priority 5: ỔN — default (kèm tooltip cảnh báo nếu content rẻ nhưng trend xấu)
         const trendWarning = absolutelyCheap && cppZ >= 1.0
             ? `\n📉 CPP tăng ${fmtZ(cppZ)} so với lịch sử, nhưng vẫn rẻ hơn TB campaign (${formatMoney(campaignAvgCpp)})`
             : '';

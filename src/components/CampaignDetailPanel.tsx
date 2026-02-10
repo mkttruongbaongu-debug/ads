@@ -766,15 +766,17 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         // Reset tab to overview
         setActiveTab('overview');
 
-        console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Launching 3 parallel streams...');
+        console.log('[CAMPAIGN_DETAIL] ✅ State reset complete. Phase 1: Load data, Phase 2: AI analysis...');
 
-        // 🚀 PARALLEL: All 3 run simultaneously!
-        // Stream 1: FAST — Chart data (~1-2s)
-        // Stream 2: SLOW — AI analysis (~6-18s)
-        // Stream 3: MEDIUM — Ads data (~2-5s)
-        fetchTrend();
-        handleAnalyzeAI();
-        fetchAds();
+        // 🚀 2-PHASE approach:
+        // Phase 1: Load data in parallel (trend + ads) — FAST
+        // Phase 2: AI analysis — CHỈ CHẠY KHI DATA ĐÃ LOAD XONG
+        const loadData = async () => {
+            await Promise.all([fetchTrend(), fetchAds()]);
+            console.log('[CAMPAIGN_DETAIL] ✅ Phase 1 complete — data loaded. Starting AI analysis...');
+            handleAnalyzeAI();
+        };
+        loadData();
     }, [campaign.id]); // Trigger when campaign changes
 
     const fetchAds = async () => {
@@ -1868,171 +1870,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </div>
                                 </div>
                             )}
-
-                            {/* ═══ CREATIVE INTELLIGENCE ═══ */}
-                            <div style={{
-                                padding: '12px 16px', marginBottom: '16px',
-                                background: colors.bgAlt, border: `1px solid ${colors.border}`,
-                                borderRadius: '6px',
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                                        Creative Intelligence
-                                    </h4>
-                                    <button
-                                        onClick={async () => {
-                                            if ((window as any).__creativeIntelLoading) return;
-                                            (window as any).__creativeIntelLoading = true;
-                                            const btn = document.getElementById('creative-intel-btn');
-                                            if (btn) btn.textContent = 'ĐANG PHÂN TÍCH...';
-                                            try {
-                                                const res = await fetch(
-                                                    `/api/analysis/campaign/${campaign.id}/creative-intel?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-                                                );
-                                                const json = await res.json();
-                                                if (json.success) {
-                                                    (window as any).__creativeIntelData = json.data;
-                                                    // Force re-render by setting a state
-                                                    setAiError(null);
-                                                } else {
-                                                    alert(json.error || 'Lỗi phân tích creative');
-                                                }
-                                            } catch (err) {
-                                                alert('Lỗi kết nối');
-                                            } finally {
-                                                (window as any).__creativeIntelLoading = false;
-                                                if (btn) btn.textContent = 'PHÂN TÍCH CREATIVE';
-                                            }
-                                        }}
-                                        id="creative-intel-btn"
-                                        style={{
-                                            background: 'transparent', border: `1px solid ${colors.primary}`,
-                                            color: colors.primary, fontSize: '0.625rem', fontWeight: 700,
-                                            padding: '4px 10px', borderRadius: '3px', cursor: 'pointer',
-                                            letterSpacing: '0.05em',
-                                        }}
-                                    >PHÂN TÍCH CREATIVE</button>
-                                </div>
-
-                                {/* Results */}
-                                {(window as any).__creativeIntelData && (() => {
-                                    const data = (window as any).__creativeIntelData;
-                                    const healthColors: Record<string, string> = {
-                                        EXCELLENT: colors.success,
-                                        GOOD: '#3b82f6',
-                                        NEEDS_REFRESH: colors.warning,
-                                        CRITICAL: colors.error,
-                                    };
-                                    return (
-                                        <div style={{ marginTop: '12px' }}>
-                                            {/* Health Badge */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                                                <span style={{
-                                                    fontSize: '0.625rem', fontWeight: 700,
-                                                    padding: '2px 8px', borderRadius: '3px',
-                                                    background: healthColors[data.overallHealth] || colors.textMuted,
-                                                    color: '#fff',
-                                                }}>{data.overallHealth}</span>
-                                                <span style={{ fontSize: '0.6875rem', color: colors.textMuted }}>
-                                                    {data.refreshUrgency}
-                                                </span>
-                                            </div>
-
-                                            {/* Winning Patterns */}
-                                            {data.winningPatterns?.length > 0 && (
-                                                <div style={{ marginBottom: '10px' }}>
-                                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: colors.success, marginBottom: '4px', letterSpacing: '0.05em' }}>
-                                                        WINNING PATTERNS
-                                                    </div>
-                                                    {data.winningPatterns.map((p: any, i: number) => (
-                                                        <div key={i} style={{ fontSize: '0.6875rem', color: colors.textMuted, marginBottom: '3px', paddingLeft: '8px', borderLeft: `2px solid ${colors.success}30` }}>
-                                                            <span style={{ color: colors.text, fontWeight: 600 }}>{p.category}:</span> {p.pattern}
-                                                            <span style={{ color: colors.textSubtle, fontSize: '0.5625rem' }}> ({p.evidence})</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Losing Patterns */}
-                                            {data.losingPatterns?.length > 0 && (
-                                                <div style={{ marginBottom: '10px' }}>
-                                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: colors.error, marginBottom: '4px', letterSpacing: '0.05em' }}>
-                                                        LOSING PATTERNS
-                                                    </div>
-                                                    {data.losingPatterns.map((p: any, i: number) => (
-                                                        <div key={i} style={{ fontSize: '0.6875rem', color: colors.textMuted, marginBottom: '3px', paddingLeft: '8px', borderLeft: `2px solid ${colors.error}30` }}>
-                                                            <span style={{ color: colors.text, fontWeight: 600 }}>{p.category}:</span> {p.pattern}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Creative Brief */}
-                                            {data.creativeBrief && (
-                                                <div style={{ marginTop: '12px', padding: '10px 12px', background: colors.bg, borderRadius: '4px', border: `1px solid ${colors.border}` }}>
-                                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: colors.primary, marginBottom: '6px', letterSpacing: '0.05em' }}>
-                                                        CREATIVE BRIEF
-                                                    </div>
-                                                    <p style={{ fontSize: '0.6875rem', color: colors.text, margin: '0 0 8px', lineHeight: 1.5 }}>
-                                                        {data.creativeBrief.summary}
-                                                    </p>
-                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, marginBottom: '4px' }}>
-                                                        <span style={{ fontWeight: 600, color: colors.textSubtle }}>Format:</span> {data.creativeBrief.contentFormat}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, marginBottom: '4px' }}>
-                                                        <span style={{ fontWeight: 600, color: colors.textSubtle }}>Caption:</span> {data.creativeBrief.captionGuideline}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, marginBottom: '4px' }}>
-                                                        <span style={{ fontWeight: 600, color: colors.textSubtle }}>Visual:</span> {data.creativeBrief.visualDirection}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, marginBottom: '6px' }}>
-                                                        <span style={{ fontWeight: 600, color: colors.textSubtle }}>CTA:</span> {data.creativeBrief.ctaRecommendation}
-                                                    </div>
-
-                                                    {/* Caption Examples */}
-                                                    {data.creativeBrief.captionExamples?.length > 0 && (
-                                                        <div style={{ marginTop: '8px' }}>
-                                                            <div style={{ fontSize: '0.5625rem', fontWeight: 700, color: colors.textSubtle, marginBottom: '4px', letterSpacing: '0.05em' }}>
-                                                                CAPTION MAU
-                                                            </div>
-                                                            {data.creativeBrief.captionExamples.map((ex: string, i: number) => (
-                                                                <div key={i} style={{
-                                                                    fontSize: '0.625rem', color: colors.text, padding: '6px 8px',
-                                                                    background: colors.bgAlt, borderRadius: '3px', marginBottom: '4px',
-                                                                    borderLeft: `2px solid ${colors.primary}`,
-                                                                    fontStyle: 'italic',
-                                                                }}>
-                                                                    {ex}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Do / Don't */}
-                                                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                                                        {data.creativeBrief.doList?.length > 0 && (
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ fontSize: '0.5625rem', fontWeight: 700, color: colors.success, marginBottom: '3px' }}>NEN LAM</div>
-                                                                {data.creativeBrief.doList.map((d: string, i: number) => (
-                                                                    <div key={i} style={{ fontSize: '0.5625rem', color: colors.textMuted, marginBottom: '2px' }}>+ {d}</div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {data.creativeBrief.dontList?.length > 0 && (
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ fontSize: '0.5625rem', fontWeight: 700, color: colors.error, marginBottom: '3px' }}>KHONG NEN</div>
-                                                                {data.creativeBrief.dontList.map((d: string, i: number) => (
-                                                                    <div key={i} style={{ fontSize: '0.5625rem', color: colors.textMuted, marginBottom: '2px' }}>- {d}</div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3 style={styles.sectionTitle}>

@@ -212,6 +212,45 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         fetchAds();
     }, [fetchAds]);
 
+    // ===== FETCH AD SETS =====
+    const fetchAdSets = useCallback(async () => {
+        if (!campaignId) return;
+        setAdSetLoading(true);
+        setAdSetError('');
+        try {
+            const today = new Date();
+            const ed = today.toISOString().split('T')[0];
+            const sd = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            console.log(`[CREATIVE_STUDIO] Fetching adsets for campaign ${campaignId}...`);
+            const res = await fetch(`/api/facebook/campaign/${campaignId}/adsets?startDate=${sd}&endDate=${ed}`);
+            const json = await res.json();
+            console.log('[CREATIVE_STUDIO] Adsets response:', json);
+            if (json.success && json.data) {
+                setAdSets(json.data.map((a: any) => ({ id: a.id, name: a.name, status: a.status })));
+                if (json.data.length > 0) {
+                    const active = json.data.find((a: any) => a.status === 'ACTIVE');
+                    if (active) setSelectedAdSet(active.id);
+                    else setSelectedAdSet(json.data[0].id);
+                } else {
+                    setAdSetError('Campaign không có ad set nào');
+                }
+            } else {
+                setAdSetError(json.error || 'Không tải được ad sets');
+            }
+        } catch (err) {
+            console.error('Failed to fetch adsets:', err);
+            setAdSetError(err instanceof Error ? err.message : 'Lỗi kết nối');
+        } finally {
+            setAdSetLoading(false);
+        }
+    }, [campaignId]);
+
+    // Auto-fetch adsets when creative is generated
+    useEffect(() => {
+        if (generatedCaption && adSets.length === 0) {
+            fetchAdSets();
+        }
+    }, [generatedCaption, fetchAdSets]); // eslint-disable-line react-hooks/exhaustive-deps
     // ===== GENERATE CREATIVE (Caption + Images) =====
     const generateCreative = useCallback(async () => {
         if (!intel) return;
@@ -644,30 +683,6 @@ Tổng ads: ${ads.length}`}
 
                             {intel && (
                                 <div>
-                                    {/* Overall Health */}
-                                    <div style={{
-                                        padding: '12px 16px', marginBottom: '16px', borderRadius: '6px',
-                                        background: intel.overallHealth === 'EXCELLENT' ? `${colors.accent}10` :
-                                            intel.overallHealth === 'GOOD' ? `${colors.accent}08` :
-                                                intel.overallHealth === 'NEEDS_REFRESH' ? `${colors.warning}10` : `${colors.error}10`,
-                                        border: `1px solid ${intel.overallHealth === 'EXCELLENT' || intel.overallHealth === 'GOOD' ? colors.accent : intel.overallHealth === 'NEEDS_REFRESH' ? colors.warning : colors.error}30`,
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.1em' }}>
-                                                CREATIVE HEALTH
-                                            </span>
-                                            <span style={{
-                                                fontSize: '0.75rem', fontWeight: 700,
-                                                color: intel.overallHealth === 'EXCELLENT' || intel.overallHealth === 'GOOD' ? colors.accent :
-                                                    intel.overallHealth === 'NEEDS_REFRESH' ? colors.warning : colors.error,
-                                            }}>
-                                                {intel.overallHealth}
-                                            </span>
-                                        </div>
-                                        <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: colors.text }}>
-                                            {intel.refreshUrgency}
-                                        </p>
-                                    </div>
 
                                     {/* Winning Patterns */}
                                     {intel.winningPatterns.length > 0 && (
@@ -1217,36 +1232,7 @@ Tổng ads: ${ads.length}`}
                                                         ))}
                                                     </select>
                                                     <button
-                                                        onClick={async () => {
-                                                            setAdSetLoading(true);
-                                                            setAdSetError('');
-                                                            try {
-                                                                const today = new Date();
-                                                                const ed = today.toISOString().split('T')[0];
-                                                                const sd = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                                                                console.log(`[CREATIVE_STUDIO] Fetching adsets for campaign ${campaignId}...`);
-                                                                const res = await fetch(`/api/facebook/campaign/${campaignId}/adsets?startDate=${sd}&endDate=${ed}`);
-                                                                const json = await res.json();
-                                                                console.log('[CREATIVE_STUDIO] Adsets response:', json);
-                                                                if (json.success && json.data) {
-                                                                    setAdSets(json.data.map((a: any) => ({ id: a.id, name: a.name, status: a.status })));
-                                                                    if (json.data.length > 0) {
-                                                                        const active = json.data.find((a: any) => a.status === 'ACTIVE');
-                                                                        if (active) setSelectedAdSet(active.id);
-                                                                        else setSelectedAdSet(json.data[0].id);
-                                                                    } else {
-                                                                        setAdSetError('Campaign không có ad set nào');
-                                                                    }
-                                                                } else {
-                                                                    setAdSetError(json.error || 'Không tải được ad sets');
-                                                                }
-                                                            } catch (err) {
-                                                                console.error('Failed to fetch adsets:', err);
-                                                                setAdSetError(err instanceof Error ? err.message : 'Lỗi kết nối');
-                                                            } finally {
-                                                                setAdSetLoading(false);
-                                                            }
-                                                        }}
+                                                        onClick={fetchAdSets}
                                                         style={{
                                                             padding: '8px 12px', borderRadius: '4px',
                                                             background: colors.bgAlt,

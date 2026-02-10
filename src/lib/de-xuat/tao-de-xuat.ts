@@ -143,6 +143,56 @@ export async function taoDeXuat(
         console.log(`[TAO_DE_XUAT] 🔍 Bắt đầu tạo đề xuất cho campaign: ${input.tenCampaign}`);
 
         // ===================================================================
+        // STEP 0: DEDUP GUARD — Chặn nếu campaign đã có đề xuất đang active
+        // Quy tắc: Mỗi campaign chỉ được có TỐI ĐA 1 đề xuất đang hoạt động
+        // Active = CHO_DUYET | DA_DUYET | DANG_GIAM_SAT
+        // Cho phép tạo mới khi: HOAN_THANH | BI_TU_CHOI | không có đề xuất
+        // ===================================================================
+        const ACTIVE_STATUSES = ['CHO_DUYET', 'DA_DUYET', 'DANG_GIAM_SAT'];
+
+        const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        const apiSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
+
+        if (appsScriptUrl) {
+            try {
+                const checkUrl = new URL(appsScriptUrl);
+                checkUrl.searchParams.set('secret', apiSecret);
+                checkUrl.searchParams.set('action', 'layDanhSachDeXuat');
+                checkUrl.searchParams.set('campaignId', input.campaignId);
+                checkUrl.searchParams.set('userId', input.userId);
+
+                const checkRes = await fetch(checkUrl.toString());
+                const checkData = await checkRes.json();
+
+                if (checkData.success && checkData.data) {
+                    const activeProposal = checkData.data.find(
+                        (p: any) => ACTIVE_STATUSES.includes(p.trangThai)
+                    );
+
+                    if (activeProposal) {
+                        const statusLabels: Record<string, string> = {
+                            'CHO_DUYET': 'đang chờ duyệt',
+                            'DA_DUYET': 'đã duyệt, chưa thực thi',
+                            'DANG_GIAM_SAT': 'đang giám sát (chờ D+7)',
+                        };
+                        const statusLabel = statusLabels[activeProposal.trangThai] || activeProposal.trangThai;
+
+                        console.log(`[TAO_DE_XUAT] 🚫 CHẶN: Campaign "${input.tenCampaign}" đã có đề xuất ${statusLabel}`);
+
+                        return {
+                            success: false,
+                            error: `Campaign này đã có đề xuất ${statusLabel}. Mỗi campaign chỉ được có 1 đề xuất hoạt động tại một thời điểm. Vui lòng xử lý đề xuất hiện tại trước khi phân tích lại.`,
+                        };
+                    }
+                }
+                console.log(`[TAO_DE_XUAT] ✅ DEDUP OK: Campaign chưa có đề xuất active`);
+            } catch (dedupErr) {
+                // Non-critical: nếu check fail thì vẫn cho tạo (graceful degradation)
+                console.warn('[TAO_DE_XUAT] ⚠️ Dedup check failed, proceeding anyway:', dedupErr);
+            }
+        }
+
+        // ===================================================================
         // STEP 1: Prepare data cho AI analysis
         // ===================================================================
         const duLieuPhanTich: DuLieuPhanTich = {

@@ -394,7 +394,7 @@ export default function BangThucThi() {
                                     <p style={{
                                         fontSize: '0.75rem', color: colors.textMuted, margin: 0,
                                     }}>
-                                        {dx.hanhDong?.loai?.replace(/_/g, ' ')} · {new Date(dx.thoiGian_Tao).toLocaleDateString('vi-VN')}
+                                        {new Date(dx.thoiGian_Tao).toLocaleDateString('vi-VN')}
                                     </p>
                                 </div>
 

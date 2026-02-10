@@ -1463,10 +1463,34 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             {/* ═══ PHÂN TÍCH CHỈ SỐ — Redesigned ═══ */}
                             {(() => {
                                 const rec = campaign.actionRecommendation;
-                                const bands = rec?.debugData?.processing?.bands;
+                                const aiBands = rec?.debugData?.processing?.bands;
                                 const tags = rec?.metricTags || [];
 
-                                if (!bands && tags.length === 0) return null;
+                                // Fallback: compute bands locally from dailyTrend when AI hasn't run yet
+                                const computeLocalBandFull = (key: 'cpp' | 'ctr' | 'roas') => {
+                                    const vals = dailyTrend
+                                        .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
+                                        .filter((v: number) => v > 0);
+                                    if (vals.length < 3) return null;
+                                    const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
+                                    const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                    const sigma = Math.sqrt(variance);
+                                    // Window avg = last 7 days
+                                    const windowVals = vals.slice(-7);
+                                    const windowAvg = windowVals.length > 0
+                                        ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
+                                        : ma;
+                                    const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
+                                    return { ma, sigma, windowAvg, zScore };
+                                };
+
+                                const bands: Record<string, any> = {};
+                                for (const key of ['ctr', 'cpp', 'roas'] as const) {
+                                    bands[key] = aiBands?.[key] || computeLocalBandFull(key);
+                                }
+
+                                const hasBandData = bands.ctr || bands.cpp || bands.roas;
+                                if (!hasBandData && tags.length === 0) return null;
 
                                 // Status label logic (Vietnamese, human-readable)
                                 const getStatus = (zScore: number | undefined, isInverse: boolean) => {
@@ -1507,7 +1531,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                         {/* Metric Cards */}
                                         {(['CTR', 'CPP', 'ROAS'] as const).map(metric => {
-                                            const band = bands?.[metric.toLowerCase()];
+                                            const band = bands[metric.toLowerCase()];
                                             const tag = tags.find(t => t.metric === metric);
                                             if (!band && !tag) return null;
 

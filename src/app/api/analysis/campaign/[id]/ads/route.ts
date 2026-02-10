@@ -31,10 +31,11 @@ export async function GET(
         const accessToken = tokenResult.accessToken;
 
         // Fetch ads with daily insights and creative info
+        // video_id needed to batch-fetch hi-res video thumbnails
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
             `fields=id,name,status,effective_object_story_id,effective_image_url,` +
-            `creative{id,thumbnail_url,image_url,body,object_story_spec,effective_object_story_id},` +
+            `creative{id,thumbnail_url,image_url,video_id,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
@@ -60,6 +61,7 @@ export async function GET(
                 id: string;
                 thumbnail_url?: string;
                 image_url?: string;
+                video_id?: string;
                 body?: string;
                 effective_object_story_id?: string;
                 object_story_spec?: {
@@ -130,10 +132,20 @@ export async function GET(
                 || ad.creative?.thumbnail_url
                 || null;
 
-            // Enhance thumbnail URLs with width parameter for higher resolution
-            if (imageUrl && imageUrl.includes('fbcdn') && imageUrl.includes('/t45') && !imageUrl.includes('width=')) {
-                // Facebook thumbnail URLs can be enhanced with width param
-                imageUrl = imageUrl.replace(/\/s\d+x\d+\//, '/s720x720/');
+            // Enhance thumbnail URLs: try multiple fbcdn patterns for higher resolution
+            if (imageUrl && imageUrl.includes('fbcdn')) {
+                // Pattern 1: /t45.*/s64x64/ → /s720x720/
+                if (imageUrl.match(/\/s\d+x\d+\//)) {
+                    imageUrl = imageUrl.replace(/\/s\d+x\d+\//, '/s720x720/');
+                }
+                // Pattern 2: /t51.*/c64.64.../  (crop params → remove for full size)
+                if (imageUrl.match(/\/c\d+\.\d+\./)) {
+                    imageUrl = imageUrl.replace(/\/c\d+\.\d+\.[^/]+\//, '/');
+                }
+                // Pattern 3: width/height query params → upgrade
+                if (imageUrl.includes('width=') && imageUrl.includes('height=')) {
+                    imageUrl = imageUrl.replace(/width=\d+/, 'width=720').replace(/height=\d+/, 'height=720');
+                }
             }
 
             return {
@@ -211,10 +223,74 @@ export async function GET(
                 }
                 console.log(`[API:ADS] 🖼️ Batch fetched ${storyIdMap.size} post images (attachments+full_picture)`);
             } catch (err) {
-                // Non-critical: fall back to existing thumbnails
-                console.warn('[API:ADS] ⚠️ Failed to batch fetch post images, using fallback:', err);
+                console.warn('[API:ADS] ⚠️ Failed to batch fetch post images:', err);
             }
         }
+
+        // ===================================================================
+        // STEP 3: Batch fetch video thumbnails for ads STILL at 64px
+        // Video ads often have no effective_image_url or effective_object_story_id
+        // → fetch /{video_id}?fields=picture for 720px+ video poster
+        // ===================================================================
+        const videoMap = new Map<string, number[]>(); // videoId → [adIndex]
+        ads.forEach((ad: { thumbnail: string | null }, idx: number) => {
+            // Only for ads still missing hi-res image
+            const currentThumb = ad.thumbnail || '';
+            const isLowRes = !currentThumb || currentThumb.includes('/t45') || currentThumb.includes('s64x64') || currentThumb.includes('p64x64');
+            if (!isLowRes) return;
+
+            const rawAd = (adsData.data || [])[idx];
+            const videoId = rawAd?.creative?.video_id || rawAd?.creative?.object_story_spec?.video_data?.video_id;
+            if (videoId) {
+                if (!videoMap.has(videoId)) videoMap.set(videoId, []);
+                videoMap.get(videoId)!.push(idx);
+            }
+        });
+
+        if (videoMap.size > 0) {
+            try {
+                // Batch fetch: /?ids=vid1,vid2&fields=picture
+                // FB returns {vid1: {picture: "720px_url"}, vid2: ...}
+                const videoIds = Array.from(videoMap.keys()).join(',');
+                const vidRes = await fetch(
+                    `${FB_API_BASE}/?ids=${videoIds}&fields=picture,format&access_token=${accessToken}`
+                );
+                const vidData = await vidRes.json();
+
+                let upgraded = 0;
+                for (const [videoId, adIndexes] of videoMap) {
+                    const vidInfo = vidData[videoId];
+                    if (!vidInfo) continue;
+
+                    // Get best video thumbnail:
+                    // format[] contains multiple resolutions, pick largest
+                    // Otherwise use picture field (usually 480-720px)
+                    let bestPic = '';
+                    if (vidInfo.format && Array.isArray(vidInfo.format)) {
+                        const sorted = [...vidInfo.format].sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                        bestPic = sorted[0]?.picture || '';
+                    }
+                    if (!bestPic) bestPic = vidInfo.picture || '';
+
+                    if (bestPic) {
+                        for (const idx of adIndexes) {
+                            ads[idx].thumbnail = bestPic;
+                        }
+                        upgraded++;
+                    }
+                }
+                console.log(`[API:ADS] 🎬 Video thumbnails: ${upgraded}/${videoMap.size} upgraded to hi-res`);
+            } catch (err) {
+                console.warn('[API:ADS] ⚠️ Failed to fetch video thumbnails:', err);
+            }
+        }
+
+        // Log final image resolution stats
+        const hiRes = ads.filter((a: { thumbnail: string | null }) => {
+            const t = a.thumbnail || '';
+            return t && !t.includes('/t45') && !t.includes('s64x64') && !t.includes('p64x64');
+        }).length;
+        console.log(`[API:ADS] 📊 Image quality: ${hiRes}/${ads.length} ads have hi-res images`);
 
         // Sort by spend (highest first) to show most impactful ads first
         ads.sort((a: { totals: { spend: number } }, b: { totals: { spend: number } }) => b.totals.spend - a.totals.spend);

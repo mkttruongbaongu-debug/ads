@@ -215,6 +215,7 @@ export async function POST(request: NextRequest) {
         const uuTien = mapToUuTien(aiAnalysis);
 
         // Build các bước thực thi từ actionPlan
+        // NGUYÊN TẮC: 1 đề xuất = 1 hành động duy nhất (Single Variable Change)
         const cacBuoc: string[] = [];
         if (aiAnalysis.actionPlan) {
             const immediate = aiAnalysis.actionPlan.immediate;
@@ -226,14 +227,7 @@ export async function POST(request: NextRequest) {
                     cacBuoc.push(`Theo dõi: ${immediate.metric_to_watch}`);
                 }
             }
-
-            const shortTerm = aiAnalysis.actionPlan.shortTerm;
-            if (typeof shortTerm === 'string') {
-                cacBuoc.push(shortTerm);
-            } else if (shortTerm) {
-                cacBuoc.push(`${shortTerm.action} (trigger: ${shortTerm.trigger})`);
-            }
-
+            // KHÔNG gom shortTerm — hệ thống sẽ tự đề xuất ở vòng SOI tiếp theo
         }
 
         // Build kết quả kỳ vọng từ prediction

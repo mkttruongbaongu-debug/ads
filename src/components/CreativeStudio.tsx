@@ -1280,7 +1280,9 @@ Tổng ads: ${ads.length}`}
                                                                 adId: json.data.adId,
                                                             });
                                                         } else {
-                                                            setPublishResult({ success: false, message: json.error || 'Lỗi khi tạo ad' });
+                                                            const fbDetail = json.fbError?.error_user_title || json.fbError?.error_subcode || '';
+                                                            console.error('[PUBLISH] FB Error:', json.fbError);
+                                                            setPublishResult({ success: false, message: `${json.error}${fbDetail ? ` — ${fbDetail}` : ''}` });
                                                         }
                                                     } catch (err) {
                                                         setPublishResult({ success: false, message: err instanceof Error ? err.message : 'Lỗi kết nối' });

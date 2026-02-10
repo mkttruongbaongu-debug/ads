@@ -216,25 +216,35 @@ VERDICT
 Bạn tự quyết dựa trên phân tích. KHÔNG có công thức — dùng NÃO.
 
 ═══════════════════════════════════════════
-QUY TẮC actionPlan — CỤ THỂ, KHÔNG CHUNG CHUNG
+NGUYÊN TẮC CỐT LÕI: 1 ĐỀ XUẤT = 1 HÀNH ĐỘNG DUY NHẤT
 ═══════════════════════════════════════════
 
-1. immediate.action PHẢI NÊU TÊN CONTENT CỤ THỂ từ data contentAnalysis:
-   ✅ "Tắt content \\"V3 REEL\\" (CPP +2.1σ, CTR giảm 35%). Giữ \\"V7 STATIC\\" (đang tốt)."
-   ❌ "Tắt 2 creative đang bão hoà" (KHÔNG CỤ THỂ — CẤM!)
+Hệ thống chạy vòng lặp tự động: SOI → TỐI ƯU → GIÁM SÁT → SOI LẠI.
+Mỗi lần phân tích CHỈ đề xuất 1 HÀNH ĐỘNG DUY NHẤT — hành động ưu tiên cao nhất.
 
-2. shortTerm.action: bao nhiêu creative, test thế nào — KHÔNG mô tả nội dung:
-   ✅ "Tạo 2-3 creative mới. A/B test với content đang tốt trong 5 ngày."
-   ❌ "Tạo video 15s giới thiệu sản phẩm + carousel combo" (BỊA NỘI DUNG — CẤM!)
-   ❌ "Test creative mới" (VÔ NGHĨA — CẤM!)
+TẠI SAO: Nếu thay đổi nhiều biến cùng lúc (vừa tắt content, vừa tăng budget),
+khi metrics thay đổi sẽ KHÔNG BIẾT do yếu tố nào → KHÔNG HỌC ĐƯỢC GÌ.
+1 thay đổi → đo → kết luận → thay đổi tiếp. Các hành động còn lại sẽ được đề xuất ở vòng SOI tiếp theo.
+
+THỨ TỰ ƯU TIÊN HÀNH ĐỘNG:
+1. Tắt content đang gây hại (CPP cao, ROAS thấp) → ưu tiên cao nhất vì giảm phí ngay
+2. Thay đổi budget (tăng/giảm) → ưu tiên thứ 2
+3. Tạo creative mới → ưu tiên thứ 3 (chỉ đề xuất khi không có content cần tắt và budget đã ổn)
+
+QUY TẮC actionPlan:
+
+1. immediate.action = 1 HÀNH ĐỘNG DUY NHẤT, CỤ THỂ:
+   ✅ "Tắt content \\"V3 REEL\\" (CPP +2.1σ, CTR giảm 35%)" — 1 hành động
+   ✅ "Tăng daily budget 20% (từ 200K lên 240K)" — 1 hành động
+   ✅ "Không cần thay đổi. Giữ nguyên chiến lược." — MAINTAIN
+   ❌ "Tắt content + Tăng budget + Tạo creative mới" — CẤM gom nhiều hành động!
+   ❌ "Tắt 2 creative đang bão hoà" — KHÔNG CỤ THỂ, cấm!
+
+2. KHÔNG CÓ shortTerm — hệ thống sẽ tự đề xuất ở vòng SOI tiếp theo
 
 3. CẤM lời khuyên chung chung kiểu sách giáo khoa:
    ❌ "Luôn duy trì 5 creative thay thế"
    ❌ "Theo dõi CTR & CPP hàng ngày"
-   → Chỉ nói HÀNH ĐỘNG CỤ THỂ mà user CẦN LÀM NGAY
-
-4. Nếu campaign đang tốt, KHÔNG cần liệt kê bước vô nghĩa:
-   ✅ immediate.action = "Không cần thay đổi. Giữ nguyên chiến lược."
 
 ═══════════════════════════════════════════
 OUTPUT FORMAT (JSON — giữ nguyên structure)
@@ -283,13 +293,9 @@ OUTPUT FORMAT (JSON — giữ nguyên structure)
   },
   "actionPlan": {
     "immediate": {
-      "action": "HÀNH ĐỘNG CỤ THỂ NGAY — nêu tên content, con số, deadline",
+      "action": "1 HÀNH ĐỘNG DUY NHẤT — cụ thể: tên content/con số/deadline. KHÔNG gom nhiều hành động.",
       "reason": "TẠI SAO làm điều này (dựa trên bằng chứng từ data)",
       "metric_to_watch": "SỐ CỤ THỂ cần theo dõi trong bao lâu"
-    },
-    "shortTerm": {
-      "action": "Bước tiếp theo CỤ THỂ — bao nhiêu creative, loại gì, test ra sao",
-      "trigger": "Khi nào thực hiện — điều kiện cụ thể"
     }
   },
   "prediction": {
@@ -575,14 +581,15 @@ LƯU Ý CONTENT:
 2. Tìm ROOT CAUSE cho vấn đề (nếu có)
 3. Đưa ra VERDICT dứt khoát - PHẢI dựa trên XU HƯỚNG 7 NGÀY GẦN NHẤT
 4. Dự đoán 3-5 ngày tới
-${contentAnalysis && contentAnalysis.length > 0 ? `5. Đánh giá TỪNG CONTENT: content nào nên tắt, content nào nên giữ/scale, có cần tạo content mới không?
-6. Nếu phát hiện content bão hoà chiếm % chi tiêu lớn → CẢNH BÁO rõ ràng
+${contentAnalysis && contentAnalysis.length > 0 ? `5. Đánh giá TỪNG CONTENT: xác định content NÀO đang kéo hiệu quả xuống nhiều nhất
+6. actionPlan.immediate CHỈ chứa 1 HÀNH ĐỘNG DUY NHẤT — ưu tiên: tắt content xấu > thay budget > tạo creative mới
 ` : ''}
 KIỂM TRA LẦN CUỐI trước khi output:
 - Verdict dựa trên 7 NGÀY GẦN NHẤT, không phải ROAS tổng
 - Nếu CPP đang TĂNG + CTR đang GIẢM → KHÔNG ĐƯỢC nói SCALE
 - Nếu 2/3 metrics đang xấu đi → verdict tối đa là MAINTAIN
 - headline phải phản ánh xu hướng gần đây, không phải thành tích quá khứ
+- actionPlan.immediate PHẢI là 1 HÀNH ĐỘNG DUY NHẤT — KHÔNG gom nhiều bước
 
 Trả về JSON đúng format.`;
 }

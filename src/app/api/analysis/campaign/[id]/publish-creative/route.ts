@@ -160,8 +160,14 @@ export async function POST(
         const creativeData = await creativeRes.json();
 
         if (creativeData.error) {
+            console.error('[PUBLISH_CREATIVE] ❌ Step 3 FAILED:', JSON.stringify(creativeData.error, null, 2));
+            console.error('[PUBLISH_CREATIVE] 📦 Payload sent:', JSON.stringify({
+                name: creativeForm.get('name'),
+                object_story_spec: creativeForm.get('object_story_spec'),
+                adAccountId,
+            }));
             return NextResponse.json(
-                { success: false, error: `Creative error: ${creativeData.error.message}` },
+                { success: false, error: `Creative error: ${creativeData.error.message}`, fbError: creativeData.error },
                 { status: 400 }
             );
         }
@@ -189,8 +195,16 @@ export async function POST(
         const adData = await adRes.json();
 
         if (adData.error) {
+            console.error('[PUBLISH_CREATIVE] ❌ Step 4 FAILED:', JSON.stringify(adData.error, null, 2));
+            console.error('[PUBLISH_CREATIVE] 📦 Payload sent:', JSON.stringify({
+                name: adForm.get('name'),
+                adset_id: adForm.get('adset_id'),
+                creative: adForm.get('creative'),
+                status: adForm.get('status'),
+                adAccountId,
+            }));
             return NextResponse.json(
-                { success: false, error: `Ad creation error: ${adData.error.message}` },
+                { success: false, error: `Ad creation error: ${adData.error.message}`, fbError: adData.error },
                 { status: 400 }
             );
         }

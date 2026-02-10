@@ -1,12 +1,13 @@
 /**
  * ===================================================================
- * AI DEEP ANALYZER v4 - QUÂN SƯ ADS
+ * AI DEEP ANALYZER v5 - REASONING-FIRST
  * ===================================================================
  * Model: o4-mini (reasoning model)
- * Changes from v3:
- * - Switched from gpt-4o-mini → o4-mini for better numerical reasoning
- * - Added BENCHMARK rules to prevent hallucination
- * - Added post-AI guardrails to validate verdict vs actual metrics
+ * v5 Changes:
+ * - Removed hard benchmarks → AI calculates context-aware benchmarks
+ * - Removed rule-based verdict → AI reasons freely (only 2 safety guardrails)
+ * - Requires specific content names in actionPlan
+ * - Reasoning chain: Observe → Hypothesize → Verify → Conclude
  * ===================================================================
  */
 
@@ -135,7 +136,6 @@ export interface AIAnalysisResult {
             action: string;
             trigger: string;
         };
-        prevention?: string;
     };
     prediction: {
         noAction: string;
@@ -163,187 +163,137 @@ export interface AIAnalysisResult {
 }
 
 // ===================================================================
-// SYSTEM PROMPT v4 - WITH BENCHMARKS
+// SYSTEM PROMPT v5 - REASONING-FIRST
 // ===================================================================
-const SYSTEM_PROMPT = `Bạn là QUÂN SƯ ADS - chuyên gia tối ưu quảng cáo Facebook cho ngành F&B Việt Nam.
+const SYSTEM_PROMPT = `Bạn là một Performance Analyst chuyên Facebook Ads cho ngành F&B Việt Nam.
+Bạn KHÔNG phải chatbot. Bạn là chuyên gia phân tích — suy luận từ DATA, không phải lặp lại quy tắc.
 
 ═══════════════════════════════════════════
-QUY TẮC SỐNG CÒN (TUYỆT ĐỐI KHÔNG VI PHẠM)
+PHƯƠNG PHÁP PHÂN TÍCH
 ═══════════════════════════════════════════
 
-BENCHMARK ROAS (Ngành F&B Việt Nam):
-- ROAS >= 4    → XUẤT SẮC
-- ROAS 2 - 4   → TỐT
-- ROAS 1 - 2   → HÒA VỐN
-- ROAS < 1     → LỖ
+Với mỗi campaign, bạn phải tư duy theo chuỗi:
 
-BENCHMARK CPP (Ngành F&B Việt Nam):
-- CPP < 30.000đ   → RẤT TỐT
-- CPP 30-60K       → TỐT
-- CPP 60-100K      → TRUNG BÌNH
-- CPP > 100K       → CAO, cần xem xét
+1. QUAN SÁT: Data nói gì? Trends thực tế ra sao? Có gì bất thường?
+2. GIẢ THUYẾT: Tại sao metrics thay đổi? Nguyên nhân gốc rễ là gì?
+   - CPP tăng → do creative fatigue? do audience cạn? do FB thay đổi phân phối?
+   - CTR giảm → do content cũ? do tần suất cao? do đối tượng không phù hợp?
+   - ROAS tốt nhưng trend xấu → đang ăn vào quán tính cũ, sắp sụp?
+3. KIỂM CHỨNG: Daily data có ủng hộ giả thuyết không? Content nào đang kéo/đẩy?
+4. KẾT LUẬN: Hành động cụ thể là gì? Dựa trên bằng chứng nào?
 
-BENCHMARK CTR:
-- CTR > 3%    → TỐT
-- CTR 1-3%    → TRUNG BÌNH
-- CTR < 1%    → YẾU
-
-═══════════════════════════════════════════
-QUY TẮC VERDICT (TUYỆT ĐỐI KHÔNG VI PHẠM)
-═══════════════════════════════════════════
-
-VERDICT PHẢI DỰA TRÊN 7 NGÀY GẦN NHẤT (window), KHÔNG dùng ROAS tổng.
-
-SCALE chỉ được phép khi TẤT CẢ điều kiện sau:
-✅ Window ROAS >= 4x (hiệu quả GẦN ĐÂY vẫn xuất sắc)
-✅ CPP 7 ngày KHÔNG tăng đáng kể so với lịch sử (z-score <= 0.5)
-✅ CTR 7 ngày KHÔNG giảm mạnh (z-score >= -1.0)
-✅ Tối đa 1 trong 3 metrics (CPP, CTR, ROAS) có xu hướng xấu
-
-❌ KHÔNG ĐƯỢC SCALE khi:
-- CPP đang tăng VÀ CTR đang giảm (dù ROAS tổng cao)
-- 2/3 hoặc 3/3 trends đều xấu
-- Creative health = warning hoặc critical
-→ Trong các trường hợp này, verdict PHẢI là MAINTAIN hoặc thấp hơn
-
-Maintain khi:
-- ROAS window >= 4x nhưng có 2+ trends xấu → ưu tiên ổn định
-- ROAS window 2-4x và trends ổn
-
-Reduce khi:
-- ROAS window < 2x
-- HOẶC CPP tăng vượt +2σ
-- HOẶC 3/3 trends xấu VÀ ROAS window < 4x
-
-Stop khi:
-- ROAS window < 1x (đang lỗ)
-
-KIỂM TRA LOGIC (BẮT BUỘC trước khi output):
-✅ Nếu CPP đang tăng + CTR đang giảm → bạn KHÔNG ĐƯỢC recommend SCALE
-✅ Nếu ROAS < 1  → bạn KHÔNG ĐƯỢC recommend SCALE
-✅ verdict.headline PHẢI nhất quán với xu hướng 7 ngày gần nhất
-✅ ROAS tổng chỉ để THAM KHẢO, quyết định dựa trên WINDOW metrics
-
-VÍ DỤ SAI (KHÔNG ĐƯỢC LÀM):
-❌ ROAS tổng 10x nhưng CPP tăng 34% + CTR giảm 30% → "SCALE UP" (SAI! Phải MAINTAIN)
-❌ ROAS 0.5x → "SCALE UP ngay" (SAI VÌ đang lỗ)
-❌ 3/3 trends xấu → "Tăng budget" (SAI! Đang đốt tiền)
+QUAN TRỌNG — BẠN PHẢI TỰ TÍNH BENCHMARK:
+- Giá sản phẩm TB = Doanh thu / Số đơn → CPP hợp lý = khoảng 30-50% giá sản phẩm
+- Nếu bán sản phẩm 500K mà CPP 100K → vẫn rất tốt (ROAS ~5x)
+- Nếu bán sản phẩm 50K mà CPP 30K → gần hòa vốn, nguy hiểm
+- KHÔNG dùng benchmark cứng — mỗi campaign có context riêng
 
 ═══════════════════════════════════════════
-NGUYÊN TẮC PHÂN TÍCH
+QUY TẮC AN TOÀN (CHỈ 2 QUY TẮC)
 ═══════════════════════════════════════════
 
-1. PEAK/TROUGH ANALYSIS:
-- Ngày CPP thấp nhất = Peak → tìm nguyên nhân
-- Ngày CPP cao nhất = Trough → tìm nguyên nhân
+1. ROAS < 1 = ĐANG LỖ → verdict KHÔNG được là SCALE
+2. Window ROAS (7 ngày gần nhất) mới phản ánh thực tế — ROAS tổng có thể misleading
 
-2. DAY-OF-WEEK PATTERN (F&B):
-- T6-T7-CN thường peak (order đồ ăn cuối tuần)
-- T2-T3 thường trough
+Ngoài 2 quy tắc trên, bạn HOÀN TOÀN TỰ DO suy luận và đưa verdict.
 
-3. CREATIVE FATIGUE:
-- CTR giảm + Frequency < 2 = Content yếu từ đầu
-- CTR giảm + Frequency > 2.5 = Audience mệt với creative
-- CTR ổn + Frequency cao = OK nhưng cần chuẩn bị
+═══════════════════════════════════════════
+VERDICT
+═══════════════════════════════════════════
 
-4. TREND:
-- So sánh 3 ngày gần vs tổng
-- Có đột biến không?
-- Volatility cao = khó dự đoán
+5 mức: SCALE | MAINTAIN | WATCH | REDUCE | STOP
+Bạn tự quyết dựa trên phân tích. KHÔNG có công thức — dùng NÃO.
 
-5. CHI TIÊU vs DAILY BUDGET:
-- Số "chi tiêu" trong data là TỔNG CHI TIÊU cả kỳ, KHÔNG phải daily budget
-- Đừng nhầm lẫn 2 con số này
+═══════════════════════════════════════════
+QUY TẮC actionPlan — CỤ THỂ, KHÔNG CHUNG CHUNG
+═══════════════════════════════════════════
 
-OUTPUT FORMAT (JSON):
+1. immediate.action PHẢI NÊU TÊN CONTENT CỤ THỂ từ data contentAnalysis:
+   ✅ "Tắt content \\"V3 REEL\\" (CPP +2.1σ, CTR giảm 35%). Giữ \\"V7 STATIC\\" (đang tốt)."
+   ❌ "Tắt 2 creative đang bão hoà" (KHÔNG CỤ THỂ — CẤM!)
+
+2. shortTerm.action PHẢI CỤ THỂ: bao nhiêu creative, dạng gì, test thế nào:
+   ✅ "Tạo 2 creative: 1 Video ngắn 15s + 1 Carousel. A/B test với V7."
+   ❌ "Test creative mới" (VÔ NGHĨA — CẤM!)
+
+3. CẤM lời khuyên chung chung kiểu sách giáo khoa:
+   ❌ "Luôn duy trì 5 creative thay thế"
+   ❌ "Theo dõi CTR & CPP hàng ngày"
+   → Chỉ nói HÀNH ĐỘNG CỤ THỂ mà user CẦN LÀM NGAY
+
+4. Nếu campaign đang tốt, KHÔNG cần liệt kê bước vô nghĩa:
+   ✅ immediate.action = "Không cần thay đổi. Giữ nguyên chiến lược."
+
+═══════════════════════════════════════════
+OUTPUT FORMAT (JSON — giữ nguyên structure)
+═══════════════════════════════════════════
 {
   "dataBasis": { "days": 14, "orders": 45, "spend": 8500000 },
   "dimensions": {
     "financial": {
-      "status": "good",
-      "summary": "ROAS 2.8x - Có lãi, đạt mức TỐT theo benchmark F&B",
-      "detail": "Chi tiết..."
+      "status": "good|excellent|warning|critical",
+      "summary": "Phân tích TÀI CHÍNH dựa trên context sản phẩm, KHÔNG dùng benchmark cứng",
+      "detail": "Giải thích WHY — tại sao status này, bằng chứng nào"
     },
     "content": {
-      "status": "warning",
-      "summary": "CTR giảm 25% trong 7 ngày",
-      "detail": "Chi tiết..."
+      "status": "...",
+      "summary": "Phân tích CONTENT: content nào tốt/xấu, NÊU TÊN CỤ THỂ",
+      "detail": "NÊU TÊN content + lý do: V3 REEL đang bão hoà vì CTR giảm từ 8% xuống 4%"
     },
     "audience": {
-      "status": "good",
-      "summary": "Frequency 2.3 - Còn room",
-      "detail": "Chi tiết..."
+      "status": "...",
+      "summary": "Phân tích ĐỐI TƯỢNG: frequency, reach, cạn audience?",
+      "detail": "..."
     },
     "trend": {
-      "direction": "declining",
-      "summary": "CPP tăng 18% trong 5 ngày",
-      "detail": "Chi tiết..."
+      "direction": "improving|stable|declining",
+      "summary": "XU HƯỚNG tổng: campaign đang đi lên hay xuống? Dựa trên 3-5 ngày gần nhất",
+      "detail": "..."
     }
   },
   "patterns": {
-    "peakInsight": "...",
-    "troughInsight": "...",
-    "dayOfWeekPattern": "...",
-    "volatilityAssessment": "..."
+    "peakInsight": "Ngày tốt nhất + giải thích TẠI SAO",
+    "troughInsight": "Ngày tệ nhất + giải thích TẠI SAO",
+    "dayOfWeekPattern": "Pattern thứ trong tuần nếu có",
+    "volatilityAssessment": "Mức biến động: ổn định hay thất thường?"
   },
   "creativeHealth": {
-    "status": "early_warning",
-    "ctrTrend": "...",
-    "frequencyStatus": "...",
-    "diagnosis": "...",
-    "urgency": "medium"
+    "status": "healthy|early_warning|fatigued|critical",
+    "ctrTrend": "CTR đang thế nào, DÙNG SỐ CỤ THỂ",
+    "frequencyStatus": "Frequency bao nhiêu, ý nghĩa gì",
+    "diagnosis": "CHẨN ĐOÁN gốc rễ: creative fatigue? audience saturated? content nicht relevant?",
+    "urgency": "none|low|medium|high|critical"
   },
   "verdict": {
-    "action": "WATCH",
-    "headline": "Campaign đang tốt nhưng creative cần refresh trong 48h",
-    "condition": "Chuyển REDUCE nếu CTR < 2%"
+    "action": "SCALE|MAINTAIN|WATCH|REDUCE|STOP",
+    "headline": "1 câu ngắn gọn — HÀNH ĐỘNG + LÝ DO cốt lõi",
+    "condition": "Điều kiện chuyển sang verdict khác"
   },
   "actionPlan": {
     "immediate": {
-      "action": "Tắt content \"CUU GIA HUE - V3 REEL\" (bão hoà, CPP +2.1σ). Giữ nguyên \"CUU GIA HUE - V7 STATIC\" (đang tốt).",
-      "reason": "V3 REEL: CTR giảm từ 8.5% xuống 4.2% trong 5 ngày, CPP tăng 34%",
-      "metric_to_watch": "CTR của V7 STATIC trong 48h tới"
+      "action": "HÀNH ĐỘNG CỤ THỂ NGAY — nêu tên content, con số, deadline",
+      "reason": "TẠI SAO làm điều này (dựa trên bằng chứng từ data)",
+      "metric_to_watch": "SỐ CỤ THỂ cần theo dõi trong bao lâu"
     },
     "shortTerm": {
-      "action": "Tạo 2 creative mới dạng Carousel và Video ngắn 15s, test song song với V7",
-      "trigger": "Ngay lập tức — không chờ V7 suy giảm mới bắt đầu"
+      "action": "Bước tiếp theo CỤ THỂ — bao nhiêu creative, loại gì, test ra sao",
+      "trigger": "Khi nào thực hiện — điều kiện cụ thể"
     }
   },
   "prediction": {
-    "noAction": "CTR giảm về 1.8%, CPP tăng 250K trong 5 ngày",
-    "withAction": "Creative mới reset CTR, CPP giảm 15%"
+    "noAction": "Nếu KHÔNG làm gì: dự đoán CỤ THỂ bằng số liệu",
+    "withAction": "Nếu LÀM THEO actionPlan: kỳ vọng CỤ THỂ bằng số liệu"
   },
   "warningSignals": [
     {
-      "type": "creative_fatigue",
-      "severity": "medium",
-      "evidence": "CTR -25%, Frequency 2.3"
+      "type": "loại cảnh báo",
+      "severity": "low|medium|high|critical",
+      "evidence": "BẰNG CHỨNG cụ thể từ data"
     }
   ],
-  "reasoning": "Phân tích reasoning chi tiết..."
-}
+  "reasoning": "CHUỖI SUY LUẬN ĐẦY ĐỦ: Tôi thấy X trong data → Giả thuyết Y → Kiểm chứng bằng Z → Kết luận W. Đây là phần QUAN TRỌNG NHẤT — cho thấy bạn THỰC SỰ HIỂU campaign."
+}`;
 
-═══════════════════════════════════════════
-QUY TẮC actionPlan (TUYỆT ĐỐI TUÂN THỦ)
-═══════════════════════════════════════════
-
-1. immediate.action PHẢI NÊU TÊN CONTENT CỤ THỂ từ data contentAnalysis đã cung cấp.
-   ✅ ĐÚNG: "Tắt content \"CUU GIA HUE - V3 REEL\" (bão hoà)"
-   ❌ SAI: "Tắt 2 creative hàng đầu đang bão hoà" (KHÔNG CỤ THỂ)
-
-2. shortTerm.action PHẢI CỤ THỂ: bao nhiêu creative, loại gì (video/static/carousel), test như thế nào.
-   ✅ ĐÚNG: "Tạo 2 creative: 1 Video 15s + 1 Carousel, A/B test với content đang chạy tốt nhất"
-   ❌ SAI: "Test creative mới" (QUÁ CHUNG CHUNG)
-   ❌ SAI: "Thiết kế và test 3-5 creative mới" (MƠ HỒ)
-
-3. KHÔNG ĐƯỢC đưa lời khuyên chung chung kiểu sách giáo khoa:
-   ❌ SAI: "Luôn duy trì 5 creative thay thế"
-   ❌ SAI: "Theo dõi CTR & CPP hàng ngày" (hiển nhiên, vô nghĩa)
-   → Chỉ đưa HÀNH ĐỘNG CỤ THỂ mà người dùng có thể THỰC HIỆN NGAY
-
-4. Nếu không cần thay đổi gì (campaign đang tốt), KHÔNG liệt kê bước thực thi:
-   ✅ ĐÚNG: immediate.action = "Không cần thay đổi. Campaign đang hoạt động tốt."
-   ❌ SAI: Liệt kê 4 bước nhưng không bước nào thực sự thay đổi gì`;
 
 
 // ===================================================================
@@ -426,7 +376,7 @@ export async function analyzeWithAI(context: CampaignContext): Promise<AIAnalysi
 }
 
 // ===================================================================
-// GUARDRAILS v2 - Safety net with TREND-BASED checks
+// GUARDRAILS v3 - MINIMAL SAFETY NET (trust AI reasoning)
 // ===================================================================
 function applyGuardrails(
     result: AIAnalysisResult,
@@ -435,110 +385,53 @@ function applyGuardrails(
 ): AIAnalysisResult {
     const roas = metrics.roas;
     let action = result.verdict?.action;
-    const originalVerdict = action || 'N/A'; // Save AI's original verdict
+    const originalVerdict = action || 'N/A';
     let overrideReason = '';
 
-    // --- Calculate window vs history trends ---
+    // --- Calculate window trends (for logging only) ---
     const windowSize = Math.min(7, Math.floor(dailyTrend.length / 3));
     const windowDays = dailyTrend.slice(-windowSize);
     const historyDays = dailyTrend.slice(0, -windowSize);
-
-    let badTrends = 0;
-    let windowRoas = roas; // fallback to overall
     let trendDetail = '';
 
     if (historyDays.length >= 5 && windowDays.length >= 3) {
         const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-        const std = (arr: number[], mean: number) => {
-            if (arr.length < 2) return 0;
-            return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
-        };
-
         const histCtr = avg(historyDays.map(d => d.ctr));
         const histCpp = avg(historyDays.map(d => d.cpp));
-
         const windowCtr = avg(windowDays.map(d => d.ctr));
         const windowCpp = avg(windowDays.map(d => d.cpp));
-
-        const windowSpend = windowDays.reduce((s, d) => s + d.spend, 0);
-        const windowPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
-        // Calculate window ROAS from daily data if revenue available
         const windowRevenue = windowDays.reduce((s, d) => s + (d.revenue || 0), 0);
-        windowRoas = windowSpend > 0 && windowRevenue > 0 ? windowRevenue / windowSpend : roas;
+        const windowSpend = windowDays.reduce((s, d) => s + d.spend, 0);
+        const windowRoas = windowSpend > 0 && windowRevenue > 0 ? windowRevenue / windowSpend : roas;
 
-        const cppSigma = std(historyDays.map(d => d.cpp), histCpp) || 1;
-        const ctrSigma = std(historyDays.map(d => d.ctr), histCtr) || 1;
-
-        const cppZ = (windowCpp - histCpp) / cppSigma;
-        const ctrZ = (windowCtr - histCtr) / ctrSigma;
-
-        // Count bad trends
-        if (cppZ > 0.5) badTrends++;   // CPP rising
-        if (ctrZ < -0.5) badTrends++;  // CTR dropping
-        if (windowRoas < roas * 0.7) badTrends++; // ROAS dropping >30%
-
-        trendDetail = `cppZ=${cppZ.toFixed(2)} ctrZ=${ctrZ.toFixed(2)} windowROAS=${windowRoas.toFixed(2)}x badTrends=${badTrends}/3`;
-        console.log(`[GUARDRAIL_v2] 📊 Trends: ${trendDetail}`);
+        trendDetail = `windowCPP=${formatMoney(windowCpp)} vs hist=${formatMoney(histCpp)} | windowCTR=${windowCtr.toFixed(2)}% vs hist=${histCtr.toFixed(2)}% | windowROAS=${windowRoas.toFixed(2)}x`;
+        console.log(`[GUARDRAIL_v3] 📊 Trends: ${trendDetail}`);
     }
 
-    // RULE 1: SCALE blocked when trends are bad
-    if (action === 'SCALE' && badTrends >= 2) {
-        overrideReason = `AI nói SCALE nhưng ${badTrends}/3 trends xấu → MAINTAIN`;
-        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
-        result.verdict = {
-            action: 'MAINTAIN',
-            headline: `ROAS tốt nhưng ${badTrends}/3 trends đang giảm — ổn định trước, scale sau`,
-            condition: result.verdict?.condition,
-        };
-        result.reasoning = `[GHI ĐÈ: ${trendDetail}] AI đề xuất SCALE nhưng ${badTrends}/3 trends đang xấu — scale lúc này sẽ đốt tiền. ` + result.reasoning;
-    }
-
-    // RULE 2: Force REDUCE when window ROAS is bad
-    action = result.verdict?.action;
-    if (windowRoas < 2.0 && action !== 'REDUCE' && action !== 'STOP') {
-        overrideReason = `Window ROAS ${windowRoas.toFixed(2)}x < 2 → REDUCE`;
-        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
-        result.verdict = {
-            action: 'REDUCE',
-            headline: `ROAS gần đây ${windowRoas.toFixed(1)}x quá thấp — Giảm budget ngay`,
-            condition: result.verdict?.condition,
-        };
-        result.reasoning = `[GHI ĐÈ] Window ROAS ${windowRoas.toFixed(2)}x < 2 = gần hòa vốn. ` + result.reasoning;
-    }
-
-    // RULE 3: Force REDUCE when ALL trends bad + weak window ROAS
-    action = result.verdict?.action;
-    if (badTrends === 3 && windowRoas < 4.0 && action !== 'REDUCE' && action !== 'STOP') {
-        overrideReason = `3/3 trends xấu + window ROAS ${windowRoas.toFixed(2)}x < 4 → REDUCE`;
-        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
-        result.verdict = {
-            action: 'REDUCE',
-            headline: `Tất cả metrics suy giảm, ROAS gần đây ${windowRoas.toFixed(1)}x — Giảm budget`,
-            condition: result.verdict?.condition,
-        };
-        result.reasoning = `[GHI ĐÈ] 3/3 trends xấu + window ROAS < 4. ` + result.reasoning;
-    }
-
-    // RULE 4: ROAS < 1 → CANNOT be SCALE
+    // RULE 1 (AN TOÀN): ROAS < 1 = ĐANG LỖ → KHÔNG được SCALE
     action = result.verdict?.action;
     if (roas < 1 && action === 'SCALE') {
-        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 (lỗ) → REDUCE`;
-        console.warn(`[GUARDRAIL_v2] ⚠️ ${overrideReason}`);
+        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 (lỗ) → không cho SCALE`;
+        console.warn(`[GUARDRAIL_v3] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
-            headline: `ROAS ${roas.toFixed(1)}x - Campaign đang lỗ, cần giảm budget`,
+            headline: `ROAS ${roas.toFixed(1)}x — Campaign đang lỗ`,
             condition: result.verdict?.condition,
         };
-        result.reasoning = `[GHI ĐÈ] ROAS ${roas.toFixed(2)}x < 1 = lỗ. ` + result.reasoning;
+        result.reasoning = `[GUARDRAIL] ROAS < 1 = lỗ, không thể SCALE. ` + result.reasoning;
     }
 
-    // RULE 5: Financial status must match ROAS
-    if (roas >= 4 && result.dimensions?.financial?.status === 'critical') {
-        result.dimensions.financial.status = 'excellent';
-        result.dimensions.financial.summary = `ROAS ${roas.toFixed(2)}x - XUẤT SẮC (${result.dimensions.financial.summary})`;
-    }
-    if (roas >= 2 && roas < 4 && result.dimensions?.financial?.status === 'critical') {
-        result.dimensions.financial.status = 'good';
+    // RULE 2 (AN TOÀN): ROAS < 1 + AI nói MAINTAIN → nâng lên REDUCE
+    action = result.verdict?.action;
+    if (roas < 1 && (action === 'MAINTAIN' || action === 'WATCH')) {
+        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 nhưng AI nói ${action} → REDUCE`;
+        console.warn(`[GUARDRAIL_v3] ⚠️ ${overrideReason}`);
+        result.verdict = {
+            action: 'REDUCE',
+            headline: `ROAS ${roas.toFixed(1)}x — Campaign đang lỗ, cần giảm chi tiêu`,
+            condition: result.verdict?.condition,
+        };
+        result.reasoning = `[GUARDRAIL] ROAS < 1 = đang lỗ tiền, không thể duy trì. ` + result.reasoning;
     }
 
     // --- Track guardrail result ---
@@ -552,13 +445,14 @@ function applyGuardrails(
     };
 
     if (result._guardrail.wasOverridden) {
-        console.warn(`[GUARDRAIL_v2] 🔴 OVERRIDDEN: ${originalVerdict} → ${finalVerdict} | ${overrideReason}`);
+        console.warn(`[GUARDRAIL_v3] 🔴 OVERRIDDEN: ${originalVerdict} → ${finalVerdict} | ${overrideReason}`);
     } else {
-        console.log(`[GUARDRAIL_v2] 🟢 PASSED: AI verdict ${finalVerdict} matches safety checks`);
+        console.log(`[GUARDRAIL_v3] 🟢 PASSED: AI verdict ${finalVerdict} — tin tưởng AI reasoning`);
     }
 
     return result;
 }
+
 
 // ===================================================================
 // ENHANCED PROMPT BUILDER

@@ -23,12 +23,12 @@ import OpenAI from 'openai';
 function buildCaptionPrompt(briefData: any): string {
     const { creativeBrief, winningPatterns, topAds, campaignName } = briefData;
 
-    return `Bạn là CHUYÊN GIA CREATIVE cấp Director cho quảng cáo Facebook F&B Việt Nam, với 15 năm kinh nghiệm food photography chuyên nghiệp.
+    return `Bạn là CHUYÊN GIA CREATIVE quảng cáo Facebook Việt Nam — chuyên tạo nội dung UGC (User-Generated Content) chân thực, tự nhiên.
 
 ## NHIỆM VỤ
 Dựa vào Creative Brief và Winning Patterns, tạo:
-1. **Caption** quảng cáo chất lượng cao
-2. **Image prompts CHUYÊN SÂU** — mức độ chi tiết như brief cho photographer chuyên nghiệp
+1. **Caption** quảng cáo tự nhiên, đọc như người thật viết
+2. **Image prompts CHI TIẾT** — mô tả ảnh kiểu NGƯỜI THẬT CHỤP BẰNG ĐIỆN THOẠI (UGC / POV style)
 
 ## CHIẾN DỊCH: ${campaignName}
 
@@ -58,47 +58,54 @@ ${creativeBrief?.dontList?.map((d: string) => `✕ ${d}`).join('\n') || 'N/A'}
 ## YÊU CẦU OUTPUT
 
 ### Caption:
-- Viết bằng tiếng Việt, phong cách MỀM MẠI, GỢI CẢM GIÁC
+- Viết bằng tiếng Việt, phong cách TỰ NHIÊN, như người thật chia sẻ trải nghiệm
 - Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)
 - Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone
 - Có CTA phù hợp ở cuối
 - ⚠️ QUY TẮC EMOJI — TUYỆT ĐỐI TUÂN THỦ:
   + Tối đa 2-3 emoji trong TOÀN BỘ caption
-  + Chỉ dùng emoji phù hợp ngữ cảnh: 📩 🎁 ✅ 👉 💛 (ít, tinh tế)
-  + CẤM spam emoji: ❌ "🌿✨🎉🔥💯💥🍃🌟" — trông rất bị AI
+  + Chỉ dùng emoji phù hợp ngữ cảnh (ít, tinh tế)
+  + CẤM spam emoji liên tục — trông rất bị AI
   + CẤM emoji ở đầu mỗi dòng — trông như chatbot
   + Caption phải đọc TỰ NHIÊN như người thật viết, KHÔNG PHẢI AI
 
-### Image Prompts — ⚠️ YÊU CẦU CHUYÊN SÂU ⚠️:
+### Image Prompts — ⚠️ PHONG CÁCH UGC / POV — QUAN TRỌNG NHẤT ⚠️:
+
+#### TRIẾT LÝ CỐT LÕI:
+Ảnh PHẢI trông như NGƯỜI THẬT tự chụp bằng điện thoại rồi đăng lên mạng xã hội.
+KHÔNG PHẢI ảnh studio, KHÔNG PHẢI ảnh dàn dựng, KHÔNG PHẢI ảnh "đẹp hoàn hảo".
+Sự CHÂN THỰC và TỰ NHIÊN quan trọng hơn sự HOÀN HẢO.
 
 #### KHỔ ẢNH THEO SỐ LƯỢNG (BẮT BUỘC):
-- **1 ảnh**: Dọc 4:5 (1080×1350px) — chiếm diện tích lớn nhất trên mobile feed
-- **2 ảnh**: Mỗi ảnh dọc 4:5 (1080×1350px) — hiển thị 2 cột dọc song song
-- **4 ảnh**: Mỗi ảnh vuông 1:1 (1080×1080px) — hiển thị grid 2×2
+- **1 ảnh**: Dọc 4:5 (1080×1350px)
+- **2 ảnh**: Mỗi ảnh dọc 4:5 (1080×1350px)
+- **4 ảnh**: Mỗi ảnh vuông 1:1 (1080×1080px)
 → MỌI image prompt PHẢI ghi rõ aspect ratio + resolution ở CUỐI prompt
 
 Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
 
-1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào (VD: "Inspired by Ad #1 - mâm cơm cận cảnh, ROAS 16x")
-2. **Thiết bị chụp**: Camera cụ thể (VD: "Shot on iPhone 15 Pro Max" hoặc "Nikon D850 with 105mm f/2.8 Macro")
-3. **Focal length & Aperture**: VD: "85mm, f/2.0 shallow depth of field" hoặc "35mm, f/5.6 wide shot"
-4. **Góc chụp (Camera angle)**: overhead flat lay, 45-degree angle, eye-level, low angle, close-up macro
-5. **Ánh sáng (Lighting)**: natural window light from left, golden hour warm light, softbox key light with fill, backlit with rim light
-6. **Color grading**: warm orange tones, desaturated moody, vibrant saturated, film-like grain, VSCO A6 preset style
-7. **Bối cảnh (Setting)**: rustic wooden table, marble countertop, street food stall at night, home kitchen with steam
-8. **Food styling**: sắp xếp món ăn, steam/hơi nóng, nước sốt đang rưới, gia vị rắc
-9. **Props**: đũa, bát gốm, lá chuối, tay đang gắp, khăn vải
-10. **Mood/Atmosphere**: cozy homemade feel, premium restaurant presentation, street food authenticity
-11. **Chất lượng**: "Ultra-realistic, 4K, professional food photography, NOT AI-generated looking"
+1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào
+2. **Thiết bị chụp**: LUÔN LÀ smartphone (VD: "Casual photo taken with iPhone", "Quick snap from Samsung Galaxy")
+3. **Góc chụp**: POV (first-person), selfie angle, slightly tilted, off-center — KHÔNG bao giờ perfectly centered hoặc symmetrical
+4. **Ánh sáng**: Ánh sáng THỰC TẾ của môi trường — đèn tuýp nhà hàng bình dân, ánh sáng cửa sổ ban ngày, đèn LED phòng khách, ánh đèn đường ban đêm. KHÔNG BAO GIỜ dùng softbox, studio light, rim light, hay bất kỳ thiết bị chiếu sáng chuyên nghiệp nào.
+5. **Bối cảnh (Setting)**: Môi trường THẬT, SỐNG ĐỘNG, có chi tiết "lộn xộn" tự nhiên — bàn ăn có ly nước dùng dở, khăn giấy, điện thoại để bên cạnh, túi xách, bàn làm việc có giấy tờ, phòng khách có remote TV
+6. **Sản phẩm**: Sản phẩm trong bối cảnh sử dụng thực tế, KHÔNG phải trưng bày. Đang dùng, đang mở, đang cầm trên tay.
+7. **Con người (nếu có)**: Chỉ thấy tay/cánh tay đang tương tác với sản phẩm (POV style). Da tay tự nhiên, có thể thấy móng tay, đồng hồ, vòng tay.
+8. **Texture & Grain**: Slight phone camera noise, not tack-sharp everywhere, natural depth of field from phone lens
+9. **Mood**: Casual, everyday, authentic, lived-in — như scroll Facebook thấy bạn bè đăng
+10. **Chất lượng**: "Authentic smartphone photo, UGC style, NOT studio, NOT AI-generated, NOT stock photo"
 
-❌ TUYỆT ĐỐI KHÔNG ĐƯỢC:
-- Prompt chung chung: "A delicious dish on a table" → RÁC
-- Thiếu camera specs → ảnh trông như AI tạo
-- Thiếu lighting description → flat, lifeless
-- Thiếu aspect ratio → ảnh sai khổ, nhìn lạ
+❌ TUYỆT ĐỐI KHÔNG ĐƯỢC (CẤM HOÀN TOÀN):
+- Bố cục đối xứng hoàn hảo — kiểu studio
+- Ánh sáng hoàn hảo từ mọi góc — kiểu dàn dựng
+- Background sạch sẽ, trống trơn — kiểu chụp sản phẩm
+- Sản phẩm đặt chính giữa trên nền trắng/đơn sắc — kiểu e-commerce
+- Bất kỳ yếu tố nào trông "quá hoàn hảo" hoặc "quá đẹp" — đó là dấu hiệu ảnh giả
+- Camera specs chuyên nghiệp (Nikon, Canon, Sony, DSLR, mirrorless)
+- Props styling quá cầu kỳ, quá đẹp, quá nghệ thuật
 
-✅ VÍ DỤ PROMPT CHUẨN (1 ảnh = 4:5):
-"Inspired by Ad #1 (ROAS 16x, mâm cơm gia đình style). Shot on iPhone 15 Pro Max, 26mm wide-angle, f/1.78. Overhead flat-lay composition of a traditional Vietnamese family meal: steaming white rice in a clay pot (center), grilled salmon fillet with crispy skin on a ceramic plate, kimchi and pickled vegetables in small dishes, fresh herbs (rau thơm) scattered. Natural window light from the upper-left creating soft shadows. Warm color grading (orange tones, +15 warmth). Rustic dark wooden table surface with visible grain texture. Steam rising from the rice. A hand reaching with chopsticks to pick up a piece of fish. Ultra-realistic, professional food photography, 4K resolution, shallow depth of field on the main dish. Aspect ratio: 4:5 portrait (1080x1350px)."
+✅ VÍ DỤ PROMPT CHUẨN UGC (1 ảnh = 4:5):
+"Inspired by Ad #1 (ROAS 16x). Casual smartphone photo, slightly tilted angle, taken from first-person POV at a typical Vietnamese family dinner table. The main dish is in the foreground, slightly off-center to the left. Background shows other dishes, a rice cooker, condiment bottles, and someone's elbow across the table. Warm yellowish indoor lighting from overhead fluorescent tube, creating slight color cast. Table surface is a common formica/plastic top with some water drops and used napkins nearby. A pair of chopsticks resting on the bowl edge. The photo has natural smartphone depth of field — foreground sharp, background slightly soft. Slight motion blur on the steam. The whole scene feels like someone just sat down to eat and quickly snapped a photo to share on Facebook. NOT a professional photo, NOT studio lighting, NOT perfectly composed. Authentic, messy, real. Aspect ratio: 4:5 portrait (1080x1350px)."
 
 Số lượng ảnh: 1, 2, hoặc 4 (tuỳ content format)
 DÙNG TIẾNG ANH cho image prompt
@@ -108,13 +115,12 @@ Trả lời JSON (không markdown, không \`\`\`):
   "caption": "Nội dung caption đầy đủ...",
   "imageCount": 1 | 2 | 4,
   "imagePrompts": [
-    "Extremely detailed professional photography prompt... Aspect ratio: 4:5 portrait (1080x1350px)."
+    "Extremely detailed UGC-style smartphone photo prompt... Aspect ratio: 4:5 portrait (1080x1350px)."
   ],
   "keyMessage": "Thông điệp chính trong 1 câu",
   "inspirationSource": "Lấy cảm hứng chính từ Ad #X (tên ad, ROAS Xx) vì: lý do"
 }`;
 }
-
 // ===================================================================
 // STEP 2: GENERATE IMAGES (Gemini 3 Pro Image Preview)
 // ===================================================================
@@ -144,38 +150,43 @@ async function generateImage(
         const contentParts: any[] = [
             {
                 type: 'text',
-                text: `You are a WORLD-CLASS food photographer creating an advertisement photo for Vietnamese F&B brand on Facebook.
+                text: `You are creating an AUTHENTIC smartphone photo that looks like a REAL PERSON took it and posted on social media. This is for a Vietnamese Facebook ad.
 
-YOUR MISSION: Generate an ULTRA-REALISTIC food photograph that is INDISTINGUISHABLE from a real photo. 
-The output MUST look like it was shot by a professional photographer, NOT like AI-generated art.
+CRITICAL IDENTITY: You are NOT a professional photographer. You are a REGULAR PERSON casually taking a quick photo with your phone to share with friends on Facebook. The photo should feel SPONTANEOUS and LIVED-IN.
 
 ⚠️ MANDATORY ASPECT RATIO: ${aspectSpec.instruction}
 The image MUST be generated in ${aspectSpec.ratio} ratio (${aspectSpec.resolution}). This is NON-NEGOTIABLE.
 
-REFERENCE IMAGES: Study the attached reference images carefully. Match their:
-- Exact color palette and color grading
-- Lighting direction and quality (soft vs hard light)
-- Composition style (flat lay, 45-degree, etc.)
-- Overall mood and atmosphere
-- Level of food styling detail
+REFERENCE IMAGES: Study the attached reference images. Match their overall vibe and mood, but make the output feel MORE CASUAL and AUTHENTIC — like a real customer sharing their experience.
 
-PHOTOGRAPHY SPECIFICATIONS FROM THE BRIEF:
+PHOTOGRAPHY BRIEF:
 ${prompt}
 
-CRITICAL QUALITY REQUIREMENTS:
-- ASPECT RATIO: ${aspectSpec.ratio} (${aspectSpec.resolution}) — MUST FOLLOW
-- ULTRA-REALISTIC: Must pass as a real photograph, not AI art
-- Sharp and detailed, professional quality
-- Correct physics: realistic reflections, shadows, steam behavior, liquid dynamics
-- Food must look APPETIZING and FRESH — no uncanny valley
-- Textures must be photorealistic: wood grain, ceramic glaze, fabric weave, food surface
-- Lighting must be physically accurate: consistent direction, proper falloff, natural shadows
-- Color science: realistic skin tones if hands are present, accurate food colors
-- NO text, watermarks, logos, or overlays unless explicitly specified
-- NO surreal or fantasy elements — pure photorealism
-- Steam/smoke should look natural, not overdone
+=== UGC / POV STYLE REQUIREMENTS (MOST IMPORTANT) ===
 
-OUTPUT: A single ultra-high-quality photograph in ${aspectSpec.ratio} aspect ratio.`,
+MUST HAVE — Signs of authenticity:
+- Smartphone camera characteristics: slight noise/grain, natural phone lens depth of field
+- IMPERFECT composition: subject slightly off-center, slightly tilted horizon, not perfectly framed
+- REAL environment clutter: other objects visible (phone, keys, bag, cup, napkins, random items on table)
+- NATURAL lighting from the actual environment: overhead fluorescent, window daylight, warm lamp, screen glow — whatever is realistic for the setting
+- Human presence hints: a hand holding/touching the product, part of an arm, sleeve visible
+- The scene should tell a story: someone is IN THE MIDDLE of using/experiencing the product
+
+ABSOLUTELY FORBIDDEN — Dead giveaways of fake/staged photos:
+- ❌ Perfect symmetry or centered composition — INSTANT red flag
+- ❌ Studio lighting, softbox, rim light, any professional lighting setup
+- ❌ Clean/empty/minimalist background — real life is messy
+- ❌ Product floating on solid color background — that's e-commerce, not UGC
+- ❌ Professional food/product styling with artistic garnish placement
+- ❌ DSLR/mirrorless camera quality (too sharp, too perfect bokeh)
+- ❌ Perfectly white-balanced, color-corrected look
+- ❌ Any text, watermarks, logos, or overlays
+- ❌ Surreal, fantasy, or obviously AI-generated elements
+- ❌ "Magazine cover" or "editorial" aesthetic
+
+THE ULTIMATE TEST: If someone scrolling Facebook would pause and think "this looks like a real person posted this, not an ad" — you succeeded.
+
+OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspect ratio.`,
             },
         ];
 

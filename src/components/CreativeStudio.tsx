@@ -128,6 +128,13 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [generateStep, setGenerateStep] = useState('');  // progress indicator
     const [copiedCaption, setCopiedCaption] = useState(false);
 
+    // Publish to Facebook
+    const [adSets, setAdSets] = useState<{ id: string; name: string; status: string }[]>([]);
+    const [selectedAdSet, setSelectedAdSet] = useState('');
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [publishResult, setPublishResult] = useState<{ success: boolean; message: string; adId?: string } | null>(null);
+    const [publishStep, setPublishStep] = useState('');
+
     // ===== FETCH ADS DATA =====
     const fetchAds = useCallback(async () => {
         setLoadingAds(true);
@@ -902,6 +909,170 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                             <p style={{ margin: 0, fontSize: '0.75rem', color: colors.warning }}>
                                                 Ảnh chưa tạo được. Bấm TẠO LẠI để thử lại.
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {/* ═══ PUBLISH TO FACEBOOK ═══ */}
+                                    {generatedImages.length > 0 && (
+                                        <div style={{
+                                            padding: '16px', borderRadius: '8px',
+                                            background: colors.bgAlt,
+                                            border: `1px solid ${colors.accent}30`,
+                                            marginBottom: '16px',
+                                        }}>
+                                            <span style={{
+                                                fontSize: '0.6875rem', fontWeight: 700, color: colors.accent,
+                                                letterSpacing: '0.1em', display: 'block', marginBottom: '10px',
+                                            }}>
+                                                THÊM VÀO CHIẾN DỊCH
+                                            </span>
+
+                                            {/* Ad Set selector */}
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <label style={{
+                                                    fontSize: '0.625rem', color: colors.textMuted,
+                                                    fontWeight: 600, display: 'block', marginBottom: '4px',
+                                                }}>
+                                                    CHỌN AD SET
+                                                </label>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <select
+                                                        value={selectedAdSet}
+                                                        onChange={(e) => setSelectedAdSet(e.target.value)}
+                                                        style={{
+                                                            flex: 1, padding: '8px 10px',
+                                                            background: colors.bg, color: colors.text,
+                                                            border: `1px solid ${colors.border}`,
+                                                            borderRadius: '4px', fontSize: '0.75rem',
+                                                            cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        <option value="">
+                                                            {adSets.length === 0 ? '— Bấm TẢI để lấy danh sách —' : '— Chọn Ad Set —'}
+                                                        </option>
+                                                        {adSets.map(as => (
+                                                            <option key={as.id} value={as.id}>
+                                                                {as.name} ({as.status})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                const today = new Date();
+                                                                const endDate = today.toISOString().split('T')[0];
+                                                                const startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                                                const res = await fetch(`/api/facebook/campaign/${campaignId}/adsets?startDate=${startDate}&endDate=${endDate}`);
+                                                                const json = await res.json();
+                                                                if (json.success && json.data) {
+                                                                    setAdSets(json.data.map((a: any) => ({ id: a.id, name: a.name, status: a.status })));
+                                                                    if (json.data.length > 0) {
+                                                                        // Auto-select first ACTIVE ad set
+                                                                        const active = json.data.find((a: any) => a.status === 'ACTIVE');
+                                                                        if (active) setSelectedAdSet(active.id);
+                                                                        else setSelectedAdSet(json.data[0].id);
+                                                                    }
+                                                                }
+                                                            } catch (err) {
+                                                                console.error('Failed to fetch adsets:', err);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            padding: '8px 12px', borderRadius: '4px',
+                                                            background: colors.bgAlt,
+                                                            border: `1px solid ${colors.border}`,
+                                                            color: colors.textMuted, fontSize: '0.625rem',
+                                                            fontWeight: 700, cursor: 'pointer',
+                                                            whiteSpace: 'nowrap' as const,
+                                                        }}
+                                                    >
+                                                        TẢI
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Publish button */}
+                                            <button
+                                                onClick={async () => {
+                                                    if (!selectedAdSet || !generatedImages[0]) return;
+                                                    setIsPublishing(true);
+                                                    setPublishResult(null);
+                                                    setPublishStep('Đang upload ảnh + tạo ad...');
+                                                    try {
+                                                        const res = await fetch(`/api/analysis/campaign/${campaignId}/publish-creative`, {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                caption: generatedCaption,
+                                                                image: generatedImages[0],
+                                                                adSetId: selectedAdSet,
+                                                                adName: `CS ${new Date().toLocaleDateString('vi-VN')}`,
+                                                            }),
+                                                        });
+                                                        const json = await res.json();
+                                                        if (json.success) {
+                                                            setPublishResult({
+                                                                success: true,
+                                                                message: json.data.message,
+                                                                adId: json.data.adId,
+                                                            });
+                                                        } else {
+                                                            setPublishResult({ success: false, message: json.error || 'Lỗi khi tạo ad' });
+                                                        }
+                                                    } catch (err) {
+                                                        setPublishResult({ success: false, message: err instanceof Error ? err.message : 'Lỗi kết nối' });
+                                                    } finally {
+                                                        setIsPublishing(false);
+                                                        setPublishStep('');
+                                                    }
+                                                }}
+                                                disabled={!selectedAdSet || isPublishing}
+                                                style={{
+                                                    width: '100%', padding: '12px',
+                                                    background: !selectedAdSet ? colors.bgAlt
+                                                        : isPublishing ? colors.bgAlt
+                                                            : colors.accent,
+                                                    border: 'none', borderRadius: '6px',
+                                                    color: !selectedAdSet ? colors.textMuted : '#000',
+                                                    fontSize: '0.75rem', fontWeight: 700,
+                                                    cursor: !selectedAdSet ? 'not-allowed' : 'pointer',
+                                                    letterSpacing: '0.05em',
+                                                    opacity: isPublishing ? 0.7 : 1,
+                                                }}
+                                            >
+                                                {isPublishing ? (
+                                                    <>{publishStep || 'Đang tạo...'}</>
+                                                ) : (
+                                                    <>THÊM VÀO CHIẾN DỊCH (TRẠNG THÁI: TẠM DỪNG)</>
+                                                )}
+                                            </button>
+
+                                            {/* Result message */}
+                                            {publishResult && (
+                                                <div style={{
+                                                    marginTop: '10px', padding: '10px 14px',
+                                                    borderRadius: '6px',
+                                                    background: publishResult.success ? `${colors.success}10` : `${colors.error}10`,
+                                                    border: `1px solid ${publishResult.success ? colors.success : colors.error}30`,
+                                                }}>
+                                                    <p style={{
+                                                        margin: 0, fontSize: '0.75rem',
+                                                        color: publishResult.success ? colors.success : colors.error,
+                                                        fontWeight: 600,
+                                                    }}>
+                                                        {publishResult.success ? '✓ ' : '✗ '}
+                                                        {publishResult.message}
+                                                    </p>
+                                                    {publishResult.adId && (
+                                                        <p style={{
+                                                            margin: '4px 0 0', fontSize: '0.625rem',
+                                                            color: colors.textMuted,
+                                                        }}>
+                                                            Ad ID: {publishResult.adId}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

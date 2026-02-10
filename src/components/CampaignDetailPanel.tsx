@@ -1575,78 +1575,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     {/* ═══ KẾT LUẬN TAB ═══ */}
                     {activeTab === 'conclusion' && (
                         <div style={styles.section}>
-                            {/* Content Summary for AI */}
-                            {ads.length > 0 && (
-                                <div style={{
-                                    padding: '12px 16px', marginBottom: '16px',
-                                    background: colors.bgAlt, border: `1px solid ${colors.border}`,
-                                    borderRadius: '6px',
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <h4 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                                            Tổng hợp Content ({ads.length})
-                                        </h4>
-                                        <button
-                                            onClick={() => {
-                                                const totalSpend = campaign.totals.spend;
-                                                const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
-                                                const debugLines = ads.map((ad, i) => {
-                                                    const ev = getContentBadge(ad, totalSpend, avgCpp);
-                                                    return [
-                                                        `--- Content ${i + 1}: ${ad.name} ---`,
-                                                        `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
-                                                        `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
-                                                        `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
-                                                        `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
-                                                        `Z-Score detail: ${ev.tip}`,
-                                                    ].join('\n');
-                                                });
-
-                                                const summary = [
-                                                    `===== CONTENT DEBUG - ${campaign.name} =====`,
-                                                    `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
-                                                    `Tổng: ${ads.length} content | Chi: ${formatMoney(totalSpend)}`,
-                                                    ``,
-                                                    ...debugLines,
-                                                ].join('\n\n');
-
-                                                navigator.clipboard.writeText(summary);
-                                            }}
-                                            style={{
-                                                background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
-                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
-                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
-                                            }}
-                                        >COPY DEBUG</button>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
-                                        {ads.slice(0, 10).map((ad, i) => {
-                                            const avgCpp2 = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
-                                            const ev = getContentBadge(ad, campaign.totals.spend, avgCpp2);
-                                            return (
-                                                <div key={ad.id} style={{
-                                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                                    fontSize: '0.6875rem', color: colors.textMuted, lineHeight: 1.6,
-                                                }}>
-                                                    <span style={{ color: colors.textSubtle, width: '16px', textAlign: 'right' as const }}>{i + 1}</span>
-                                                    <span style={{
-                                                        fontSize: '0.5625rem', fontWeight: 700,
-                                                        padding: '1px 5px', borderRadius: '3px',
-                                                        background: ev.badge.bg, color: ev.badge.color,
-                                                        minWidth: '50px', textAlign: 'center' as const,
-                                                    }}>{ev.badge.text}</span>
-                                                    <span style={{ color: colors.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{ad.name}</span>
-                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
-                                                        FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* AI Analysis */}
                             <h3 style={{ ...styles.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 Phân tích AI
@@ -1842,6 +1770,78 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     {/* Content Tab */}
                     {activeTab === 'ads' && (
                         <div style={styles.section}>
+                            {/* ═══ TỔNG HỢP CONTENT ═══ */}
+                            {ads.length > 0 && (
+                                <div style={{
+                                    padding: '12px 16px', marginBottom: '16px',
+                                    background: colors.bgAlt, border: `1px solid ${colors.border}`,
+                                    borderRadius: '6px',
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+                                            Tổng hợp Content ({ads.length})
+                                        </h4>
+                                        <button
+                                            onClick={() => {
+                                                const totalSpend = campaign.totals.spend;
+                                                const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
+                                                const debugLines = ads.map((ad, i) => {
+                                                    const ev = getContentBadge(ad, totalSpend, avgCpp);
+                                                    return [
+                                                        `--- Content ${i + 1}: ${ad.name} ---`,
+                                                        `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                        `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
+                                                        `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
+                                                        `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
+                                                        `Z-Score detail: ${ev.tip}`,
+                                                    ].join('\n');
+                                                });
+
+                                                const summary = [
+                                                    `===== CONTENT DEBUG - ${campaign.name} =====`,
+                                                    `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
+                                                    `Tổng: ${ads.length} content | Chi: ${formatMoney(totalSpend)}`,
+                                                    ``,
+                                                    ...debugLines,
+                                                ].join('\n\n');
+
+                                                navigator.clipboard.writeText(summary);
+                                            }}
+                                            style={{
+                                                background: 'transparent', border: `1px solid ${colors.border}`,
+                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
+                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                            }}
+                                        >COPY DEBUG</button>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+                                        {ads.slice(0, 10).map((ad, i) => {
+                                            const avgCpp2 = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
+                                            const ev = getContentBadge(ad, campaign.totals.spend, avgCpp2);
+                                            return (
+                                                <div key={ad.id} style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                                    fontSize: '0.6875rem', color: colors.textMuted, lineHeight: 1.6,
+                                                }}>
+                                                    <span style={{ color: colors.textSubtle, width: '16px', textAlign: 'right' as const }}>{i + 1}</span>
+                                                    <span style={{
+                                                        fontSize: '0.5625rem', fontWeight: 700,
+                                                        padding: '1px 5px', borderRadius: '3px',
+                                                        background: ev.badge.bg, color: ev.badge.color,
+                                                        minWidth: '50px', textAlign: 'center' as const,
+                                                    }}>{ev.badge.text}</span>
+                                                    <span style={{ color: colors.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{ad.name}</span>
+                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
+                                                        FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3 style={styles.sectionTitle}>
                                     Danh sách Content

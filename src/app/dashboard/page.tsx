@@ -356,9 +356,10 @@ export default function DashboardPage() {
     const [filterText, setFilterText] = useState('');
 
     // Tab navigation - keeps state when switching views
-    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'execution' | 'monitoring' | 'autopilot'>('campaigns');
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'execution' | 'monitoring'>('campaigns');
 
     // Autopilot state
+    const [showAutopilot, setShowAutopilot] = useState(false);
     const [autopilotRunning, setAutopilotRunning] = useState(false);
     const [autopilotResult, setAutopilotResult] = useState<any>(null);
     const [autopilotStatus, setAutopilotStatus] = useState<{ step: number; message: string } | null>(null);
@@ -734,38 +735,43 @@ export default function DashboardPage() {
                                 GIÁM SÁT
                             </button>
 
-                            {/* AUTOPILOT Tab */}
-                            <button
-                                onClick={() => setActiveView('autopilot')}
-                                style={{
-                                    padding: '8px 16px',
-                                    background: activeView === 'autopilot' ? 'rgba(14, 203, 129, 0.15)' : 'transparent',
-                                    border: `1px solid ${activeView === 'autopilot' ? colors.accent : colors.border}`,
-                                    borderRadius: '6px',
-                                    color: activeView === 'autopilot' ? colors.accent : colors.text,
-                                    fontSize: '0.875rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                }}
-                                title="Chạy pipeline tự động: Scan → Phân tích → Thực thi → Giám sát"
-                                onMouseEnter={(e) => {
-                                    if (activeView !== 'autopilot') {
-                                        e.currentTarget.style.background = 'rgba(14, 203, 129, 0.1)';
-                                        e.currentTarget.style.borderColor = colors.accent;
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (activeView !== 'autopilot') {
-                                        e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.borderColor = colors.border;
-                                    }
-                                }}
-                            >
-                                AUTOPILOT
-                            </button>
                         </div>
                     </div>
+                    {/* AUTOPILOT Small Button */}
+                    <button
+                        onClick={() => setShowAutopilot(!showAutopilot)}
+                        style={{
+                            padding: '6px 12px',
+                            background: autopilotRunning ? `${colors.accent}30` : showAutopilot ? `${colors.accent}20` : 'transparent',
+                            border: `1px solid ${autopilotRunning ? colors.accent : colors.border}`,
+                            borderRadius: '6px',
+                            color: autopilotRunning ? colors.accent : colors.textMuted,
+                            fontSize: '0.6875rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            letterSpacing: '0.05em',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                        }}
+                        title="Chạy pipeline tự động"
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = colors.accent;
+                            e.currentTarget.style.color = colors.accent;
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!showAutopilot && !autopilotRunning) {
+                                e.currentTarget.style.borderColor = colors.border;
+                                e.currentTarget.style.color = colors.textMuted;
+                            }
+                        }}
+                    >
+                        {autopilotRunning && (
+                            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors.accent, animation: 'pulse 1.5s infinite' }} />
+                        )}
+                        AUTOPILOT
+                    </button>
                     {/* User Profile Dropdown - CEX Style */}
                     <div style={{ position: 'relative' }}>
                         <button
@@ -969,121 +975,139 @@ export default function DashboardPage() {
                     <BangGiamSat userId={session?.user?.email || ''} />
                 )}
 
-                {/* TAB: AUTOPILOT */}
-                {activeView === 'autopilot' && (
-                    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                        <div style={{
-                            background: colors.bgCard,
-                            borderRadius: '8px',
-                            border: `1px solid ${colors.border}`,
-                            padding: '32px',
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                {/* AUTOPILOT OVERLAY PANEL */}
+                {showAutopilot && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0, right: 0,
+                        width: '380px',
+                        height: '100vh',
+                        background: colors.bgCard,
+                        borderLeft: `1px solid ${colors.border}`,
+                        boxShadow: '-8px 0 30px rgba(0,0,0,0.4)',
+                        zIndex: 1000,
+                        display: 'flex',
+                        flexDirection: 'column' as const,
+                        overflow: 'hidden',
+                    }}>
+                        <div style={{ padding: '20px', flex: 1, overflowY: 'auto' as const }}>
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                 <div>
-                                    <h2 style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em' }}>
+                                    <h2 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em' }}>
                                         AUTOPILOT PIPELINE
                                     </h2>
-                                    <p style={{ margin: 0, fontSize: '0.8125rem', color: colors.textMuted }}>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', color: colors.textMuted }}>
                                         Scan → AI Analysis → Execute → Monitor
                                     </p>
                                 </div>
                                 <button
-                                    onClick={async () => {
-                                        if (autopilotRunning) return;
-                                        setAutopilotRunning(true);
-                                        setAutopilotResult(null);
-                                        setAutopilotStatus(null);
-                                        try {
-                                            const res = await fetch('/api/cron/autopilot', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ maxCampaigns: 20 }),
-                                            });
-                                            const reader = res.body?.getReader();
-                                            if (!reader) throw new Error('No response body');
-                                            const decoder = new TextDecoder();
-                                            let buffer = '';
-                                            while (true) {
-                                                const { done, value } = await reader.read();
-                                                if (done) break;
-                                                buffer += decoder.decode(value, { stream: true });
-                                                const lines = buffer.split('\n');
-                                                buffer = lines.pop() || '';
-                                                for (const line of lines) {
-                                                    const trimmed = line.trim();
-                                                    if (!trimmed) continue;
-                                                    if (trimmed.startsWith('STEP:')) {
-                                                        const parts = trimmed.split(':');
-                                                        const stepNum = parseInt(parts[1]);
-                                                        const msg = parts.slice(2).join(':');
-                                                        setAutopilotStatus({ step: stepNum, message: msg });
-                                                    } else if (trimmed.startsWith('RESULT:')) {
-                                                        const json = JSON.parse(trimmed.substring(7));
-                                                        setAutopilotResult(json.data || json);
-                                                    }
-                                                }
-                                            }
-                                            if (buffer.trim()) {
-                                                const trimmed = buffer.trim();
-                                                if (trimmed.startsWith('RESULT:')) {
+                                    onClick={() => { if (!autopilotRunning) setShowAutopilot(false); }}
+                                    style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: autopilotRunning ? 'not-allowed' : 'pointer', fontSize: '1.25rem', padding: '4px 8px' }}
+                                    title="Đóng"
+                                >×</button>
+                            </div>
+
+                            {/* Run Button */}
+                            <button
+                                onClick={async () => {
+                                    if (autopilotRunning) return;
+                                    setAutopilotRunning(true);
+                                    setAutopilotResult(null);
+                                    setAutopilotStatus(null);
+                                    try {
+                                        const res = await fetch('/api/cron/autopilot', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ maxCampaigns: 20 }),
+                                        });
+                                        const reader = res.body?.getReader();
+                                        if (!reader) throw new Error('No response body');
+                                        const decoder = new TextDecoder();
+                                        let buffer = '';
+                                        while (true) {
+                                            const { done, value } = await reader.read();
+                                            if (done) break;
+                                            buffer += decoder.decode(value, { stream: true });
+                                            const lines = buffer.split('\n');
+                                            buffer = lines.pop() || '';
+                                            for (const line of lines) {
+                                                const trimmed = line.trim();
+                                                if (!trimmed) continue;
+                                                if (trimmed.startsWith('STEP:')) {
+                                                    const parts = trimmed.split(':');
+                                                    const stepNum = parseInt(parts[1]);
+                                                    const msg = parts.slice(2).join(':');
+                                                    setAutopilotStatus({ step: stepNum, message: msg });
+                                                } else if (trimmed.startsWith('RESULT:')) {
                                                     const json = JSON.parse(trimmed.substring(7));
                                                     setAutopilotResult(json.data || json);
                                                 }
                                             }
-                                        } catch (err) {
-                                            setAutopilotResult({ error: 'Connection failed' });
-                                        } finally {
-                                            setAutopilotRunning(false);
-                                            setAutopilotStatus(null);
                                         }
-                                    }}
-                                    disabled={autopilotRunning}
-                                    style={{
-                                        padding: '10px 24px',
-                                        background: autopilotRunning ? colors.bgAlt : colors.accent,
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        color: autopilotRunning ? colors.textMuted : '#000',
-                                        fontSize: '0.875rem',
-                                        fontWeight: 700,
-                                        cursor: autopilotRunning ? 'not-allowed' : 'pointer',
-                                        letterSpacing: '0.05em',
-                                    }}
-                                >
-                                    {autopilotRunning ? 'ĐANG CHẠY...' : 'CHẠY AUTOPILOT'}
-                                </button>
-                            </div>
+                                        if (buffer.trim()) {
+                                            const trimmed = buffer.trim();
+                                            if (trimmed.startsWith('RESULT:')) {
+                                                const json = JSON.parse(trimmed.substring(7));
+                                                setAutopilotResult(json.data || json);
+                                            }
+                                        }
+                                    } catch (err) {
+                                        setAutopilotResult({ error: 'Connection failed' });
+                                    } finally {
+                                        setAutopilotRunning(false);
+                                        setAutopilotStatus(null);
+                                    }
+                                }}
+                                disabled={autopilotRunning}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    marginBottom: '16px',
+                                    background: autopilotRunning ? colors.bgAlt : colors.accent,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: autopilotRunning ? colors.textMuted : '#000',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: 700,
+                                    cursor: autopilotRunning ? 'not-allowed' : 'pointer',
+                                    letterSpacing: '0.05em',
+                                }}
+                            >
+                                {autopilotRunning ? 'ĐANG CHẠY...' : 'CHẠY AUTOPILOT'}
+                            </button>
 
                             {/* Pipeline Steps */}
-                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
                                 {[
-                                    { step: 1, label: 'SCAN CAMPAIGNS', desc: 'Quét tất cả campaigns đang active', icon: '1' },
-                                    { step: 2, label: 'AI ANALYSIS', desc: 'Phân tích hiệu suất từng campaign', icon: '2' },
-                                    { step: 3, label: 'CHECK PROPOSALS', desc: 'Kiểm tra đề xuất đang chờ duyệt', icon: '3' },
-                                    { step: 4, label: 'AUTO-EXECUTE', desc: 'Thực thi đề xuất đã duyệt', icon: '4' },
-                                    { step: 5, label: 'MONITORING', desc: 'Kiểm tra D+1/3/7 cho campaigns đang giám sát', icon: '5' },
+                                    { step: 1, label: 'SCAN CAMPAIGNS', desc: 'Quét campaigns active', icon: '1' },
+                                    { step: 2, label: 'AI ANALYSIS', desc: 'Phân tích hiệu suất', icon: '2' },
+                                    { step: 3, label: 'CHECK PROPOSALS', desc: 'Kiểm tra đề xuất', icon: '3' },
+                                    { step: 4, label: 'AUTO-EXECUTE', desc: 'Thực thi đề xuất', icon: '4' },
+                                    { step: 5, label: 'MONITORING', desc: 'Giám sát D+1/3/7', icon: '5' },
                                 ].map(({ step, label, desc, icon }) => (
                                     <div key={step} style={{
-                                        display: 'flex', alignItems: 'center', gap: '12px',
-                                        padding: '12px 16px',
+                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                        padding: '10px 12px',
                                         background: colors.bg,
                                         borderRadius: '6px',
-                                        border: `1px solid ${colors.border}`,
+                                        border: `1px solid ${autopilotStatus?.step === step ? colors.accent : colors.border}`,
+                                        transition: 'all 0.3s ease',
                                     }}>
                                         <span style={{
-                                            width: '28px', height: '28px',
+                                            width: '24px', height: '24px',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             borderRadius: '50%',
                                             background: autopilotStatus?.step === step ? `${colors.accent}40` :
                                                 (autopilotStatus && autopilotStatus.step > step) ? `${colors.accent}20` : `${colors.textSubtle}30`,
                                             color: autopilotStatus?.step === step ? colors.accent :
                                                 (autopilotStatus && autopilotStatus.step > step) ? colors.accent : colors.textSubtle,
-                                            fontSize: '0.75rem', fontWeight: 700,
+                                            fontSize: '0.6875rem', fontWeight: 700,
                                             transition: 'all 0.3s ease',
                                         }}>{(autopilotStatus && autopilotStatus.step > step) ? '✓' : icon}</span>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: autopilotStatus?.step === step ? colors.accent : colors.text, letterSpacing: '0.05em' }}>{label}</div>
-                                            <div style={{ fontSize: '0.6875rem', color: autopilotStatus?.step === step ? colors.accent : colors.textMuted }}>
+                                            <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: autopilotStatus?.step === step ? colors.accent : colors.text, letterSpacing: '0.05em' }}>{label}</div>
+                                            <div style={{ fontSize: '0.625rem', color: autopilotStatus?.step === step ? colors.accent : colors.textMuted }}>
                                                 {autopilotStatus?.step === step ? autopilotStatus.message : desc}
                                             </div>
                                         </div>
@@ -1094,42 +1118,42 @@ export default function DashboardPage() {
                             {/* Results */}
                             {autopilotResult && (
                                 <div style={{
-                                    marginTop: '20px', padding: '16px',
+                                    marginTop: '16px', padding: '12px',
                                     background: colors.bg,
                                     borderRadius: '6px',
                                     border: `1px solid ${autopilotResult.error ? colors.error : colors.accent}30`,
                                 }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: autopilotResult.error ? colors.error : colors.accent, marginBottom: '8px', letterSpacing: '0.05em' }}>
+                                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: autopilotResult.error ? colors.error : colors.accent, marginBottom: '8px', letterSpacing: '0.05em' }}>
                                         {autopilotResult.error ? 'ERROR' : 'PIPELINE COMPLETED'}
                                     </div>
                                     {autopilotResult.error ? (
-                                        <div style={{ fontSize: '0.8125rem', color: colors.error }}>{autopilotResult.error}</div>
+                                        <div style={{ fontSize: '0.75rem', color: colors.error }}>{autopilotResult.error}</div>
                                     ) : (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                                             {[
-                                                { label: 'Campaigns Active', value: autopilotResult.pipeline?.step1_scan?.active_campaigns ?? '-' },
+                                                { label: 'Active', value: autopilotResult.pipeline?.step1_scan?.active_campaigns ?? '-' },
                                                 { label: 'Analyzed', value: autopilotResult.pipeline?.step2_analyze?.campaigns_analyzed ?? '-' },
-                                                { label: 'Issues Found', value: autopilotResult.pipeline?.step2_analyze?.issues_found ?? '-', color: (autopilotResult.pipeline?.step2_analyze?.issues_found || 0) > 0 ? colors.error : colors.accent },
+                                                { label: 'Issues', value: autopilotResult.pipeline?.step2_analyze?.issues_found ?? '-', color: (autopilotResult.pipeline?.step2_analyze?.issues_found || 0) > 0 ? colors.error : colors.accent },
                                                 { label: 'Executed', value: `${autopilotResult.pipeline?.step4_execute?.success ?? 0}/${autopilotResult.pipeline?.step4_execute?.proposals_executed ?? 0}` },
                                                 { label: 'Observations', value: autopilotResult.pipeline?.step5_monitor?.observations_created ?? '-' },
                                                 { label: 'Duration', value: autopilotResult.duration_ms ? `${(autopilotResult.duration_ms / 1000).toFixed(1)}s` : '-' },
                                             ].map(({ label, value, color }) => (
                                                 <div key={label} style={{ textAlign: 'center' as const }}>
-                                                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: color || colors.text }}>{value}</div>
-                                                    <div style={{ fontSize: '0.625rem', color: colors.textMuted, letterSpacing: '0.05em' }}>{label}</div>
+                                                    <div style={{ fontSize: '1rem', fontWeight: 700, color: color || colors.text }}>{value}</div>
+                                                    <div style={{ fontSize: '0.5625rem', color: colors.textMuted, letterSpacing: '0.05em' }}>{label}</div>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
                                     {autopilotResult.summary && (
-                                        <div style={{ marginTop: '12px', fontSize: '0.75rem', color: colors.textMuted, fontFamily: '"JetBrains Mono", monospace' }}>
+                                        <div style={{ marginTop: '8px', fontSize: '0.6875rem', color: colors.textMuted, fontFamily: '"JetBrains Mono", monospace' }}>
                                             {autopilotResult.summary}
                                         </div>
                                     )}
                                     {autopilotResult.errors?.length > 0 && (
-                                        <div style={{ marginTop: '8px' }}>
+                                        <div style={{ marginTop: '6px' }}>
                                             {autopilotResult.errors.map((e: string, i: number) => (
-                                                <div key={i} style={{ fontSize: '0.6875rem', color: colors.error, marginTop: '2px' }}>- {e}</div>
+                                                <div key={i} style={{ fontSize: '0.625rem', color: colors.error, marginTop: '2px' }}>- {e}</div>
                                             ))}
                                         </div>
                                     )}
@@ -1138,458 +1162,475 @@ export default function DashboardPage() {
 
                             {/* Schedule Info */}
                             <div style={{
-                                marginTop: '16px', padding: '12px',
+                                marginTop: '12px', padding: '10px',
                                 background: `${colors.primary}08`,
                                 borderRadius: '4px',
                                 border: `1px solid ${colors.primary}20`,
                             }}>
-                                <div style={{ fontSize: '0.6875rem', color: colors.textMuted }}>
-                                    <span style={{ fontWeight: 700, color: colors.primary }}>CRON SCHEDULE:</span> Mỗi ngày 08:00 (UTC+7) qua cron-job.org
+                                <div style={{ fontSize: '0.625rem', color: colors.textMuted }}>
+                                    <span style={{ fontWeight: 700, color: colors.primary }}>CRON:</span> Mỗi ngày 08:00 (UTC+7)
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
+                {/* Overlay backdrop */}
+                {showAutopilot && (
+                    <div
+                        onClick={() => { if (!autopilotRunning) setShowAutopilot(false); }}
+                        style={{
+                            position: 'fixed',
+                            top: 0, left: 0,
+                            width: '100vw', height: '100vh',
+                            background: 'rgba(0,0,0,0.3)',
+                            zIndex: 999,
+                        }}
+                    />
+                )}
 
                 {/* TAB: CAMPAIGNS - Show campaign analysis */}
-                {activeView === 'campaigns' && (
-                    <>
-                        {/* Error State */}
-                        {error && (
-                            <div style={styles.error}>
-                                <p>❌ {error}</p>
-                                <button
-                                    onClick={handleSearch}
-                                    style={{ ...styles.searchBtn, marginTop: '16px' }}
-                                >
-                                    Thử lại
-                                </button>
-                            </div>
-                        )}
+                {
+                    activeView === 'campaigns' && (
+                        <>
+                            {/* Error State */}
+                            {error && (
+                                <div style={styles.error}>
+                                    <p>❌ {error}</p>
+                                    <button
+                                        onClick={handleSearch}
+                                        style={{ ...styles.searchBtn, marginTop: '16px' }}
+                                    >
+                                        Thử lại
+                                    </button>
+                                </div>
+                            )}
 
-                        {/* Pre-search Empty State */}
-                        {!hasSearched && !isLoading && !error && (
-                            <div style={styles.emptyState}>
-                                <p style={{ fontSize: '3rem', marginBottom: '16px', color: '#F0B90B', fontWeight: 300 }}>─</p>
-                                <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#EAECEF' }}>Chọn tài khoản và khoảng thời gian</p>
-                                <p style={{ color: '#848E9C', marginTop: '8px' }}>Sau đó bấm <strong>Tra cứu</strong> để phân tích campaigns</p>
-                            </div>
-                        )}
+                            {/* Pre-search Empty State */}
+                            {!hasSearched && !isLoading && !error && (
+                                <div style={styles.emptyState}>
+                                    <p style={{ fontSize: '3rem', marginBottom: '16px', color: '#F0B90B', fontWeight: 300 }}>─</p>
+                                    <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#EAECEF' }}>Chọn tài khoản và khoảng thời gian</p>
+                                    <p style={{ color: '#848E9C', marginTop: '8px' }}>Sau đó bấm <strong>Tra cứu</strong> để phân tích campaigns</p>
+                                </div>
+                            )}
 
-                        {/* Loading State */}
-                        {isLoading && !error && (
-                            <div style={styles.loader}>
-                                <p style={{ color: '#F0B90B' }}>● Đang phân tích campaigns...</p>
-                            </div>
-                        )}
+                            {/* Loading State */}
+                            {isLoading && !error && (
+                                <div style={styles.loader}>
+                                    <p style={{ color: '#F0B90B' }}>● Đang phân tích campaigns...</p>
+                                </div>
+                            )}
 
-                        {/* Data */}
-                        {hasSearched && data && !isLoading && (() => {
-                            // Filter campaigns by name
-                            const filterLower = filterText.toLowerCase();
-                            const filteredCritical = filterText
-                                ? data.critical.filter(c => c.name.toLowerCase().includes(filterLower))
-                                : data.critical;
-                            const filteredWarning = filterText
-                                ? data.warning.filter(c => c.name.toLowerCase().includes(filterLower))
-                                : data.warning;
-                            const filteredGood = filterText
-                                ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
-                                : data.good;
+                            {/* Data */}
+                            {hasSearched && data && !isLoading && (() => {
+                                // Filter campaigns by name
+                                const filterLower = filterText.toLowerCase();
+                                const filteredCritical = filterText
+                                    ? data.critical.filter(c => c.name.toLowerCase().includes(filterLower))
+                                    : data.critical;
+                                const filteredWarning = filterText
+                                    ? data.warning.filter(c => c.name.toLowerCase().includes(filterLower))
+                                    : data.warning;
+                                const filteredGood = filterText
+                                    ? data.good.filter(c => c.name.toLowerCase().includes(filterLower))
+                                    : data.good;
 
-                            // Calculate aggregate metrics
-                            const allCampaigns = [...data.critical, ...data.warning, ...data.good];
-                            const totalPurchases = allCampaigns.reduce((sum, c) => sum + c.totals.purchases, 0);
-                            const totalClicks = allCampaigns.reduce((sum, c) => sum + (c.totals.ctr > 0 ? c.totals.purchases / (c.totals.ctr / 100) : 0), 0);
-                            const avgRoas = data.summary.totalSpend > 0
-                                ? data.summary.totalRevenue / data.summary.totalSpend
-                                : 0;
-                            const avgAov = totalPurchases > 0
-                                ? data.summary.totalRevenue / totalPurchases
-                                : 0;
-                            const avgCvr = totalClicks > 0
-                                ? (totalPurchases / totalClicks) * 100
-                                : 0;
+                                // Calculate aggregate metrics
+                                const allCampaigns = [...data.critical, ...data.warning, ...data.good];
+                                const totalPurchases = allCampaigns.reduce((sum, c) => sum + c.totals.purchases, 0);
+                                const totalClicks = allCampaigns.reduce((sum, c) => sum + (c.totals.ctr > 0 ? c.totals.purchases / (c.totals.ctr / 100) : 0), 0);
+                                const avgRoas = data.summary.totalSpend > 0
+                                    ? data.summary.totalRevenue / data.summary.totalSpend
+                                    : 0;
+                                const avgAov = totalPurchases > 0
+                                    ? data.summary.totalRevenue / totalPurchases
+                                    : 0;
+                                const avgCvr = totalClicks > 0
+                                    ? (totalPurchases / totalClicks) * 100
+                                    : 0;
 
-                            return (
-                                <>
-                                    {/* CEX Trading Stats Panel */}
-                                    <div style={{ marginBottom: '24px' }}>
-                                        {/* Primary Row: Financial Metrics */}
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(3, 1fr)',
-                                            gap: '16px',
-                                            marginBottom: '12px',
-                                        }}>
-                                            {/* Spend Card */}
+                                return (
+                                    <>
+                                        {/* CEX Trading Stats Panel */}
+                                        <div style={{ marginBottom: '24px' }}>
+                                            {/* Primary Row: Financial Metrics */}
                                             <div style={{
-                                                background: colors.bgCard,
-                                                borderRadius: '8px',
-                                                padding: '20px 24px',
-                                                border: `1px solid ${colors.border}`,
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                                gap: '16px',
+                                                marginBottom: '12px',
                                             }}>
-                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
-                                                    Tổng chi tiêu
-                                                </p>
-                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {formatMoney(data.summary.totalSpend)}
-                                                </p>
-                                            </div>
+                                                {/* Spend Card */}
+                                                <div style={{
+                                                    background: colors.bgCard,
+                                                    borderRadius: '8px',
+                                                    padding: '20px 24px',
+                                                    border: `1px solid ${colors.border}`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                                        Tổng chi tiêu
+                                                    </p>
+                                                    <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {formatMoney(data.summary.totalSpend)}
+                                                    </p>
+                                                </div>
 
-                                            {/* Revenue Card */}
-                                            <div style={{
-                                                background: colors.bgCard,
-                                                borderRadius: '8px',
-                                                padding: '20px 24px',
-                                                border: `1px solid ${colors.border}`,
-                                            }}>
-                                                <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
-                                                    Doanh thu
-                                                </p>
-                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {formatMoney(data.summary.totalRevenue)}
-                                                </p>
-                                            </div>
+                                                {/* Revenue Card */}
+                                                <div style={{
+                                                    background: colors.bgCard,
+                                                    borderRadius: '8px',
+                                                    padding: '20px 24px',
+                                                    border: `1px solid ${colors.border}`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>
+                                                        Doanh thu
+                                                    </p>
+                                                    <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {formatMoney(data.summary.totalRevenue)}
+                                                    </p>
+                                                </div>
 
-                                            {/* ROAS Card - Highlighted */}
-                                            <div style={{
-                                                background: `linear-gradient(135deg, ${colors.bgCard} 0%, rgba(240,185,11,0.1) 100%)`,
-                                                borderRadius: '8px',
-                                                padding: '20px 24px',
-                                                border: `1px solid ${colors.primary}40`,
-                                            }}>
-                                                <p style={{ fontSize: '0.75rem', color: colors.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px', fontWeight: 600 }}>
-                                                    ROAS
-                                                </p>
-                                                <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.primary, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {avgRoas.toFixed(2)}x
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Secondary Row: Performance + Campaign Counts */}
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(5, 1fr)',
-                                            gap: '12px',
-                                        }}>
-                                            {/* CVR */}
-                                            <div style={{
-                                                background: 'rgba(255,255,255,0.02)',
-                                                borderRadius: '8px',
-                                                padding: '14px 18px',
-                                                border: `1px solid ${colors.border}`,
-                                            }}>
-                                                <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                    Tỷ lệ chốt
-                                                </p>
-                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {avgCvr.toFixed(2)}%
-                                                </p>
-                                            </div>
-
-                                            {/* AOV */}
-                                            <div style={{
-                                                background: 'rgba(255,255,255,0.02)',
-                                                borderRadius: '8px',
-                                                padding: '14px 18px',
-                                                border: `1px solid ${colors.border}`,
-                                            }}>
-                                                <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                    AOV
-                                                </p>
-                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {formatMoney(avgAov)}
-                                                </p>
-                                            </div>
-
-                                            {/* Critical Count */}
-                                            <div style={{
-                                                background: 'rgba(248,113,113,0.08)',
-                                                borderRadius: '8px',
-                                                padding: '14px 18px',
-                                                border: `1px solid rgba(248,113,113,0.3)`,
-                                            }}>
-                                                <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                    Cần xử lý
-                                                </p>
-                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {data.summary.critical}
-                                                </p>
-                                            </div>
-
-                                            {/* Warning Count */}
-                                            <div style={{
-                                                background: `rgba(240,185,11,0.08)`,
-                                                borderRadius: '8px',
-                                                padding: '14px 18px',
-                                                border: `1px solid rgba(240,185,11,0.3)`,
-                                            }}>
-                                                <p style={{ fontSize: '0.65rem', color: '#FCD535', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                    Theo dõi
-                                                </p>
-                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {data.summary.warning}
-                                                </p>
-                                            </div>
-
-                                            {/* Good Count */}
-                                            <div style={{
-                                                background: 'rgba(14,203,129,0.08)',
-                                                borderRadius: '8px',
-                                                padding: '14px 18px',
-                                                border: `1px solid rgba(14,203,129,0.3)`,
-                                            }}>
-                                                <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                    Đang tốt
-                                                </p>
-                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                    {data.summary.good}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Campaign Table View (like landing demo) */}
-                                    <div style={{
-                                        background: colors.bgCard,
-                                        borderRadius: '8px',
-                                        border: `1px solid ${colors.border}`,
-                                        marginBottom: '28px',
-                                        overflow: 'hidden',
-                                    }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
-                                                <tr>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        Chiến dịch
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        Chi tiêu
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        NS/ngày
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                {/* ROAS Card - Highlighted */}
+                                                <div style={{
+                                                    background: `linear-gradient(135deg, ${colors.bgCard} 0%, rgba(240,185,11,0.1) 100%)`,
+                                                    borderRadius: '8px',
+                                                    padding: '20px 24px',
+                                                    border: `1px solid ${colors.primary}40`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.75rem', color: colors.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px', fontWeight: 600 }}>
                                                         ROAS
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        CTR
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        Tuổi
-                                                    </th>
-                                                    <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                        Đề xuất AI
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
-                                                    const action = campaign.actionRecommendation?.action || 'WATCH';
-                                                    const actionLabel = action === 'STOP' ? 'Dừng' : action === 'ADJUST' ? 'Điều chỉnh' : action === 'WATCH' ? 'Theo dõi' : 'Scale';
-                                                    const actionColor = action === 'STOP' ? colors.error : action === 'ADJUST' ? '#FF8C00' : action === 'WATCH' ? colors.warning : colors.success;
-                                                    const statusIcon = action === 'SCALE' ? '✓' : action === 'GOOD' ? '✓' : action === 'ADJUST' ? '⚡' : action === 'WATCH' ? '!' : '✕';
-                                                    const roasValue = campaign.totals.roas;
-                                                    const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
+                                                    </p>
+                                                    <p style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.primary, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {avgRoas.toFixed(2)}x
+                                                    </p>
+                                                </div>
+                                            </div>
 
-                                                    return (
-                                                        <tr
-                                                            key={campaign.id}
-                                                            onClick={() => setSelectedCampaign(campaign)}
-                                                            style={{
-                                                                borderBottom: `1px solid ${colors.border}`,
-                                                                cursor: 'pointer',
-                                                                transition: 'background 0.15s',
-                                                            }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                        >
-                                                            <td style={{ padding: '16px 20px' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                    <div style={{
-                                                                        width: '32px',
-                                                                        height: '32px',
-                                                                        borderRadius: '50%',
-                                                                        background: actionColor,
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        fontSize: '0.85rem',
-                                                                        fontWeight: 700,
-                                                                        color: colors.bg,
-                                                                    }}>
-                                                                        {statusIcon}
-                                                                    </div>
-                                                                    <div>
-                                                                        <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                            <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
-                                                                            {analyzedCampaigns[campaign.id] && (
-                                                                                <span
-                                                                                    style={{
-                                                                                        display: 'inline-flex',
-                                                                                        alignItems: 'center',
-                                                                                        gap: '4px',
-                                                                                        padding: '2px 8px',
-                                                                                        borderRadius: '4px',
-                                                                                        fontSize: '0.65rem',
-                                                                                        fontWeight: 600,
-                                                                                        background: colors.primary + '20',
-                                                                                        color: colors.primary,
-                                                                                        border: `1px solid ${colors.primary}40`,
-                                                                                        whiteSpace: 'nowrap' as const,
-                                                                                    }}
-                                                                                    title="Campaign đã được AI phân tích"
-                                                                                >
-                                                                                    AI
-                                                                                </span>
+                                            {/* Secondary Row: Performance + Campaign Counts */}
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(5, 1fr)',
+                                                gap: '12px',
+                                            }}>
+                                                {/* CVR */}
+                                                <div style={{
+                                                    background: 'rgba(255,255,255,0.02)',
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid ${colors.border}`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        Tỷ lệ chốt
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {avgCvr.toFixed(2)}%
+                                                    </p>
+                                                </div>
+
+                                                {/* AOV */}
+                                                <div style={{
+                                                    background: 'rgba(255,255,255,0.02)',
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid ${colors.border}`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        AOV
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.text, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {formatMoney(avgAov)}
+                                                    </p>
+                                                </div>
+
+                                                {/* Critical Count */}
+                                                <div style={{
+                                                    background: 'rgba(248,113,113,0.08)',
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid rgba(248,113,113,0.3)`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        Cần xử lý
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {data.summary.critical}
+                                                    </p>
+                                                </div>
+
+                                                {/* Warning Count */}
+                                                <div style={{
+                                                    background: `rgba(240,185,11,0.08)`,
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid rgba(240,185,11,0.3)`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: '#FCD535', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        Theo dõi
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {data.summary.warning}
+                                                    </p>
+                                                </div>
+
+                                                {/* Good Count */}
+                                                <div style={{
+                                                    background: 'rgba(14,203,129,0.08)',
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid rgba(14,203,129,0.3)`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        Đang tốt
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {data.summary.good}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Campaign Table View (like landing demo) */}
+                                        <div style={{
+                                            background: colors.bgCard,
+                                            borderRadius: '8px',
+                                            border: `1px solid ${colors.border}`,
+                                            marginBottom: '28px',
+                                            overflow: 'hidden',
+                                        }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                                    <tr>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            Chiến dịch
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            Chi tiêu
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            NS/ngày
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            ROAS
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            CTR
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            Tuổi
+                                                        </th>
+                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                            Đề xuất AI
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {[...filteredCritical, ...filteredWarning, ...filteredGood].map((campaign) => {
+                                                        const action = campaign.actionRecommendation?.action || 'WATCH';
+                                                        const actionLabel = action === 'STOP' ? 'Dừng' : action === 'ADJUST' ? 'Điều chỉnh' : action === 'WATCH' ? 'Theo dõi' : 'Scale';
+                                                        const actionColor = action === 'STOP' ? colors.error : action === 'ADJUST' ? '#FF8C00' : action === 'WATCH' ? colors.warning : colors.success;
+                                                        const statusIcon = action === 'SCALE' ? '✓' : action === 'GOOD' ? '✓' : action === 'ADJUST' ? '⚡' : action === 'WATCH' ? '!' : '✕';
+                                                        const roasValue = campaign.totals.roas;
+                                                        const roasColor = roasValue >= 2 ? colors.success : roasValue >= 1 ? colors.warning : colors.error;
+
+                                                        return (
+                                                            <tr
+                                                                key={campaign.id}
+                                                                onClick={() => setSelectedCampaign(campaign)}
+                                                                style={{
+                                                                    borderBottom: `1px solid ${colors.border}`,
+                                                                    cursor: 'pointer',
+                                                                    transition: 'background 0.15s',
+                                                                }}
+                                                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                                                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                            >
+                                                                <td style={{ padding: '16px 20px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                        <div style={{
+                                                                            width: '32px',
+                                                                            height: '32px',
+                                                                            borderRadius: '50%',
+                                                                            background: actionColor,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            fontSize: '0.85rem',
+                                                                            fontWeight: 700,
+                                                                            color: colors.bg,
+                                                                        }}>
+                                                                            {statusIcon}
+                                                                        </div>
+                                                                        <div>
+                                                                            <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
+                                                                                {analyzedCampaigns[campaign.id] && (
+                                                                                    <span
+                                                                                        style={{
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '4px',
+                                                                                            padding: '2px 8px',
+                                                                                            borderRadius: '4px',
+                                                                                            fontSize: '0.65rem',
+                                                                                            fontWeight: 600,
+                                                                                            background: colors.primary + '20',
+                                                                                            color: colors.primary,
+                                                                                            border: `1px solid ${colors.primary}40`,
+                                                                                            whiteSpace: 'nowrap' as const,
+                                                                                        }}
+                                                                                        title="Campaign đã được AI phân tích"
+                                                                                    >
+                                                                                        AI
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {campaign.created_time && (
+                                                                                <div style={{ fontSize: '0.7rem', color: colors.textSubtle }}>
+                                                                                    Tạo: {new Date(campaign.created_time).toLocaleDateString('vi-VN')}
+                                                                                </div>
                                                                             )}
                                                                         </div>
-
-                                                                        {campaign.created_time && (
-                                                                            <div style={{ fontSize: '0.7rem', color: colors.textSubtle }}>
-                                                                                Tạo: {new Date(campaign.created_time).toLocaleDateString('vi-VN')}
-                                                                            </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
+                                                                        {formatMoney(campaign.totals.spend)}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    <div>
+                                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text, fontSize: '0.9rem' }}>
+                                                                            {formatMoney(campaign.daily_budget_estimated || 0)}
+                                                                        </span>
+                                                                        <div style={{ fontSize: '0.65rem', color: colors.textSubtle, marginTop: '2px' }}>
+                                                                            {campaign.daily_budget ? 'CBO' : 'ước lượng'}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
+                                                                        {roasValue.toFixed(1)}x
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
+                                                                        {campaign.totals.ctr.toFixed(2)}%
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    {campaign.created_time ? (
+                                                                        <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted, fontSize: '0.85rem' }}>
+                                                                            {Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / (1000 * 60 * 60 * 24))}d
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{ color: colors.textSubtle }}>—</span>
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                                                        <button style={{
+                                                                            background: actionColor,
+                                                                            color: action === 'WATCH' ? colors.bg : '#fff',
+                                                                            border: 'none',
+                                                                            padding: '6px 16px',
+                                                                            borderRadius: '4px',
+                                                                            fontWeight: 600,
+                                                                            fontSize: '0.8rem',
+                                                                            cursor: 'pointer',
+                                                                            transition: 'opacity 0.15s',
+                                                                        }}>
+                                                                            {actionLabel}
+                                                                        </button>
+                                                                        {campaign.actionRecommendation?.debugData && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const btn = e.currentTarget;
+                                                                                    const debugLog = JSON.stringify(
+                                                                                        campaign.actionRecommendation?.debugData,
+                                                                                        null,
+                                                                                        2
+                                                                                    );
+                                                                                    navigator.clipboard.writeText(debugLog).then(() => {
+                                                                                        if (!btn) return;
+                                                                                        btn.textContent = '✓';
+                                                                                        btn.style.color = colors.success;
+                                                                                        btn.style.borderColor = colors.success;
+                                                                                        setTimeout(() => {
+                                                                                            btn.textContent = '⚙';
+                                                                                            btn.style.color = colors.textMuted;
+                                                                                            btn.style.borderColor = colors.border;
+                                                                                        }, 1500);
+                                                                                    });
+                                                                                }}
+                                                                                style={{
+                                                                                    width: '28px',
+                                                                                    height: '28px',
+                                                                                    borderRadius: '4px',
+                                                                                    fontSize: '0.85rem',
+                                                                                    background: 'transparent',
+                                                                                    color: colors.textMuted,
+                                                                                    border: `1px solid ${colors.border}`,
+                                                                                    cursor: 'pointer',
+                                                                                    transition: 'all 0.2s',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    padding: 0,
+                                                                                }}
+                                                                                title="Copy debug log vào clipboard"
+                                                                                onMouseEnter={(e) => {
+                                                                                    e.currentTarget.style.color = colors.primary;
+                                                                                    e.currentTarget.style.borderColor = colors.primary;
+                                                                                }}
+                                                                                onMouseLeave={(e) => {
+                                                                                    e.currentTarget.style.color = colors.textMuted;
+                                                                                    e.currentTarget.style.borderColor = colors.border;
+                                                                                }}
+                                                                            >
+                                                                                ⚙
+                                                                            </button>
                                                                         )}
                                                                     </div>
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
-                                                                    {formatMoney(campaign.totals.spend)}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <div>
-                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text, fontSize: '0.9rem' }}>
-                                                                        {formatMoney(campaign.daily_budget_estimated || 0)}
-                                                                    </span>
-                                                                    <div style={{ fontSize: '0.65rem', color: colors.textSubtle, marginTop: '2px' }}>
-                                                                        {campaign.daily_budget ? 'CBO' : 'ước lượng'}
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
-                                                                    {roasValue.toFixed(1)}x
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
-                                                                    {campaign.totals.ctr.toFixed(2)}%
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                {campaign.created_time ? (
-                                                                    <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted, fontSize: '0.85rem' }}>
-                                                                        {Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / (1000 * 60 * 60 * 24))}d
-                                                                    </span>
-                                                                ) : (
-                                                                    <span style={{ color: colors.textSubtle }}>—</span>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                                                                    <button style={{
-                                                                        background: actionColor,
-                                                                        color: action === 'WATCH' ? colors.bg : '#fff',
-                                                                        border: 'none',
-                                                                        padding: '6px 16px',
-                                                                        borderRadius: '4px',
-                                                                        fontWeight: 600,
-                                                                        fontSize: '0.8rem',
-                                                                        cursor: 'pointer',
-                                                                        transition: 'opacity 0.15s',
-                                                                    }}>
-                                                                        {actionLabel}
-                                                                    </button>
-                                                                    {campaign.actionRecommendation?.debugData && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                const btn = e.currentTarget;
-                                                                                const debugLog = JSON.stringify(
-                                                                                    campaign.actionRecommendation?.debugData,
-                                                                                    null,
-                                                                                    2
-                                                                                );
-                                                                                navigator.clipboard.writeText(debugLog).then(() => {
-                                                                                    if (!btn) return;
-                                                                                    btn.textContent = '✓';
-                                                                                    btn.style.color = colors.success;
-                                                                                    btn.style.borderColor = colors.success;
-                                                                                    setTimeout(() => {
-                                                                                        btn.textContent = '⚙';
-                                                                                        btn.style.color = colors.textMuted;
-                                                                                        btn.style.borderColor = colors.border;
-                                                                                    }, 1500);
-                                                                                });
-                                                                            }}
-                                                                            style={{
-                                                                                width: '28px',
-                                                                                height: '28px',
-                                                                                borderRadius: '4px',
-                                                                                fontSize: '0.85rem',
-                                                                                background: 'transparent',
-                                                                                color: colors.textMuted,
-                                                                                border: `1px solid ${colors.border}`,
-                                                                                cursor: 'pointer',
-                                                                                transition: 'all 0.2s',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                padding: 0,
-                                                                            }}
-                                                                            title="Copy debug log vào clipboard"
-                                                                            onMouseEnter={(e) => {
-                                                                                e.currentTarget.style.color = colors.primary;
-                                                                                e.currentTarget.style.borderColor = colors.primary;
-                                                                            }}
-                                                                            onMouseLeave={(e) => {
-                                                                                e.currentTarget.style.color = colors.textMuted;
-                                                                                e.currentTarget.style.borderColor = colors.border;
-                                                                            }}
-                                                                        >
-                                                                            ⚙
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Campaign sections removed - Table View above shows all info */}
-
-                                    {/* Empty State */}
-                                    {data.summary.total === 0 && (
-                                        <div style={styles.emptyState}>
-                                            <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
-                                            <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </>
-                )}
-            </main>
+
+                                        {/* Campaign sections removed - Table View above shows all info */}
+
+                                        {/* Empty State */}
+                                        {data.summary.total === 0 && (
+                                            <div style={styles.emptyState}>
+                                                <p style={{ fontSize: '2rem', marginBottom: '8px' }}>📭</p>
+                                                <p>Không có campaign nào đang chạy trong khoảng thời gian này</p>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </>
+                    )
+                }
+            </main >
 
             {/* Campaign Detail Panel */}
-            {selectedCampaign && (
-                <CampaignDetailPanel
-                    campaign={selectedCampaign}
-                    dateRange={{ startDate, endDate }}
-                    onClose={() => setSelectedCampaign(null)}
-                    formatMoney={formatMoney}
-                    accountId={selectedAccountId}
-                />
-            )}
-        </div>
+            {
+                selectedCampaign && (
+                    <CampaignDetailPanel
+                        campaign={selectedCampaign}
+                        dateRange={{ startDate, endDate }}
+                        onClose={() => setSelectedCampaign(null)}
+                        formatMoney={formatMoney}
+                        accountId={selectedAccountId}
+                    />
+                )
+            }
+        </div >
     );
 }
 

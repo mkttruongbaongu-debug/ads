@@ -128,10 +128,28 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                 `/api/analysis/campaign/${campaignId}/ads?startDate=${startDate}&endDate=${endDate}`
             );
             const json = await res.json();
-            if (json.success && json.data) {
+            if (json.success && json.data?.ads) {
+                // Map API response fields to AdItem interface
+                const mapped: AdItem[] = json.data.ads.map((ad: any) => ({
+                    ad_id: ad.id,
+                    ad_name: ad.name,
+                    caption: ad.message || '',
+                    content_type: ad.creativeId ? 'IMAGE' : 'UNKNOWN',
+                    image_url: ad.thumbnail || '',
+                    metrics: {
+                        spend: ad.totals?.spend || 0,
+                        purchases: ad.totals?.purchases || 0,
+                        revenue: ad.totals?.revenue || 0,
+                        cpp: ad.totals?.cpp || 0,
+                        roas: ad.totals?.roas || 0,
+                        ctr: ad.totals?.ctr || 0,
+                        impressions: ad.totals?.impressions || 0,
+                        clicks: ad.totals?.clicks || 0,
+                    },
+                }));
                 // Sort by ROAS desc
-                const sorted = [...json.data].sort((a: AdItem, b: AdItem) => b.metrics.roas - a.metrics.roas);
-                setAds(sorted);
+                mapped.sort((a, b) => b.metrics.roas - a.metrics.roas);
+                setAds(mapped);
             } else {
                 setAdsError(json.error || 'Không thể tải dữ liệu ads');
             }

@@ -362,7 +362,7 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
     };
 
     const formatCurrency = (value: number) => {
-        return value.toLocaleString('de-DE') + ' ₫';
+        return Math.round(value).toLocaleString('de-DE') + ' ₫';
     };
 
     // Round budget to nearest 100K for realistic display
@@ -399,10 +399,10 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                 </div>
             </div>
 
-            {/* Proposed Action */}
+            {/* Proposed Action — PHÂN TÍCH → HÀNH ĐỘNG */}
             <div style={styles.actionSection}>
-                <p style={styles.actionTitle}>Hành động đề xuất</p>
-                <p style={styles.actionType}>{actionTypeLabels[deXuat.hanhDong.loai] || deXuat.hanhDong.loai.replace(/_/g, ' ')}</p>
+                {/* PHÂN TÍCH */}
+                <p style={styles.actionTitle}>Phân tích</p>
 
                 {/* Lý do chi tiết */}
                 {deXuat.hanhDong.lyDo && (
@@ -411,49 +411,58 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                     </p>
                 )}
 
-                {/* Các bước thực thi (bao gồm budget suggestion) */}
-                {(deXuat.hanhDong.cacBuoc?.length > 0 || deXuat.hanhDong.giaTri_DeXuat) && (
-                    <div style={{ marginTop: '16px' }}>
-                        <p style={{ ...styles.actionTitle, marginBottom: '8px' }}>Các bước thực thi</p>
+                {/* HÀNH ĐỘNG */}
+                {(() => {
+                    // Filter ra chỉ các bước actionable — bỏ bước "Theo dõi" (monitoring, không phải action)
+                    const actionSteps = (deXuat.hanhDong.cacBuoc || []).filter(buoc => {
+                        const lower = buoc.toLowerCase();
+                        return !lower.startsWith('theo dõi:') && !lower.startsWith('theo dõi ');
+                    });
+                    const hasContent = actionSteps.length > 0 || deXuat.hanhDong.giaTri_DeXuat;
+                    if (!hasContent) return null;
+                    return (
+                        <div style={{ marginTop: '16px' }}>
+                            <p style={{ ...styles.actionTitle, marginBottom: '8px' }}>Hành động</p>
 
-                        {/* Budget suggestion - nằm VỚI các bước */}
-                        {deXuat.hanhDong.giaTri_DeXuat && (
-                            <div style={{
-                                marginBottom: '10px', padding: '8px 14px',
-                                background: 'rgba(255, 193, 7, 0.08)', borderRadius: '4px',
-                                border: `1px solid rgba(255, 193, 7, 0.2)`,
-                                fontSize: '0.8125rem', color: colors.warning,
-                            }}>
-                                {deXuat.hanhDong.giaTri_HienTai && (
-                                    <span>Hiện tại: {formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_HienTai)))} → </span>
-                                )}
-                                <span style={{ fontWeight: 700 }}>Đề xuất: {typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
-                                    ? formatCurrency(roundBudget(deXuat.hanhDong.giaTri_DeXuat))
-                                    : typeof deXuat.hanhDong.giaTri_DeXuat === 'string' && !isNaN(Number(deXuat.hanhDong.giaTri_DeXuat))
-                                        ? formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_DeXuat)))
-                                        : deXuat.hanhDong.giaTri_DeXuat
-                                }</span>
-                                {deXuat.hanhDong.phanTram_ThayDoi && (
-                                    <span> ({deXuat.hanhDong.phanTram_ThayDoi > 0 ? '+' : ''}{deXuat.hanhDong.phanTram_ThayDoi}%)</span>
-                                )}
-                            </div>
-                        )}
+                            {/* Budget suggestion */}
+                            {deXuat.hanhDong.giaTri_DeXuat && (
+                                <div style={{
+                                    marginBottom: '10px', padding: '8px 14px',
+                                    background: 'rgba(255, 193, 7, 0.08)', borderRadius: '4px',
+                                    border: `1px solid rgba(255, 193, 7, 0.2)`,
+                                    fontSize: '0.8125rem', color: colors.warning,
+                                }}>
+                                    {deXuat.hanhDong.giaTri_HienTai && (
+                                        <span>Hiện tại: {formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_HienTai)))} → </span>
+                                    )}
+                                    <span style={{ fontWeight: 700 }}>Đề xuất: {typeof deXuat.hanhDong.giaTri_DeXuat === 'number'
+                                        ? formatCurrency(roundBudget(deXuat.hanhDong.giaTri_DeXuat))
+                                        : typeof deXuat.hanhDong.giaTri_DeXuat === 'string' && !isNaN(Number(deXuat.hanhDong.giaTri_DeXuat))
+                                            ? formatCurrency(roundBudget(Number(deXuat.hanhDong.giaTri_DeXuat)))
+                                            : deXuat.hanhDong.giaTri_DeXuat
+                                    }</span>
+                                    {deXuat.hanhDong.phanTram_ThayDoi && (
+                                        <span> ({deXuat.hanhDong.phanTram_ThayDoi > 0 ? '+' : ''}{deXuat.hanhDong.phanTram_ThayDoi}%)</span>
+                                    )}
+                                </div>
+                            )}
 
-                        {deXuat.hanhDong.cacBuoc && deXuat.hanhDong.cacBuoc.length > 0 && (
-                            <ol style={{
-                                margin: 0,
-                                paddingLeft: '20px',
-                                color: colors.text,
-                                fontSize: '0.875rem',
-                                lineHeight: 1.8,
-                            }}>
-                                {deXuat.hanhDong.cacBuoc.map((buoc, idx) => (
-                                    <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
-                                ))}
-                            </ol>
-                        )}
-                    </div>
-                )}
+                            {actionSteps.length > 0 && (
+                                <ol style={{
+                                    margin: 0,
+                                    paddingLeft: '20px',
+                                    color: colors.text,
+                                    fontSize: '0.875rem',
+                                    lineHeight: 1.8,
+                                }}>
+                                    {actionSteps.map((buoc, idx) => (
+                                        <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
+                                    ))}
+                                </ol>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* Kết quả kỳ vọng */}
                 {deXuat.hanhDong.ketQua_KyVong && (

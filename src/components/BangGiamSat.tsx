@@ -307,7 +307,7 @@ export default function BangGiamSat({ userId }: Props) {
     };
 
     const formatCurrency = (value: number) => {
-        return value.toLocaleString('de-DE') + ' ₫';
+        return Math.round(value).toLocaleString('de-DE') + ' ₫';
     };
 
     const calculateChange = (before: number, after: number) => {

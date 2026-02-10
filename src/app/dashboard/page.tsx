@@ -735,43 +735,9 @@ export default function DashboardPage() {
                                 GIÁM SÁT
                             </button>
 
+
                         </div>
                     </div>
-                    {/* AUTOPILOT Small Button */}
-                    <button
-                        onClick={() => setShowAutopilot(!showAutopilot)}
-                        style={{
-                            padding: '6px 12px',
-                            background: autopilotRunning ? `${colors.accent}30` : showAutopilot ? `${colors.accent}20` : 'transparent',
-                            border: `1px solid ${autopilotRunning ? colors.accent : colors.border}`,
-                            borderRadius: '6px',
-                            color: autopilotRunning ? colors.accent : colors.textMuted,
-                            fontSize: '0.6875rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            letterSpacing: '0.05em',
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                        }}
-                        title="Chạy pipeline tự động"
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = colors.accent;
-                            e.currentTarget.style.color = colors.accent;
-                        }}
-                        onMouseLeave={(e) => {
-                            if (!showAutopilot && !autopilotRunning) {
-                                e.currentTarget.style.borderColor = colors.border;
-                                e.currentTarget.style.color = colors.textMuted;
-                            }
-                        }}
-                    >
-                        {autopilotRunning && (
-                            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors.accent, animation: 'pulse 1.5s infinite' }} />
-                        )}
-                        AUTOPILOT
-                    </button>
                     {/* User Profile Dropdown - CEX Style */}
                     <div style={{ position: 'relative' }}>
                         <button
@@ -974,6 +940,51 @@ export default function DashboardPage() {
                 {activeView === 'monitoring' && (
                     <BangGiamSat userId={session?.user?.email || ''} />
                 )}
+
+                {/* AUTOPILOT Floating Button — Bottom Left */}
+                <button
+                    onClick={() => setShowAutopilot(!showAutopilot)}
+                    style={{
+                        position: 'fixed',
+                        bottom: '20px',
+                        left: '20px',
+                        zIndex: 1000,
+                        padding: '10px 18px',
+                        background: autopilotRunning ? `${colors.accent}25` : showAutopilot ? `${colors.accent}15` : colors.bgCard,
+                        border: `1px solid ${autopilotRunning ? colors.accent : colors.border}`,
+                        borderRadius: '8px',
+                        color: autopilotRunning ? colors.accent : colors.textMuted,
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        letterSpacing: '0.05em',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: autopilotRunning
+                            ? `0 0 16px ${colors.accent}40`
+                            : '0 2px 12px rgba(0,0,0,0.4)',
+                    }}
+                    title="Chạy pipeline tự động"
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = colors.accent;
+                        e.currentTarget.style.color = colors.accent;
+                        e.currentTarget.style.boxShadow = `0 0 16px ${colors.accent}30`;
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!showAutopilot && !autopilotRunning) {
+                            e.currentTarget.style.borderColor = colors.border;
+                            e.currentTarget.style.color = colors.textMuted;
+                            e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.4)';
+                        }
+                    }}
+                >
+                    {autopilotRunning && (
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors.accent, animation: 'pulse 1.5s infinite' }} />
+                    )}
+                    AUTOPILOT
+                </button>
 
                 {/* AUTOPILOT OVERLAY PANEL */}
                 {showAutopilot && (

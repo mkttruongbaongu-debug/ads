@@ -933,7 +933,7 @@ export default function DashboardPage() {
 
                 {/* TAB: EXECUTION - Show BangThucThi inline */}
                 {activeView === 'execution' && (
-                    <BangThucThi />
+                    <BangThucThi onNavigateToMonitoring={() => setActiveView('monitoring')} />
                 )}
 
                 {/* TAB: MONITORING - Show BangGiamSat inline */}

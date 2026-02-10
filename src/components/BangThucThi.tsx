@@ -138,11 +138,16 @@ function bocTachBuoc(deXuat: DeXuat): BuocThucThi[] {
 // COMPONENT
 // ===================================================================
 
-export default function BangThucThi() {
+interface BangThucThiProps {
+    onNavigateToMonitoring?: () => void;
+}
+
+export default function BangThucThi({ onNavigateToMonitoring }: BangThucThiProps) {
     const [deXuatList, setDeXuatList] = useState<DeXuatVoiBuoc[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [executingStep, setExecutingStep] = useState<string | null>(null);
+    const [completedMessage, setCompletedMessage] = useState<string | null>(null);
 
     // Creative Studio overlay
     const [creativeStudio, setCreativeStudio] = useState<{
@@ -231,6 +236,19 @@ export default function BangThucThi() {
                         } : b
                     ),
                 };
+
+                // Check if ALL steps for this proposal are now done
+                const allStepsDone = next[deXuatIdx].cacBuoc.every(
+                    b => b.trangThai === 'HOAN_THANH' || b.trangThai === 'BO_QUA' || b.trangThai === 'LOI'
+                );
+                if (allStepsDone) {
+                    // Auto-refresh after a short delay to let the API update status
+                    setTimeout(() => {
+                        setCompletedMessage(`Đã thực thi xong — đề xuất đã chuyển sang GIÁM SÁT`);
+                        fetchApproved(); // Refresh to remove completed proposal
+                    }, 1500);
+                }
+
                 return next;
             });
         } catch (err) {
@@ -580,19 +598,41 @@ export default function BangThucThi() {
                                 })}
                             </div>
 
-                            {/* All done → mark as executed */}
+                            {/* All done → mark as executed + navigate to monitoring */}
                             {allDone && (
                                 <div style={{
                                     padding: '12px 20px',
                                     borderTop: `1px solid ${colors.border}`,
                                     background: 'rgba(14, 203, 129, 0.05)',
                                     textAlign: 'center',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '16px',
                                 }}>
                                     <span style={{
                                         fontSize: '0.8125rem', fontWeight: 600, color: colors.success,
                                     }}>
                                         ✓ TẤT CẢ BƯỚC ĐÃ HOÀN THÀNH
                                     </span>
+                                    {onNavigateToMonitoring && (
+                                        <button
+                                            onClick={onNavigateToMonitoring}
+                                            style={{
+                                                padding: '6px 14px',
+                                                background: 'rgba(63, 140, 238, 0.15)',
+                                                border: `1px solid rgba(63, 140, 238, 0.4)`,
+                                                borderRadius: '4px',
+                                                color: '#3F8CEE',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                            }}
+                                        >
+                                            XEM GIÁM SÁT →
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>

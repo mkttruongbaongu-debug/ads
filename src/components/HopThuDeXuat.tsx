@@ -175,7 +175,12 @@ export default function HopThuDeXuat({ userId }: Props) {
                 throw new Error(json.error || 'Failed to fetch proposals');
             }
 
-            setDeXuats(json.data || []);
+            // Filter: chỉ hiển thị proposals PRE-EXECUTION
+            // DANG_GIAM_SAT / DA_THUC_THI / HOAN_THANH thuộc tab GIÁM SÁT
+            const preExecution = (json.data || []).filter((d: DeXuat) =>
+                !['DANG_GIAM_SAT', 'DA_THUC_THI', 'HOAN_THANH'].includes(d.trangThai)
+            );
+            setDeXuats(preExecution);
         } catch (err) {
             console.error('Error fetching proposals:', err);
             setError(err instanceof Error ? err.message : 'Unknown error');

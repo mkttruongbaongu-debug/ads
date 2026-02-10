@@ -138,6 +138,8 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishResult, setPublishResult] = useState<{ success: boolean; message: string; adId?: string } | null>(null);
     const [publishStep, setPublishStep] = useState('');
+    const [adSetLoading, setAdSetLoading] = useState(false);
+    const [adSetError, setAdSetError] = useState('');
 
     // Debug
     const [showDebug, setShowDebug] = useState(false);
@@ -1216,23 +1218,33 @@ Tổng ads: ${ads.length}`}
                                                     </select>
                                                     <button
                                                         onClick={async () => {
+                                                            setAdSetLoading(true);
+                                                            setAdSetError('');
                                                             try {
                                                                 const today = new Date();
-                                                                const endDate = today.toISOString().split('T')[0];
-                                                                const startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                                                                const res = await fetch(`/api/facebook/campaign/${campaignId}/adsets?startDate=${startDate}&endDate=${endDate}`);
+                                                                const ed = today.toISOString().split('T')[0];
+                                                                const sd = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                                                console.log(`[CREATIVE_STUDIO] Fetching adsets for campaign ${campaignId}...`);
+                                                                const res = await fetch(`/api/facebook/campaign/${campaignId}/adsets?startDate=${sd}&endDate=${ed}`);
                                                                 const json = await res.json();
+                                                                console.log('[CREATIVE_STUDIO] Adsets response:', json);
                                                                 if (json.success && json.data) {
                                                                     setAdSets(json.data.map((a: any) => ({ id: a.id, name: a.name, status: a.status })));
                                                                     if (json.data.length > 0) {
-                                                                        // Auto-select first ACTIVE ad set
                                                                         const active = json.data.find((a: any) => a.status === 'ACTIVE');
                                                                         if (active) setSelectedAdSet(active.id);
                                                                         else setSelectedAdSet(json.data[0].id);
+                                                                    } else {
+                                                                        setAdSetError('Campaign không có ad set nào');
                                                                     }
+                                                                } else {
+                                                                    setAdSetError(json.error || 'Không tải được ad sets');
                                                                 }
                                                             } catch (err) {
                                                                 console.error('Failed to fetch adsets:', err);
+                                                                setAdSetError(err instanceof Error ? err.message : 'Lỗi kết nối');
+                                                            } finally {
+                                                                setAdSetLoading(false);
                                                             }
                                                         }}
                                                         style={{
@@ -1240,13 +1252,20 @@ Tổng ads: ${ads.length}`}
                                                             background: colors.bgAlt,
                                                             border: `1px solid ${colors.border}`,
                                                             color: colors.textMuted, fontSize: '0.625rem',
-                                                            fontWeight: 700, cursor: 'pointer',
+                                                            fontWeight: 700, cursor: adSetLoading ? 'wait' : 'pointer',
                                                             whiteSpace: 'nowrap' as const,
+                                                            opacity: adSetLoading ? 0.6 : 1,
                                                         }}
+                                                        disabled={adSetLoading}
                                                     >
-                                                        TẢI
+                                                        {adSetLoading ? 'ĐANG TẢI...' : 'TẢI'}
                                                     </button>
                                                 </div>
+                                                {adSetError && (
+                                                    <p style={{ margin: '4px 0 0', fontSize: '0.625rem', color: colors.error }}>
+                                                        ✗ {adSetError}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* Publish button */}
@@ -1356,7 +1375,7 @@ Tổng ads: ${ads.length}`}
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         </>
     );
 }

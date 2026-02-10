@@ -232,15 +232,22 @@ export default function BangGiamSat({ userId }: Props) {
         setError(null);
 
         try {
-            const res = await fetch('/api/de-xuat/danh-sach?status=DANG_GIAM_SAT,DA_THUC_THI');
-            const json = await res.json();
+            // Apps Script only supports single status filter (exact match)
+            // Fetch both statuses in parallel and merge
+            const [res1, res2] = await Promise.all([
+                fetch('/api/de-xuat/danh-sach?status=DANG_GIAM_SAT'),
+                fetch('/api/de-xuat/danh-sach?status=DA_THUC_THI'),
+            ]);
+            const [json1, json2] = await Promise.all([res1.json(), res2.json()]);
 
-            if (!json.success) {
-                throw new Error(json.error || 'Failed to fetch');
+            if (!json1.success && !json2.success) {
+                throw new Error(json1.error || json2.error || 'Failed to fetch');
             }
 
+            const allData = [...(json1.data || []), ...(json2.data || [])];
+
             // Enrich với monitoring data
-            const enriched: MonitoringProposal[] = (json.data || []).map((p: DeXuat) => {
+            const enriched: MonitoringProposal[] = (allData).map((p: DeXuat) => {
                 const executedTime = p.thoiGian_ThucThi || new Date().toISOString();
                 const passedCheckpoints = getAllPassedCheckpoints(executedTime);
                 const lastCheckpoint = passedCheckpoints[passedCheckpoints.length - 1] || null;

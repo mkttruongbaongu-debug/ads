@@ -1354,13 +1354,26 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 );
                             })()}
 
-                            {/* ═══ BANDS ANALYSIS (7-day avg) ═══ */}
+                            {/* ═══ PHÂN TÍCH CHỈ SỐ — Redesigned ═══ */}
                             {(() => {
                                 const rec = campaign.actionRecommendation;
                                 const bands = rec?.debugData?.processing?.bands;
                                 const tags = rec?.metricTags || [];
 
                                 if (!bands && tags.length === 0) return null;
+
+                                // Status label logic (Vietnamese, human-readable)
+                                const getStatus = (zScore: number | undefined, isInverse: boolean) => {
+                                    if (zScore === undefined) return { label: '—', color: colors.textMuted, bg: `${colors.textMuted}15` };
+                                    // For inverse metrics (CPP): positive z = bad, negative z = good
+                                    const effectiveZ = isInverse ? zScore : -zScore;
+                                    if (effectiveZ <= -2.0) return { label: 'NGUY HIỂM', color: '#EF4444', bg: '#EF444418' };
+                                    if (effectiveZ <= -1.0) return { label: 'YẾU', color: '#F97316', bg: '#F9731618' };
+                                    if (effectiveZ <= -0.5) return { label: 'CẦN THEO DÕI', color: colors.warning, bg: `${colors.warning}18` };
+                                    if (effectiveZ < 0.5) return { label: 'ỔN ĐỊNH', color: '#3B82F6', bg: '#3B82F618' };
+                                    if (effectiveZ < 1.0) return { label: 'TỐT', color: '#22C55E', bg: '#22C55E18' };
+                                    return { label: 'XUẤT SẮC', color: '#10B981', bg: '#10B98118' };
+                                };
 
                                 return (
                                     <div style={{
@@ -1379,10 +1392,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <span style={{
                                                 fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
                                                 textTransform: 'uppercase', letterSpacing: '0.08em',
-                                            }}>CHỈ SỐ PHÂN TÍCH</span>
+                                            }}>PHÂN TÍCH CHỈ SỐ (7 NGÀY GẦN NHẤT)</span>
                                         </div>
 
-                                        {/* Metric Rows */}
+                                        {/* Metric Cards */}
                                         {(['CTR', 'CPP', 'ROAS'] as const).map(metric => {
                                             const band = bands?.[metric.toLowerCase()];
                                             const tag = tags.find(t => t.metric === metric);
@@ -1394,90 +1407,149 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             const isInverse = metric === 'CPP';
 
                                             // Format values
-                                            const fmtWindow = metric === 'CTR' ? `${windowAvg?.toFixed(2)}%`
-                                                : metric === 'ROAS' ? `${windowAvg?.toFixed(2)}x`
-                                                    : formatMoney(windowAvg || 0);
+                                            const fmtVal = (v: number) => metric === 'CTR' ? `${v.toFixed(2)}%`
+                                                : metric === 'ROAS' ? `${v.toFixed(2)}x`
+                                                    : formatMoney(v);
+                                            const fmtWindow = fmtVal(windowAvg || 0);
+                                            const fmtMA = fmtVal(ma || 0);
 
-                                            // Deviation ratio for progress bar
-                                            let ratio = ma && windowAvg ? windowAvg / ma : 1;
-                                            if (isInverse) ratio = ma && windowAvg ? ma / windowAvg : 1;
-                                            const barPercent = Math.min(Math.max(ratio * 100, 5), 200);
-                                            const isGood = isInverse ? (windowAvg || 0) < (ma || 0) : (windowAvg || 0) > (ma || 0);
+                                            // Percentage change from MA
+                                            const pctChange = ma && windowAvg && ma > 0
+                                                ? ((windowAvg - ma) / ma) * 100
+                                                : 0;
+                                            // For display: is this change good or bad?
+                                            const changeIsGood = isInverse ? pctChange < 0 : pctChange > 0;
 
-                                            // Severity color
-                                            const sevColor = tag?.severity === 'critical' ? colors.error
-                                                : tag?.severity === 'warning' ? colors.warning
-                                                    : tag ? '#3B82F6' : colors.textMuted;
+                                            // Status
+                                            const status = getStatus(zScore, isInverse);
+
+                                            // Gauge bar: position of current value relative to band range
+                                            const sigma = band?.sigma || 0;
+                                            const lowerBound = Math.max(0, (ma || 0) - 2 * sigma);
+                                            const upperBound = (ma || 0) + 2 * sigma;
+                                            const bandRange = upperBound - lowerBound || 1;
+                                            const gaugePercent = Math.min(Math.max(((windowAvg || 0) - lowerBound) / bandRange * 100, 2), 98);
+
+                                            // Gauge colors
+                                            const gaugeColor = status.color;
+
+                                            // Action from issue
+                                            const metricIssueTypes: Record<string, string[]> = {
+                                                'CTR': ['content_worn'],
+                                                'CPP': ['cpp_rising'],
+                                                'ROAS': ['losing_money'],
+                                            };
+                                            const matchingIssue = campaign.issues.find(i => metricIssueTypes[metric]?.includes(i.type));
 
                                             return (
                                                 <div key={metric} style={{
-                                                    padding: '10px 0',
-                                                    borderBottom: metric !== 'ROAS' ? `1px solid ${colors.border}30` : 'none',
+                                                    padding: '14px 0',
+                                                    borderBottom: metric !== 'ROAS' ? `1px solid ${colors.border}40` : 'none',
                                                 }}>
-                                                    {/* Top row: metric name, value, tag, z-score */}
+                                                    {/* Row 1: Metric name + Status badge + Action */}
                                                     <div style={{
                                                         display: 'flex', alignItems: 'center', gap: '10px',
-                                                        marginBottom: '6px',
+                                                        marginBottom: '8px',
                                                     }}>
                                                         <span style={{
-                                                            fontSize: '0.75rem', fontWeight: 700, color: colors.text,
+                                                            fontSize: '0.6875rem', fontWeight: 700, color: colors.textMuted,
                                                             fontFamily: '"JetBrains Mono", monospace',
-                                                            width: '40px',
+                                                            width: '38px', letterSpacing: '0.03em',
                                                         }}>{metric}</span>
                                                         <span style={{
-                                                            fontSize: '0.9375rem', fontWeight: 700,
-                                                            color: colors.text,
-                                                            fontFamily: '"JetBrains Mono", monospace',
-                                                            minWidth: '80px',
-                                                        }}>{fmtWindow}</span>
-                                                        {tag && (
+                                                            fontSize: '0.625rem', fontWeight: 700,
+                                                            padding: '3px 8px', borderRadius: '3px',
+                                                            background: status.bg, color: status.color,
+                                                            letterSpacing: '0.05em',
+                                                        }}>{status.label}</span>
+                                                        {matchingIssue && (
                                                             <span style={{
-                                                                fontSize: '0.6875rem', fontWeight: 700,
-                                                                padding: '2px 6px', borderRadius: '3px',
-                                                                background: `${sevColor}20`, color: sevColor,
-                                                            }}>{tag.label}</span>
+                                                                fontSize: '0.625rem', color: colors.success,
+                                                                fontWeight: 600, marginLeft: 'auto', whiteSpace: 'nowrap',
+                                                            }}>→ {matchingIssue.action}</span>
                                                         )}
-                                                        {zScore !== undefined && (
-                                                            <span style={{
-                                                                fontSize: '0.6875rem', fontWeight: 600,
-                                                                color: sevColor,
-                                                                fontFamily: '"JetBrains Mono", monospace',
-                                                            }}>{zScore > 0 ? '+' : ''}{zScore.toFixed(1)}σ</span>
-                                                        )}
-                                                        {/* Action recommendation from matching issue */}
-                                                        {(() => {
-                                                            const metricIssueTypes: Record<string, string[]> = {
-                                                                'CTR': ['content_worn'],
-                                                                'CPP': ['cpp_rising'],
-                                                                'ROAS': ['losing_money'],
-                                                            };
-                                                            const matchingIssue = campaign.issues.find(i => metricIssueTypes[metric]?.includes(i.type));
-                                                            if (!matchingIssue) return null;
-                                                            return (
-                                                                <span style={{
-                                                                    fontSize: '0.6875rem', color: colors.success,
-                                                                    fontWeight: 500, marginLeft: 'auto', whiteSpace: 'nowrap',
-                                                                }}>→ {matchingIssue.action}</span>
-                                                            );
-                                                        })()}
                                                     </div>
-                                                    {/* Deviation bar */}
+
+                                                    {/* Row 2: Big value + change indicator + MA comparison */}
                                                     <div style={{
-                                                        height: '4px', borderRadius: '2px',
-                                                        background: colors.border,
-                                                        position: 'relative',
-                                                        overflow: 'hidden',
+                                                        display: 'flex', alignItems: 'baseline', gap: '10px',
+                                                        marginBottom: '10px',
                                                     }}>
-                                                        <div style={{
-                                                            height: '100%', borderRadius: '2px',
-                                                            width: `${Math.min(barPercent, 100)}%`,
-                                                            background: isGood ? colors.success
-                                                                : tag?.severity === 'critical' ? colors.error
-                                                                    : tag?.severity === 'warning' ? colors.warning
-                                                                        : '#3B82F6',
-                                                            transition: 'width 0.5s ease',
-                                                        }} />
+                                                        <span style={{
+                                                            fontSize: '1.25rem', fontWeight: 700,
+                                                            color: status.color,
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                        }}>{fmtWindow}</span>
+                                                        {pctChange !== 0 && (
+                                                            <span style={{
+                                                                fontSize: '0.75rem', fontWeight: 700,
+                                                                color: changeIsGood ? colors.success : colors.error,
+                                                                fontFamily: '"JetBrains Mono", monospace',
+                                                                display: 'flex', alignItems: 'center', gap: '2px',
+                                                            }}>
+                                                                <span style={{ fontSize: '0.625rem' }}>
+                                                                    {pctChange > 0 ? '▲' : '▼'}
+                                                                </span>
+                                                                {Math.abs(pctChange).toFixed(0)}%
+                                                            </span>
+                                                        )}
+                                                        {ma && (
+                                                            <span style={{
+                                                                fontSize: '0.6875rem', color: colors.textSubtle,
+                                                                fontFamily: '"JetBrains Mono", monospace',
+                                                            }}>
+                                                                vs TB {fmtMA}
+                                                            </span>
+                                                        )}
                                                     </div>
+
+                                                    {/* Row 3: Gauge bar with position indicator */}
+                                                    {sigma > 0 && (
+                                                        <div style={{ position: 'relative' }}>
+                                                            {/* Labels */}
+                                                            <div style={{
+                                                                display: 'flex', justifyContent: 'space-between',
+                                                                marginBottom: '4px',
+                                                            }}>
+                                                                <span style={{
+                                                                    fontSize: '0.5625rem', color: isInverse ? colors.success : colors.error,
+                                                                    fontFamily: '"JetBrains Mono", monospace', opacity: 0.7,
+                                                                }}>-2σ</span>
+                                                                <span style={{
+                                                                    fontSize: '0.5625rem', color: colors.textSubtle,
+                                                                    fontFamily: '"JetBrains Mono", monospace',
+                                                                }}>TB</span>
+                                                                <span style={{
+                                                                    fontSize: '0.5625rem', color: isInverse ? colors.error : colors.success,
+                                                                    fontFamily: '"JetBrains Mono", monospace', opacity: 0.7,
+                                                                }}>+2σ</span>
+                                                            </div>
+                                                            {/* Track */}
+                                                            <div style={{
+                                                                height: '6px', borderRadius: '3px',
+                                                                background: `linear-gradient(90deg, ${isInverse ? colors.success : colors.error}30, ${colors.textSubtle}20 45%, ${colors.textSubtle}20 55%, ${isInverse ? colors.error : colors.success}30)`,
+                                                                position: 'relative',
+                                                            }}>
+                                                                {/* MA center mark */}
+                                                                <div style={{
+                                                                    position: 'absolute', left: '50%', top: '-1px',
+                                                                    width: '1px', height: '8px',
+                                                                    background: colors.textSubtle, opacity: 0.5,
+                                                                }} />
+                                                                {/* Current value dot */}
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    left: `${gaugePercent}%`,
+                                                                    top: '50%', transform: 'translate(-50%, -50%)',
+                                                                    width: '10px', height: '10px',
+                                                                    borderRadius: '50%',
+                                                                    background: gaugeColor,
+                                                                    border: `2px solid ${colors.bg}`,
+                                                                    boxShadow: `0 0 6px ${gaugeColor}60`,
+                                                                }} />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}

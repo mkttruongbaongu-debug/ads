@@ -228,6 +228,11 @@ function runStreamingPipeline(request: NextRequest, body: any): Response {
 
                             const preprocessed = preprocessCampaignData(dailyMetrics);
 
+                            // Budget: lấy từ campaign object (đã có từ getCampaigns)
+                            const campaignBudget = (campaign as any).dailyBudget || 0;
+                            const numberOfDays = dailyMetrics.length || 1;
+                            const estimatedBudget = Math.round(preprocessed.basics.totalSpend / numberOfDays);
+
                             const context = {
                                 campaign: { id: campaign.id, name: campaign.name, status: campaign.status },
                                 metrics: {
@@ -244,8 +249,8 @@ function runStreamingPipeline(request: NextRequest, body: any): Response {
                                     cpp: d.cpp, ctr: d.ctr, revenue: d.revenue,
                                 })),
                                 issues: [] as Array<{ type: string; severity: string; message: string; detail: string }>,
-                                ads: [],
-                                dateRange: { startDate, endDate },
+                                dailyBudget: campaignBudget > 0 ? campaignBudget : undefined,
+                                dailyBudgetEstimated: campaignBudget > 0 ? campaignBudget : estimatedBudget,
                             };
 
                             const aiResult = await analyzeWithAI(context);

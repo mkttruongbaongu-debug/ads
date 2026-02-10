@@ -79,6 +79,9 @@ export interface CampaignContext {
             ctr: number;
         }>;
     }>;
+    // Budget from Facebook (real CBO budget or estimated)
+    dailyBudget?: number;          // Real daily_budget from FB (CBO campaigns)
+    dailyBudgetEstimated?: number; // Estimated = totalSpend / days
 }
 
 export interface AIAnalysisResult {
@@ -559,6 +562,11 @@ ID: ${campaign.id}
 ${metrics.frequency ? `- Frequency: ${metrics.frequency.toFixed(1)}` : ''}
 
 LƯU Ý: "Chi tiêu" ở trên là TỔNG CHI TIÊU cả ${dailyTrend.length} ngày, KHÔNG phải daily budget.
+${context.dailyBudget
+            ? `\n🏦 DAILY BUDGET (Facebook):\n- Budget đặt trên Facebook: ${formatMoney(context.dailyBudget)}/ngày (CBO)\n- Chi tiêu TB thực tế: ${formatMoney(context.dailyBudgetEstimated || 0)}/ngày\n- Hiệu suất budget: ${context.dailyBudgetEstimated ? ((context.dailyBudgetEstimated / context.dailyBudget * 100).toFixed(0)) : 'N/A'}% budget được chi`
+            : context.dailyBudgetEstimated
+                ? `\n🏦 DAILY BUDGET (ước lượng):\n- Không có CBO budget → ước lượng từ chi tiêu: ~${formatMoney(context.dailyBudgetEstimated)}/ngày`
+                : ''}
 
 ===== DIỄN BIẾN THEO NGÀY =====
 ${trendText}
@@ -571,17 +579,17 @@ ${preprocessedSection}
 
 ${contentAnalysis && contentAnalysis.length > 0 ? `===== PHÂN TÍCH TỪNG CONTENT (${contentAnalysis.length} ads) =====
 ${contentAnalysis.map((c, i) => {
-        const roasText = c.roas > 0 ? c.roas.toFixed(2) + 'x' : 'N/A';
-        const summary = `${i + 1}. [${c.badge}] "${c.name}" (ID: ${c.adId}) — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
-        // Include full daily breakdown for all content
-        const dailyText = c.dailyMetrics
-            ? '\n   Diễn biến: ' + c.dailyMetrics.map(d => {
-                const cppText = d.purchases > 0 ? formatMoney(d.cpp) : '-';
-                return `${d.date.slice(5)}: ${d.purchases}đơn CPP=${cppText} CTR=${d.ctr.toFixed(1)}%`;
-            }).join(' | ')
-            : '';
-        return summary + dailyText;
-    }).join('\n')}
+                    const roasText = c.roas > 0 ? c.roas.toFixed(2) + 'x' : 'N/A';
+                    const summary = `${i + 1}. [${c.badge}] "${c.name}" (ID: ${c.adId}) — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
+                    // Include full daily breakdown for all content
+                    const dailyText = c.dailyMetrics
+                        ? '\n   Diễn biến: ' + c.dailyMetrics.map(d => {
+                            const cppText = d.purchases > 0 ? formatMoney(d.cpp) : '-';
+                            return `${d.date.slice(5)}: ${d.purchases}đơn CPP=${cppText} CTR=${d.ctr.toFixed(1)}%`;
+                        }).join(' | ')
+                        : '';
+                    return summary + dailyText;
+                }).join('\n')}
 
 LƯU Ý CONTENT:
 - Content có badge "Bão hoà" = CPP vượt +2σ so với lịch sử, CẦN TẮT hoặc THAY THẾ

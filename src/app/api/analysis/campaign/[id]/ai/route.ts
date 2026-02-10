@@ -43,7 +43,7 @@ export async function POST(
             // Stream 1: Campaign daily insights
             fetch(
                 `${FB_API_BASE}/${campaignId}?` +
-                `fields=id,name,status,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
+                `fields=id,name,status,daily_budget,insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
                 `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,frequency` +
                 `}&access_token=${accessToken}`
             ),
@@ -118,6 +118,11 @@ export async function POST(
             impressions: acc.impressions + day.impressions,
         }), { spend: 0, purchases: 0, revenue: 0, clicks: 0, impressions: 0 });
 
+        // Daily budget: thật từ Facebook hoặc ước lượng
+        const fbDailyBudget = campaignData.daily_budget ? parseInt(campaignData.daily_budget) / 100 : 0;
+        const numberOfDays = dailyMetrics.length || 1;
+        const estimatedDailyBudget = Math.round(totals.spend / numberOfDays);
+
         const campaign: CampaignData = {
             id: campaignData.id,
             name: campaignData.name,
@@ -131,6 +136,8 @@ export async function POST(
                 roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
                 ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
             },
+            daily_budget: fbDailyBudget > 0 ? fbDailyBudget : undefined,
+            daily_budget_estimated: fbDailyBudget > 0 ? fbDailyBudget : estimatedDailyBudget,
         };
 
         // Detect issues using pattern engine
@@ -173,6 +180,8 @@ export async function POST(
                 detail: i.detail,
             })),
             comparison,
+            dailyBudget: fbDailyBudget > 0 ? fbDailyBudget : undefined,
+            dailyBudgetEstimated: fbDailyBudget > 0 ? fbDailyBudget : estimatedDailyBudget,
         };
 
         // ===== PROCESS ADS DATA (already fetched in parallel) =====

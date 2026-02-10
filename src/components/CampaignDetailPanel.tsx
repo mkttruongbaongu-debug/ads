@@ -49,6 +49,7 @@ interface Ad {
     name: string;
     status: string;
     thumbnail: string | null;
+    thumbnails?: string[];
     message?: string | null;
     link?: string | null;
     postUrl?: string | null;
@@ -2174,7 +2175,35 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         {/* Top: Image + Info side by side */}
                                         <div style={{ display: 'flex', gap: '0' }}>
                                             {/* Image - larger */}
-                                            {ad.thumbnail ? (
+                                            {/* Carousel: show all images */}
+                                            {ad.thumbnails && ad.thumbnails.length > 1 ? (
+                                                <div style={{
+                                                    width: '160px',
+                                                    height: '160px',
+                                                    flexShrink: 0,
+                                                    display: 'flex',
+                                                    overflowX: 'auto',
+                                                    scrollSnapType: 'x mandatory',
+                                                    scrollbarWidth: 'none',
+                                                    position: 'relative',
+                                                }}>
+                                                    {ad.thumbnails.map((img, i) => (
+                                                        <img
+                                                            key={i}
+                                                            src={img}
+                                                            alt={`${ad.name} - ${i + 1}`}
+                                                            style={{
+                                                                width: '160px',
+                                                                height: '160px',
+                                                                objectFit: 'cover',
+                                                                flexShrink: 0,
+                                                                scrollSnapAlign: 'start',
+                                                                display: 'block',
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : ad.thumbnail ? (
                                                 <img
                                                     src={ad.thumbnail}
                                                     alt={ad.name}

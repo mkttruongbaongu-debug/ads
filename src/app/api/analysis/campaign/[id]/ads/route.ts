@@ -184,34 +184,21 @@ export async function GET(
 
         // ===================================================================
         // IMAGE UPGRADE PIPELINE
-        // Strategy: Run ALL steps for ALL ads. Later steps override earlier.
-        // We CANNOT detect image quality from URL alone (FB serves 64px via
-        // normal-looking URLs), so we track upgrade source instead.
+        // Strategy:
+        //   Video ads → STEP 3 (video thumbnail, highest quality)
+        //   Image/carousel → STEP 2 (post attachments) + STEP 4 (creative)
+        //   Carousel ads → collect ALL images into thumbnails[]
         //
-        // Priority (lowest → highest, later wins):
-        //   STEP 1: effective_image_url (already done above, ~720px for some)
-        //   STEP 2: Post attachments/subattachments (carousel support)
-        //   STEP 3: Video /{video_id}?fields=picture,format (ALWAYS for video ads)
-        //   STEP 4: Creative effective_image_url (for non-video ads)
-        //
-        // Track which ads have been upgraded by reliable sources:
+        // DO NOT trust effective_image_url — it often returns 64px
         // ===================================================================
-        const upgradedBy = new Map<number, string>(); // adIndex → step that upgraded it
-
-        // Mark ads that already have effective_image_url (STEP 1)
-        ads.forEach((ad: { thumbnail: string | null }, idx: number) => {
-            const rawAd = (adsData.data || [])[idx];
-            if (rawAd?.effective_image_url && ad.thumbnail === rawAd.effective_image_url) {
-                upgradedBy.set(idx, 'step1_effective');
-            }
-        });
 
         // ===================================================================
         // STEP 2: Batch fetch images from Facebook Posts
-        // Uses attachments + subattachments (for carousel)
-        // Only upgrades ads NOT yet upgraded by STEP 1
+        // Fetches attachments + subattachments
+        // For carousel: collects ALL images into thumbnails[]
         // ===================================================================
         const storyIdMap = new Map<string, number[]>();
+        const videoAdIndexes = new Set<number>();
         ads.forEach((ad: { postUrl: string | null }, idx: number) => {
             const rawAd = (adsData.data || [])[idx];
             const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
@@ -233,51 +220,30 @@ export async function GET(
                     const postInfo = postData[storyId];
                     if (!postInfo) continue;
 
-                    // Collect all candidate images from post
-                    const candidates: Array<{ src: string; width: number; source: string }> = [];
                     const attachment = postInfo.attachments?.data?.[0];
-
-                    // Main attachment image
-                    if (attachment?.media?.image?.src) {
-                        candidates.push({
-                            src: attachment.media.image.src,
-                            width: attachment.media.image.width || 0,
-                            source: 'attachment',
-                        });
-                    }
-
-                    // Carousel subattachments
                     const subs = attachment?.subattachments?.data || [];
-                    for (const sub of subs) {
-                        if (sub?.media?.image?.src) {
-                            candidates.push({
-                                src: sub.media.image.src,
-                                width: sub.media.image.width || 0,
-                                source: 'subattachment',
-                            });
+
+                    // Carousel: collect ALL subattachment images
+                    if (subs.length > 1) {
+                        const allImages: string[] = [];
+                        for (const sub of subs) {
+                            if (sub?.media?.image?.src) {
+                                allImages.push(sub.media.image.src);
+                            }
                         }
-                    }
-
-                    // full_picture (usually lower quality but always available)
-                    if (postInfo.full_picture) {
-                        candidates.push({
-                            src: postInfo.full_picture,
-                            width: 0, // unknown
-                            source: 'full_picture',
-                        });
-                    }
-
-                    if (candidates.length === 0) continue;
-
-                    // Pick highest-width candidate, or first attachment
-                    const sorted = [...candidates].sort((a, b) => b.width - a.width);
-                    const best = sorted[0].width > 0 ? sorted[0] : candidates[0];
-
-                    for (const idx of adIndexes) {
-                        // Only upgrade if NOT already upgraded by STEP 1
-                        if (!upgradedBy.has(idx)) {
-                            ads[idx].thumbnail = best.src;
-                            upgradedBy.set(idx, `step2_${best.source}`);
+                        if (allImages.length > 0) {
+                            for (const idx of adIndexes) {
+                                ads[idx].thumbnails = allImages;
+                                ads[idx].thumbnail = allImages[0];
+                            }
+                        }
+                    } else {
+                        // Single image: use attachment or full_picture
+                        const bestImage = attachment?.media?.image?.src || postInfo.full_picture;
+                        if (bestImage) {
+                            for (const idx of adIndexes) {
+                                ads[idx].thumbnail = bestImage;
+                            }
                         }
                     }
                 }
@@ -294,10 +260,11 @@ export async function GET(
         // This OVERRIDES any previous step for video ads
         // ===================================================================
         const videoMap = new Map<string, number[]>();
-        ads.forEach((_ad: { thumbnail: string | null }, idx: number) => {
+        ads.forEach((_ad: any, idx: number) => {
             const rawAd = (adsData.data || [])[idx];
             const videoId = rawAd?.creative?.video_id || rawAd?.creative?.object_story_spec?.video_data?.video_id;
             if (videoId) {
+                videoAdIndexes.add(idx);
                 if (!videoMap.has(videoId)) videoMap.set(videoId, []);
                 videoMap.get(videoId)!.push(idx);
             }
@@ -326,8 +293,7 @@ export async function GET(
 
                     if (bestPic) {
                         for (const idx of adIndexes) {
-                            ads[idx].thumbnail = bestPic; // ALWAYS override for video ads
-                            upgradedBy.set(idx, 'step3_video');
+                            ads[idx].thumbnail = bestPic; // ALWAYS override for video
                         }
                         upgraded++;
                     }
@@ -339,15 +305,14 @@ export async function GET(
         }
 
         // ===================================================================
-        // STEP 4: Creative images — for NON-VIDEO ads not yet upgraded
-        // Fetch /{creative_id}?fields=effective_image_url,image_url
-        // effective_image_url from creative API returns full-size (~720px)
+        // STEP 4: Creative images — for ALL non-video ads
+        // Fetch /{creative_id}?fields=effective_image_url,image_url,
+        //   object_story_spec{link_data{child_attachments}}
+        // Always runs — OVERRIDES STEP 2 (which may have low-res images)
         // ===================================================================
         const creativeMap = new Map<string, number[]>();
-        ads.forEach((ad: { thumbnail: string | null; creativeId?: string }, idx: number) => {
-            // Skip ads already upgraded by a reliable source (step1, step3)
-            const source = upgradedBy.get(idx);
-            if (source === 'step1_effective' || source === 'step3_video') return;
+        ads.forEach((ad: any, idx: number) => {
+            if (videoAdIndexes.has(idx)) return; // Video already handled by STEP 3
 
             const rawAd = (adsData.data || [])[idx];
             const creativeId = ad.creativeId || rawAd?.creative?.id;
@@ -361,7 +326,7 @@ export async function GET(
             try {
                 const creativeIds = Array.from(creativeMap.keys()).join(',');
                 const creativeRes = await fetch(
-                    `${FB_API_BASE}/?ids=${creativeIds}&fields=effective_image_url,image_url,object_story_spec{link_data{picture},photo_data{url}}&access_token=${accessToken}`
+                    `${FB_API_BASE}/?ids=${creativeIds}&fields=effective_image_url,image_url,object_story_spec{link_data{picture,child_attachments{image_hash,picture}},photo_data{url}}&access_token=${accessToken}`
                 );
                 const creativeData = await creativeRes.json();
 
@@ -370,16 +335,33 @@ export async function GET(
                     const info = creativeData[creativeId];
                     if (!info) continue;
 
-                    // Priority: effective_image_url > image_url > link_data.picture > photo_data.url
+                    // Carousel: child_attachments have individual pictures
+                    const childAttachments = info.object_story_spec?.link_data?.child_attachments || [];
+                    if (childAttachments.length > 1) {
+                        const carouselImages: string[] = childAttachments
+                            .map((c: any) => c.picture)
+                            .filter(Boolean);
+                        if (carouselImages.length > 0) {
+                            for (const idx of adIndexes) {
+                                // Prefer STEP 2 subattachments (higher res) if available
+                                if (!ads[idx].thumbnails || ads[idx].thumbnails.length === 0) {
+                                    ads[idx].thumbnails = carouselImages;
+                                }
+                                ads[idx].thumbnail = info.effective_image_url || info.image_url || carouselImages[0];
+                            }
+                            upgraded++;
+                            continue;
+                        }
+                    }
+
+                    // Single image
                     const bestImage = info.effective_image_url
                         || info.image_url
                         || info.object_story_spec?.link_data?.picture
                         || info.object_story_spec?.photo_data?.url;
-
                     if (bestImage) {
                         for (const idx of adIndexes) {
                             ads[idx].thumbnail = bestImage;
-                            upgradedBy.set(idx, 'step4_creative');
                         }
                         upgraded++;
                     }
@@ -391,9 +373,8 @@ export async function GET(
         }
 
         // Log final stats
-        const stats: Record<string, number> = {};
-        upgradedBy.forEach(source => { stats[source] = (stats[source] || 0) + 1; });
-        console.log(`[API:ADS] 📊 Image sources: ${JSON.stringify(stats)} (${upgradedBy.size}/${ads.length} upgraded)`);
+        const withCarousel = ads.filter((a: any) => a.thumbnails?.length > 1).length;
+        console.log(`[API:ADS] 📊 Final: ${ads.length} ads, ${withCarousel} carousel, ${videoAdIndexes.size} video`);
 
         // Sort by spend (highest first) to show most impactful ads first
         ads.sort((a: { totals: { spend: number } }, b: { totals: { spend: number } }) => b.totals.spend - a.totals.spend);

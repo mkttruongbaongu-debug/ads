@@ -202,6 +202,14 @@ LƯU Ý VỀ SỐ LIỆU:
 - Budget đề xuất phải là số tròn (bội số 100.000 VND), VD: 300.000, 500.000, 1.000.000
 - ❌ KHÔNG BAO GIỜ đề xuất số lẻ như 2.659.852
 
+LƯU Ý VỀ TÊN CONTENT/AD/ADSET:
+- Khi nhắc đến tên content hoặc ad, LUÔN ghi rõ: content tên "X" (hoặc ad tên "X", adset tên "X")
+- ❌ SAI: "Tắt content 2 và 1" (mơ hồ - không rõ "2" và "1" là tên hay số thứ tự)
+- ✅ ĐÚNG: "Tắt content có tên '2' và content có tên '1'" 
+- ✅ ĐÚNG: "Tắt ad tên '2' (CPP: 108K, ROAS: 3.8x)"
+- Nếu có ID, luôn kèm theo: "ad tên '2' (ID: 123456789)"
+- Mục đích: người đọc phải hiểu NGAY mà không cần đoán
+
 Trả về JSON format:
 {
   "loai_hanh_dong": "TAM_DUNG | THAY_DOI_NGAN_SACH | LAM_MOI_CREATIVE | DIEU_CHINH_DOI_TUONG | DUNG_VINH_VIEN",

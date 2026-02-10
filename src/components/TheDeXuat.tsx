@@ -439,19 +439,28 @@ export default function TheDeXuat({ deXuat, onUpdated }: Props) {
                                 </div>
                             )}
 
-                            {actionSteps.length > 0 && (
-                                <ol style={{
-                                    margin: 0,
-                                    paddingLeft: '20px',
-                                    color: colors.text,
-                                    fontSize: '0.875rem',
-                                    lineHeight: 1.8,
-                                }}>
-                                    {actionSteps.map((buoc, idx) => (
-                                        <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
-                                    ))}
-                                </ol>
-                            )}
+                            {(() => {
+                                // Ẩn danh sách steps nếu chỉ có 1 step trùng nội dung với header đề xuất
+                                const headerText = String(deXuat.hanhDong.giaTri_DeXuat || '').toLowerCase().trim();
+                                const isDuplicate = actionSteps.length === 1 && headerText && (
+                                    actionSteps[0].toLowerCase().trim().includes(headerText) ||
+                                    headerText.includes(actionSteps[0].toLowerCase().trim())
+                                );
+                                if (isDuplicate || actionSteps.length === 0) return null;
+                                return (
+                                    <ol style={{
+                                        margin: 0,
+                                        paddingLeft: '20px',
+                                        color: colors.text,
+                                        fontSize: '0.875rem',
+                                        lineHeight: 1.8,
+                                    }}>
+                                        {actionSteps.map((buoc, idx) => (
+                                            <li key={idx} style={{ marginBottom: '4px' }}>{buoc}</li>
+                                        ))}
+                                    </ol>
+                                );
+                            })()}
                         </div>
                     );
                 })()}

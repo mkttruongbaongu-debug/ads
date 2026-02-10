@@ -52,7 +52,7 @@ export async function GET(
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
             `fields=id,name,status,` +
-            `creative{id,thumbnail_url,image_url,body,title,call_to_action_type,object_story_spec,asset_feed_spec},` +
+            `creative{id,thumbnail_url,image_url,effective_image_url,body,title,call_to_action_type,object_story_spec,asset_feed_spec},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}){` +
             `spend,impressions,clicks,actions,action_values` +
             `}&limit=100&access_token=${accessToken}`
@@ -96,11 +96,13 @@ export async function GET(
 
             const videoId = storySpec?.video_data?.video_id || '';
 
-            // Extract ALL image URLs — ưu tiên image_url > thumbnail_url
+            // Extract ALL image URLs — ưu tiên effective_image_url > image_url > thumbnail_url
             const imageUrls: string[] = [];
-            if (ad.creative?.image_url) imageUrls.push(ad.creative.image_url);
+            if (ad.creative?.effective_image_url) imageUrls.push(ad.creative.effective_image_url);
+            else if (ad.creative?.image_url) imageUrls.push(ad.creative.image_url);
             if (ad.creative?.thumbnail_url && !imageUrls.includes(ad.creative.thumbnail_url)) {
-                imageUrls.push(ad.creative.thumbnail_url);
+                // Only add thumbnail as fallback, not alongside full image
+                if (imageUrls.length === 0) imageUrls.push(ad.creative.thumbnail_url);
             }
             // Carousel / asset feed images
             if (assetFeed?.images) {

@@ -107,7 +107,7 @@ const formatMoney = (n: number) => {
 // ===================================================================
 
 export default function CreativeStudio({ campaignId, campaignName, startDate, endDate, onClose }: Props) {
-    const [activeTab, setActiveTab] = useState<'content_win' | 'brief'>('content_win');
+    const [activeTab, setActiveTab] = useState<'content_win' | 'brief' | 'output'>('content_win');
 
     // Content Win data
     const [ads, setAds] = useState<AdItem[]>([]);
@@ -118,6 +118,15 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [intel, setIntel] = useState<IntelResult | null>(null);
     const [loadingIntel, setLoadingIntel] = useState(false);
     const [intelError, setIntelError] = useState('');
+
+    // Generated Output data
+    const [generatedCaption, setGeneratedCaption] = useState('');
+    const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+    const [generatedKeyMessage, setGeneratedKeyMessage] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generateError, setGenerateError] = useState('');
+    const [generateStep, setGenerateStep] = useState('');  // progress indicator
+    const [copiedCaption, setCopiedCaption] = useState(false);
 
     // ===== FETCH ADS DATA =====
     const fetchAds = useCallback(async () => {
@@ -186,6 +195,56 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     useEffect(() => {
         fetchAds();
     }, [fetchAds]);
+
+    // ===== GENERATE CREATIVE (Caption + Images) =====
+    const generateCreative = useCallback(async () => {
+        if (!intel) return;
+        setIsGenerating(true);
+        setGenerateError('');
+        setGenerateStep('Đang tạo caption & image prompts...');
+        setGeneratedCaption('');
+        setGeneratedImages([]);
+
+        try {
+            // Collect top ad image URLs for reference
+            const topAdImageUrls = ads
+                .slice(0, 5)
+                .map(a => a.image_url)
+                .filter(Boolean);
+
+            const res = await fetch(
+                `/api/analysis/campaign/${campaignId}/generate-creative`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        creativeBrief: intel.creativeBrief,
+                        winningPatterns: intel.winningPatterns,
+                        topAds: intel.topAds,
+                        campaignName,
+                        topAdImageUrls,
+                    }),
+                }
+            );
+
+            setGenerateStep('Đang tạo ảnh với Nano Banana Pro...');
+            const json = await res.json();
+
+            if (json.success && json.data) {
+                setGeneratedCaption(json.data.caption || '');
+                setGeneratedImages(json.data.images || []);
+                setGeneratedKeyMessage(json.data.keyMessage || '');
+                setActiveTab('output');
+            } else {
+                setGenerateError(json.error || 'Không thể tạo creative');
+            }
+        } catch (err) {
+            setGenerateError(err instanceof Error ? err.message : 'Lỗi kết nối');
+        } finally {
+            setIsGenerating(false);
+            setGenerateStep('');
+        }
+    }, [intel, ads, campaignId, campaignName]);
 
     // ===== RENDER HELPERS =====
 
@@ -335,6 +394,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                     {[
                         { id: 'content_win' as const, label: 'CONTENT WIN' },
                         { id: 'brief' as const, label: 'CREATIVE BRIEF' },
+                        { id: 'output' as const, label: 'OUTPUT' },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -631,6 +691,237 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                             {intel.creativeBrief.estimatedImpact}
                                         </p>
                                     </div>
+
+                                    {/* ═══ TẠO CREATIVE BUTTON ═══ */}
+                                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${colors.border}` }}>
+                                        <button
+                                            onClick={generateCreative}
+                                            disabled={isGenerating}
+                                            style={{
+                                                width: '100%', padding: '14px',
+                                                background: isGenerating ? colors.bgAlt : `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
+                                                border: 'none', borderRadius: '8px',
+                                                color: isGenerating ? colors.textMuted : '#000',
+                                                fontSize: '0.8125rem', fontWeight: 700,
+                                                letterSpacing: '0.05em',
+                                                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            }}
+                                        >
+                                            {isGenerating ? (
+                                                <>
+                                                    <span style={{
+                                                        display: 'inline-block', width: 14, height: 14,
+                                                        border: `2px solid ${colors.textMuted}`,
+                                                        borderTopColor: colors.primary,
+                                                        borderRadius: '50%',
+                                                        animation: 'spin 0.8s linear infinite',
+                                                    }} />
+                                                    {generateStep || 'Đang tạo...'}
+                                                </>
+                                            ) : (
+                                                <>TẠO CREATIVE (CAPTION + ẢNH)</>
+                                            )}
+                                        </button>
+                                        {generateError && (
+                                            <p style={{ margin: '8px 0 0', fontSize: '0.6875rem', color: colors.error }}>
+                                                {generateError}
+                                            </p>
+                                        )}
+                                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ═══════════════ TAB: OUTPUT ═══════════════ */}
+                    {activeTab === 'output' && (
+                        <div style={{ padding: '16px 20px' }}>
+                            {/* Empty state */}
+                            {!generatedCaption && !isGenerating && (
+                                <div style={{
+                                    textAlign: 'center' as const, padding: '40px 20px',
+                                    color: colors.textMuted,
+                                }}>
+                                    <p style={{ fontSize: '2rem', margin: '0 0 8px' }}>🎨</p>
+                                    <p style={{ fontSize: '0.8125rem', margin: '0 0 16px' }}>
+                                        Chưa có creative nào được tạo
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            if (intel) generateCreative();
+                                            else setActiveTab('brief');
+                                        }}
+                                        style={{
+                                            padding: '10px 24px',
+                                            background: intel ? colors.primary : colors.bgAlt,
+                                            border: intel ? 'none' : `1px solid ${colors.border}`,
+                                            borderRadius: '6px',
+                                            color: intel ? '#000' : colors.text,
+                                            fontSize: '0.75rem', fontWeight: 700,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {intel ? 'TẠO CREATIVE NGAY' : 'CHẠY CREATIVE BRIEF TRƯỚC'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Generating state */}
+                            {isGenerating && (
+                                <div style={{
+                                    textAlign: 'center' as const, padding: '60px 20px',
+                                }}>
+                                    <div style={{
+                                        width: 48, height: 48, margin: '0 auto 16px',
+                                        border: `3px solid ${colors.border}`,
+                                        borderTopColor: colors.primary,
+                                        borderRadius: '50%',
+                                        animation: 'spin 0.8s linear infinite',
+                                    }} />
+                                    <p style={{ fontSize: '0.8125rem', color: colors.primary, fontWeight: 700, margin: '0 0 4px' }}>
+                                        ĐANG TẠO CREATIVE
+                                    </p>
+                                    <p style={{ fontSize: '0.6875rem', color: colors.textMuted, margin: 0 }}>
+                                        {generateStep || 'Đang xử lý...'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Generated result */}
+                            {generatedCaption && !isGenerating && (
+                                <div>
+                                    {/* Key Message */}
+                                    {generatedKeyMessage && (
+                                        <div style={{
+                                            padding: '10px 14px', marginBottom: '16px',
+                                            background: `${colors.primary}10`, borderRadius: '6px',
+                                            border: `1px solid ${colors.primary}30`,
+                                        }}>
+                                            <span style={{ fontSize: '0.5625rem', color: colors.primary, fontWeight: 700, letterSpacing: '0.1em' }}>
+                                                KEY MESSAGE
+                                            </span>
+                                            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: colors.text }}>
+                                                {generatedKeyMessage}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Caption */}
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <div style={{
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            marginBottom: '8px',
+                                        }}>
+                                            <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: colors.accent, letterSpacing: '0.1em' }}>
+                                                CAPTION
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(generatedCaption);
+                                                    setCopiedCaption(true);
+                                                    setTimeout(() => setCopiedCaption(false), 2000);
+                                                }}
+                                                style={{
+                                                    padding: '4px 10px', borderRadius: '4px',
+                                                    background: copiedCaption ? `${colors.accent}20` : colors.bgAlt,
+                                                    border: `1px solid ${copiedCaption ? colors.accent : colors.border}`,
+                                                    color: copiedCaption ? colors.accent : colors.textMuted,
+                                                    fontSize: '0.625rem', fontWeight: 700,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                {copiedCaption ? '✓ ĐÃ COPY' : 'COPY'}
+                                            </button>
+                                        </div>
+                                        <div style={{
+                                            padding: '14px 16px', borderRadius: '6px',
+                                            background: colors.bg, border: `1px solid ${colors.border}`,
+                                            fontSize: '0.8125rem', color: colors.text,
+                                            lineHeight: 1.6, whiteSpace: 'pre-wrap' as const,
+                                        }}>
+                                            {generatedCaption}
+                                        </div>
+                                    </div>
+
+                                    {/* Generated Images */}
+                                    {generatedImages.length > 0 && (
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <span style={{
+                                                fontSize: '0.6875rem', fontWeight: 700, color: colors.accent,
+                                                letterSpacing: '0.1em', display: 'block', marginBottom: '8px',
+                                            }}>
+                                                MEDIA ({generatedImages.length} ẢNH)
+                                            </span>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: generatedImages.length === 1 ? '1fr'
+                                                    : generatedImages.length === 2 ? '1fr 1fr'
+                                                        : '1fr 1fr',
+                                                gap: '8px',
+                                            }}>
+                                                {generatedImages.map((img, i) => (
+                                                    <div key={i} style={{ position: 'relative' }}>
+                                                        <img
+                                                            src={img}
+                                                            alt={`Generated ${i + 1}`}
+                                                            style={{
+                                                                width: '100%', borderRadius: '6px',
+                                                                border: `1px solid ${colors.border}`,
+                                                                display: 'block',
+                                                            }}
+                                                        />
+                                                        <a
+                                                            href={img}
+                                                            download={`creative-${campaignId}-${i + 1}.png`}
+                                                            style={{
+                                                                position: 'absolute', bottom: '6px', right: '6px',
+                                                                padding: '4px 8px', borderRadius: '4px',
+                                                                background: 'rgba(0,0,0,0.7)',
+                                                                color: '#fff', fontSize: '0.5625rem',
+                                                                fontWeight: 700, textDecoration: 'none',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            ↓ TẢI
+                                                        </a>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {generatedImages.length === 0 && (
+                                        <div style={{
+                                            padding: '16px', borderRadius: '6px',
+                                            background: `${colors.warning}08`, border: `1px solid ${colors.warning}20`,
+                                            marginBottom: '16px',
+                                        }}>
+                                            <p style={{ margin: 0, fontSize: '0.75rem', color: colors.warning }}>
+                                                Ảnh chưa tạo được. Bấm TẠO LẠI để thử lại.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Regenerate button */}
+                                    <button
+                                        onClick={generateCreative}
+                                        disabled={isGenerating}
+                                        style={{
+                                            width: '100%', padding: '12px',
+                                            background: colors.bgAlt,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '6px',
+                                            color: colors.text,
+                                            fontSize: '0.75rem', fontWeight: 700,
+                                            cursor: 'pointer',
+                                            letterSpacing: '0.05em',
+                                        }}
+                                    >
+                                        TẠO LẠI
+                                    </button>
                                 </div>
                             )}
                         </div>

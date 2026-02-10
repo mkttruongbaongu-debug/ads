@@ -1375,8 +1375,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 // Status label logic (Vietnamese, human-readable)
                                 const getStatus = (zScore: number | undefined, isInverse: boolean) => {
                                     if (zScore === undefined) return { label: '—', color: colors.textMuted, bg: `${colors.textMuted}15` };
-                                    // For inverse metrics (CPP): positive z = bad, negative z = good
-                                    const effectiveZ = isInverse ? zScore : -zScore;
+                                    // For inverse metrics (CPP): positive z = cost UP = bad → negate
+                                    // For normal metrics (CTR, ROAS): positive z = value UP = good → keep as-is
+                                    const effectiveZ = isInverse ? -zScore : zScore;
                                     if (effectiveZ <= -2.0) return { label: 'NGUY HIỂM', color: '#EF4444', bg: '#EF444418' };
                                     if (effectiveZ <= -1.0) return { label: 'YẾU', color: '#F97316', bg: '#F9731618' };
                                     if (effectiveZ <= -0.5) return { label: 'CẦN THEO DÕI', color: colors.warning, bg: `${colors.warning}18` };

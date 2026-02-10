@@ -51,7 +51,7 @@ export async function GET(
         // Step 1: Fetch ads with insights + creative
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
-            `fields=id,name,status,effective_image_url,` +
+            `fields=id,name,status,effective_image_url,effective_object_story_id,` +
             `creative{id,thumbnail_url,image_url,body,title,call_to_action_type,object_story_spec,asset_feed_spec},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}){` +
             `spend,impressions,clicks,actions,action_values` +
@@ -138,6 +138,46 @@ export async function GET(
                 },
             } satisfies AdPerformanceData;
         });
+
+        // ===================================================================
+        // STEP 2.5: Batch fetch full_picture from Facebook Posts
+        // effective_object_story_id → Post → full_picture (720px+)
+        // ===================================================================
+        const storyIdMap = new Map<string, number[]>();
+        (adsData.data || []).forEach((ad: any, idx: number) => {
+            const storyId = ad.effective_object_story_id;
+            if (storyId) {
+                if (!storyIdMap.has(storyId)) storyIdMap.set(storyId, []);
+                storyIdMap.get(storyId)!.push(idx);
+            }
+        });
+
+        if (storyIdMap.size > 0) {
+            try {
+                const storyIds = Array.from(storyIdMap.keys()).join(',');
+                const postRes = await fetch(
+                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture&access_token=${accessToken}`
+                );
+                const postData = await postRes.json();
+
+                for (const [storyId, adIndexes] of storyIdMap) {
+                    const fullPic = postData[storyId]?.full_picture;
+                    if (fullPic) {
+                        for (const idx of adIndexes) {
+                            const adItem = ads[idx];
+                            if (!adItem) continue;
+                            adItem.image_url = fullPic;
+                            if (adItem.image_urls && !adItem.image_urls.includes(fullPic)) {
+                                adItem.image_urls.unshift(fullPic);
+                            }
+                        }
+                    }
+                }
+                console.log(`[CREATIVE_INTEL_API] 🖼️ Batch fetched ${storyIdMap.size} post images`);
+            } catch (err) {
+                console.warn('[CREATIVE_INTEL_API] ⚠️ Failed to batch fetch full_picture:', err);
+            }
+        }
 
         console.log(`[CREATIVE_INTEL_API] 📊 ${ads.length} ads fetched`);
 

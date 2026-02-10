@@ -170,6 +170,45 @@ export async function GET(
             };
         });
 
+        // ===================================================================
+        // STEP 2: Batch fetch full_picture from Facebook Posts
+        // Each ad has effective_object_story_id = Facebook Post ID
+        // Fetching full_picture gives 720px+ images instead of 64px thumbnails
+        // ===================================================================
+        const storyIdMap = new Map<string, number[]>(); // storyId → [adIndex, ...]
+        ads.forEach((ad: { postUrl: string | null }, idx: number) => {
+            const rawAd = (adsData.data || [])[idx];
+            const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
+            if (storyId) {
+                if (!storyIdMap.has(storyId)) storyIdMap.set(storyId, []);
+                storyIdMap.get(storyId)!.push(idx);
+            }
+        });
+
+        if (storyIdMap.size > 0) {
+            try {
+                const storyIds = Array.from(storyIdMap.keys()).join(',');
+                const postRes = await fetch(
+                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture&access_token=${accessToken}`
+                );
+                const postData = await postRes.json();
+
+                // Map full_picture URLs back to ads
+                for (const [storyId, adIndexes] of storyIdMap) {
+                    const fullPic = postData[storyId]?.full_picture;
+                    if (fullPic) {
+                        for (const idx of adIndexes) {
+                            ads[idx].thumbnail = fullPic;
+                        }
+                    }
+                }
+                console.log(`[API:ADS] 🖼️ Batch fetched ${storyIdMap.size} post images`);
+            } catch (err) {
+                // Non-critical: fall back to existing thumbnails
+                console.warn('[API:ADS] ⚠️ Failed to batch fetch full_picture, using fallback:', err);
+            }
+        }
+
         // Sort by spend (highest first) to show most impactful ads first
         ads.sort((a: { totals: { spend: number } }, b: { totals: { spend: number } }) => b.totals.spend - a.totals.spend);
 

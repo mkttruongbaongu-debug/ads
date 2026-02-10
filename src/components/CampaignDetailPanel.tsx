@@ -951,198 +951,152 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
-    // Content evaluation: 2-layer approach
     // ===================================================================
-    // CONTENT BADGE LOGIC v4
+    // CONTENT SCORE /10
     // ===================================================================
-    // Layer 1: ROAS check (is this content profitable?)
-    // Layer 2: Absolute CPP vs campaign avg (cheap or expensive?)
-    // Layer 3: Z-score trend (improving or deteriorating?)
-    // Layer 4: Anomaly detection (extreme z-scores)
-    const getContentBadge = (ad: Ad, totalCampaignSpend: number, campaignAvgCpp: number) => {
+    // Điểm = ROAS (4đ) + CPP absolute (3đ) + CPP trend (2đ) + CTR trend (1đ)
+    const getContentScore = (ad: Ad, totalCampaignSpend: number, campaignAvgCpp: number) => {
         const daily = ad.dailyMetrics || [];
-        const totalSpend = ad.totals.spend;
-        const spendShare = totalCampaignSpend > 0 ? (totalSpend / totalCampaignSpend) * 100 : 0;
+        const spendShare = totalCampaignSpend > 0 ? (ad.totals.spend / totalCampaignSpend) * 100 : 0;
         const totalROAS = ad.totals.spend > 0 ? ad.totals.revenue / ad.totals.spend : 0;
 
-        // --- Not enough data: dựa trên số đơn hàng (< 5 đơn = ít data) ---
+        // --- Ít data: < 5 đơn hoặc < 5 ngày ---
         if (ad.totals.purchases < 5 || daily.length < 5) {
             return {
-                badge: { text: 'Ít data', bg: `${colors.textSubtle}20`, color: colors.textMuted },
+                score: -1, // -1 = chưa đủ data
+                color: colors.textMuted,
                 spendShare,
-                tip: `Chưa đủ dữ liệu để đánh giá (${ad.totals.purchases} đơn, ${daily.length} ngày data)`,
+                tip: `Chưa đủ dữ liệu (${ad.totals.purchases} đơn, ${daily.length} ngày)`,
             };
         }
 
-        // --- Split history vs window (last 7 days) ---
+        // --- Split history vs recent 7d ---
         const windowSize = Math.min(7, Math.floor(daily.length / 2));
         const windowDays = daily.slice(-windowSize);
         const historyDays = daily.slice(0, -windowSize);
 
         if (historyDays.length < 3) {
+            // Content mới — chấm dựa trên ROAS + CPP absolute only
+            let earlyScore = 0;
+            // ROAS (4đ)
+            if (totalROAS >= 15) earlyScore += 4;
+            else if (totalROAS >= 10) earlyScore += 3;
+            else if (totalROAS >= 5) earlyScore += 2;
+            else if (totalROAS >= 2) earlyScore += 1;
+            // CPP absolute (3đ) — simplified
+            const overallCpp = ad.totals.purchases > 0 ? ad.totals.spend / ad.totals.purchases : 0;
+            if (campaignAvgCpp > 0 && overallCpp > 0) {
+                const ratio = overallCpp / campaignAvgCpp;
+                if (ratio < 0.7) earlyScore += 3;
+                else if (ratio < 1.0) earlyScore += 2;
+                else if (ratio < 1.5) earlyScore += 1;
+            }
+            // Trend unknown → give neutral 1.5/3
+            earlyScore += 1.5;
             return {
-                badge: { text: 'Tiềm năng', bg: '#3B82F620', color: '#3B82F6' },
+                score: Math.min(10, Math.round(earlyScore * 10) / 10),
+                color: getScoreColor(earlyScore),
                 spendShare,
-                tip: `Content mới (${daily.length} ngày). Chưa đủ lịch sử để so sánh.`,
+                tip: `Content mới (${daily.length} ngày). ROAS: ${totalROAS.toFixed(1)}x`,
             };
         }
 
-        // --- Calculate bands for CPP ---
+        // --- CPP z-score ---
         const histCPP = historyDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
         const winCPP = windowDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
 
-        let cppZ = 0;
-        let cppMA = 0;
-        let cppSigma = 0;
-        let cppWindowAvg = 0;
+        let cppZ = 0, cppMA = 0, cppWindowAvg = 0;
         if (histCPP.length >= 3 && winCPP.length > 0) {
             cppMA = histCPP.reduce((s, v) => s + v, 0) / histCPP.length;
             const cppVariance = histCPP.reduce((s, v) => s + Math.pow(v - cppMA, 2), 0) / histCPP.length;
-            cppSigma = Math.sqrt(cppVariance);
+            const cppSigma = Math.sqrt(cppVariance);
             cppWindowAvg = winCPP.reduce((s, v) => s + v, 0) / winCPP.length;
             cppZ = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
         }
 
-        // --- Calculate bands for CTR ---
+        // --- CTR z-score ---
         const histCTR = historyDays.map(d => d.ctr).filter(v => v > 0);
         const winCTR = windowDays.map(d => d.ctr).filter(v => v > 0);
 
-        let ctrZ = 0;
-        let ctrMA = 0;
-        let ctrSigma = 0;
-        let ctrWindowAvg = 0;
+        let ctrZ = 0, ctrMA = 0, ctrWindowAvg = 0;
         if (histCTR.length >= 3 && winCTR.length > 0) {
             ctrMA = histCTR.reduce((s, v) => s + v, 0) / histCTR.length;
             const ctrVariance = histCTR.reduce((s, v) => s + Math.pow(v - ctrMA, 2), 0) / histCTR.length;
-            ctrSigma = Math.sqrt(ctrVariance);
+            const ctrSigma = Math.sqrt(ctrVariance);
             ctrWindowAvg = winCTR.reduce((s, v) => s + v, 0) / winCTR.length;
             ctrZ = ctrSigma > 0 ? (ctrWindowAvg - ctrMA) / ctrSigma : 0;
         }
 
-        // --- Build tooltip ---
+        // =====================================================
+        // SCORING (tổng 10 điểm)
+        // =====================================================
+
+        // 1. ROAS Score (0-4 điểm) — yếu tố quan trọng nhất
+        let roasScore = 0;
+        if (totalROAS >= 15) roasScore = 4;
+        else if (totalROAS >= 10) roasScore = 3 + (totalROAS - 10) / 5;  // 3.0 → 4.0
+        else if (totalROAS >= 5) roasScore = 2 + (totalROAS - 5) / 5;    // 2.0 → 3.0
+        else if (totalROAS >= 2) roasScore = 1 + (totalROAS - 2) / 3;    // 1.0 → 2.0
+        else roasScore = Math.max(0, totalROAS / 2);                      // 0.0 → 1.0
+
+        // 2. CPP Absolute Score (0-3 điểm) — CPP 7d vs TB campaign
+        let cppAbsScore = 1.5; // default neutral
+        if (campaignAvgCpp > 0 && cppWindowAvg > 0) {
+            const ratio = cppWindowAvg / campaignAvgCpp;
+            if (ratio < 0.5) cppAbsScore = 3;
+            else if (ratio < 0.7) cppAbsScore = 2.5 + (0.7 - ratio) / 0.2 * 0.5;
+            else if (ratio < 1.0) cppAbsScore = 2 + (1.0 - ratio) / 0.3 * 0.5;
+            else if (ratio < 1.5) cppAbsScore = 1 + (1.5 - ratio) / 0.5;
+            else if (ratio < 2.0) cppAbsScore = (2.0 - ratio) / 0.5;
+            else cppAbsScore = 0;
+        }
+
+        // 3. CPP Trend Score (0-2 điểm) — z-score (âm = tốt, dương = xấu)
+        let cppTrendScore = 1; // neutral
+        if (cppZ <= -2) cppTrendScore = 2;
+        else if (cppZ <= -1) cppTrendScore = 1.5 + (-1 - cppZ) / 2 * 0.5;
+        else if (cppZ <= 0.5) cppTrendScore = 1 + (0.5 - cppZ) / 1.5 * 0.5;
+        else if (cppZ <= 2) cppTrendScore = Math.max(0, 1 - (cppZ - 0.5) / 1.5);
+        else cppTrendScore = 0;
+
+        // 4. CTR Trend Score (0-1 điểm) — z-score (dương = tốt, âm = xấu)
+        let ctrTrendScore = 0.5; // neutral
+        if (ctrZ >= 1) ctrTrendScore = 1;
+        else if (ctrZ >= 0) ctrTrendScore = 0.5 + ctrZ / 2;
+        else if (ctrZ >= -1) ctrTrendScore = 0.5 + ctrZ / 2;
+        else ctrTrendScore = 0;
+
+        const totalScore = Math.min(10, Math.round((roasScore + cppAbsScore + cppTrendScore + ctrTrendScore) * 10) / 10);
+
+        // --- Tooltip ---
         const fmtZ = (z: number) => `${z > 0 ? '+' : ''}${z.toFixed(1)}σ`;
-        const tipParts = [
+        const tipLines = [
+            `📊 Điểm: ${totalScore}/10`,
+            `   ROAS: ${roasScore.toFixed(1)}/4 (${totalROAS.toFixed(1)}x)`,
+            `   CPP vs TB: ${cppAbsScore.toFixed(1)}/3 (7d: ${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} vs TB: ${formatMoney(campaignAvgCpp)})`,
+            `   CPP trend: ${cppTrendScore.toFixed(1)}/2 (${fmtZ(cppZ)})`,
+            `   CTR trend: ${ctrTrendScore.toFixed(1)}/1 (${fmtZ(ctrZ)})`,
+            ``,
             `Lịch sử (${historyDays.length}d): CPP MA=${cppMA > 0 ? formatMoney(cppMA) : 'N/A'} · CTR MA=${ctrMA.toFixed(2)}%`,
             `7 ngày gần đây: CPP=${cppWindowAvg > 0 ? formatMoney(cppWindowAvg) : 'N/A'} · CTR=${ctrWindowAvg.toFixed(2)}%`,
-            `Z-Score: CPP ${fmtZ(cppZ)} · CTR ${fmtZ(ctrZ)}`,
-            `ROAS tổng: ${totalROAS > 0 ? totalROAS.toFixed(2) + 'x' : 'N/A'}`,
         ];
 
-        // --- KEY METRICS ---
-        const recentSpend = windowDays.reduce((s, d) => s + d.spend, 0);
-        const recentPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
-        const absolutelyCheap = campaignAvgCpp > 0 && cppWindowAvg > 0 && cppWindowAvg < campaignAvgCpp;
-        const absolutelyExpensive = campaignAvgCpp > 0 && cppWindowAvg > campaignAvgCpp * 1.5;
-        const highROAS = totalROAS >= 8;      // ROAS >= 8x = content tốt
-        const excellentROAS = totalROAS >= 12; // ROAS >= 12x = content xuất sắc
-
-        // =====================================================
-        // Priority 1: KÉM — chi tiền nhưng 0 đơn gần đây
-        // =====================================================
-        if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.03) {
-            return {
-                badge: { text: 'Kém', bg: '#EF444420', color: '#EF4444' },
-                spendShare,
-                tip: tipParts.join('\n') + '\n🔴 7 ngày gần đây chi tiền nhưng không có đơn',
-            };
-        }
-
-        // =====================================================
-        // Priority 2: BÃO HOÀ — CPP đắt + trend xấu + ROAS không cứu nổi
-        // =====================================================
-        if (!absolutelyCheap && !highROAS) {
-            if (cppZ >= 1.5 && ctrZ <= -1.0) {
-                return {
-                    badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                    spendShare,
-                    tip: tipParts.join('\n') + `\n⚠️ CPP 7d vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
-                };
-            }
-            if (cppZ >= 2.0) {
-                return {
-                    badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                    spendShare,
-                    tip: tipParts.join('\n') + `\n⚠️ CPP 7d vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
-                };
-            }
-        }
-
-        // =====================================================
-        // Priority 3: YẾU — CPP đắt + ROAS thấp
-        // =====================================================
-        if (absolutelyExpensive && !highROAS && cppZ > -0.5) {
-            const ratio = (cppWindowAvg / campaignAvgCpp).toFixed(1);
-            return {
-                badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n⚠️ CPP 7 ngày gần đây (${formatMoney(cppWindowAvg)}) cao gấp ${ratio}x so với TB campaign (${formatMoney(campaignAvgCpp)})`,
-            };
-        }
-
-        // =====================================================
-        // Priority 3b: XUỐNG TREND — content vẫn ngon nhưng đang suy giảm
-        // (ROAS cao hoặc CPP rẻ, nhưng z-score tăng mạnh)
-        // =====================================================
-        if (cppZ >= 1.0 && (highROAS || absolutelyCheap)) {
-            return {
-                badge: { text: 'Xuống trend', bg: '#EAB30820', color: '#EAB308' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n📉 CPP 7d tăng ${fmtZ(cppZ)} so với lịch sử. Hiệu suất tổng vẫn tốt (ROAS ${totalROAS.toFixed(1)}x) nhưng cần theo dõi`,
-            };
-        }
-
-        // =====================================================
-        // Priority 3c: BẤT THƯỜNG — z-score > 3σ dù absolute OK
-        // =====================================================
-        if (Math.abs(cppZ) > 3) {
-            const direction = cppZ > 0 ? 'tăng' : 'giảm';
-            return {
-                badge: { text: 'Bất thường', bg: '#A855F720', color: '#A855F7' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n🔍 CPP ${direction} ${fmtZ(cppZ)} — biến động cực lớn so với lịch sử. Kiểm tra lại content/targeting`,
-            };
-        }
-
-        // =====================================================
-        // Priority 4: TỐT — ROAS xuất sắc hoặc CPP cải thiện mạnh
-        // =====================================================
-        if (excellentROAS && cppZ <= 1.0) {
-            return {
-                badge: { text: 'Tốt', bg: '#22C55E20', color: '#22C55E' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n✅ ROAS ${totalROAS.toFixed(1)}x — Content hiệu quả cao`,
-            };
-        }
-        if (cppZ <= -1.0 && cppWindowAvg <= campaignAvgCpp * 1.5) {
-            return {
-                badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n✅ CPP giảm ${fmtZ(cppZ)} so với lịch sử — Hiệu suất đang cải thiện`,
-            };
-        }
-        if (cppZ <= 0.5 && ctrZ >= -0.5 && highROAS) {
-            return {
-                badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n✅ Hiệu suất ổn định, ROAS ${totalROAS.toFixed(1)}x`,
-            };
-        }
-
-        // =====================================================
-        // Priority 5: ỔN — default
-        // =====================================================
-        let extraNote = '';
-        if (absolutelyCheap && cppZ >= 1.0) {
-            extraNote = `\n📉 CPP 7d tăng ${fmtZ(cppZ)} so với lịch sử, nhưng vẫn rẻ hơn TB campaign (${formatMoney(campaignAvgCpp)})`;
-        } else if (cppZ <= 0.5 && ctrZ >= -0.5) {
-            extraNote = '\n✅ Hiệu suất ổn định trong vùng cho phép';
-        }
         return {
-            badge: { text: 'Ổn', bg: '#3B82F620', color: '#3B82F6' },
+            score: totalScore,
+            color: getScoreColor(totalScore),
             spendShare,
-            tip: tipParts.join('\n') + extraNote,
+            tip: tipLines.join('\n'),
         };
     };
+
+    // Color gradient: đỏ → cam → vàng → xanh
+    function getScoreColor(score: number): string {
+        if (score >= 9) return '#22C55E';   // xanh đậm
+        if (score >= 7) return '#4ADE80';   // xanh lá
+        if (score >= 5) return '#EAB308';   // vàng
+        if (score >= 3) return '#F97316';   // cam
+        return '#EF4444';                    // đỏ
+    }
 
     return (
         <div style={styles.overlay} onClick={onClose}>
@@ -1859,14 +1813,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 const totalSpend = campaign.totals.spend;
                                                 const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
                                                 const debugLines = ads.map((ad, i) => {
-                                                    const ev = getContentBadge(ad, totalSpend, avgCpp);
+                                                    const ev = getContentScore(ad, totalSpend, avgCpp);
                                                     return [
                                                         `--- Content ${i + 1}: ${ad.name} ---`,
-                                                        `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                        `Điểm: ${ev.score === -1 ? 'Ít data' : ev.score + '/10'} | FB chi: ${ev.spendShare.toFixed(1)}%`,
                                                         `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
                                                         `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
                                                         `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
-                                                        `Z-Score detail: ${ev.tip}`,
+                                                        `Chi tiết: ${ev.tip}`,
                                                     ].join('\n');
                                                 });
 
@@ -1891,7 +1845,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
                                         {ads.slice(0, 10).map((ad, i) => {
                                             const avgCpp2 = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
-                                            const ev = getContentBadge(ad, campaign.totals.spend, avgCpp2);
+                                            const ev = getContentScore(ad, campaign.totals.spend, avgCpp2);
                                             return (
                                                 <div key={ad.id} style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px',
@@ -1901,9 +1855,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     <span style={{
                                                         fontSize: '0.5625rem', fontWeight: 700,
                                                         padding: '1px 5px', borderRadius: '3px',
-                                                        background: ev.badge.bg, color: ev.badge.color,
-                                                        minWidth: '50px', textAlign: 'center' as const,
-                                                    }}>{ev.badge.text}</span>
+                                                        background: `${ev.color}20`, color: ev.color,
+                                                        minWidth: '36px', textAlign: 'center' as const,
+                                                    }}>{ev.score === -1 ? '—' : ev.score}</span>
                                                     <span style={{ color: colors.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{ad.name}</span>
                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.625rem', color: colors.textSubtle }}>
                                                         FB:{ev.spendShare.toFixed(0)}% · CPP:{formatMoney(ad.totals.cpp)} · CTR:{ad.totals.ctr.toFixed(1)}%
@@ -2093,15 +2047,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             const totalSpend = campaign.totals.spend;
                                             const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
                                             const debugLines = ads.map((ad, i) => {
-                                                const ev = getContentBadge(ad, totalSpend, avgCpp);
+                                                const ev = getContentScore(ad, totalSpend, avgCpp);
                                                 return [
                                                     `--- Content ${i + 1}: ${ad.name} ---`,
                                                     `ID: ${ad.id} | Status: ${ad.status}`,
-                                                    `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                    `Điểm: ${ev.score === -1 ? 'Ít data' : ev.score + '/10'} | FB chi: ${ev.spendShare.toFixed(1)}%`,
                                                     `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
                                                     `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
                                                     `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
-                                                    `Tooltip: ${ev.tip}`,
+                                                    `Chi tiết: ${ev.tip}`,
                                                     `Daily data points: ${ad.dailyMetrics?.length || 0}`,
                                                 ].join('\n');
                                             });
@@ -2155,7 +2109,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                             {ads.map((ad) => {
                                 const campaignAvgCpp = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
-                                const evaluation = getContentBadge(ad, campaign.totals.spend, campaignAvgCpp);
+                                const evaluation = getContentScore(ad, campaign.totals.spend, campaignAvgCpp);
                                 return (
                                     <div key={ad.id} style={{
                                         background: colors.bgCard,
@@ -2196,16 +2150,18 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             <div style={{ flex: 1, padding: '12px 16px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                                 {/* Ad name + badges */}
                                                 <div>
-                                                    {/* Badge row: evaluation badge + spend share + status */}
+                                                    {/* Score + spend share + status */}
                                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
                                                         <span title={evaluation.tip} style={{
-                                                            fontSize: '0.6875rem', fontWeight: 700,
-                                                            padding: '2px 8px', borderRadius: '3px',
-                                                            background: evaluation.badge.bg,
-                                                            color: evaluation.badge.color,
+                                                            fontSize: '0.75rem', fontWeight: 800,
+                                                            padding: '2px 8px', borderRadius: '4px',
+                                                            background: `${evaluation.color}15`,
+                                                            color: evaluation.color,
                                                             cursor: 'help',
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                            letterSpacing: '-0.02em',
                                                         }}>
-                                                            {evaluation.badge.text}
+                                                            {evaluation.score === -1 ? '—' : evaluation.score + '/10'}
                                                         </span>
                                                         <span style={{
                                                             fontSize: '0.625rem', fontWeight: 600, color: colors.textSubtle,

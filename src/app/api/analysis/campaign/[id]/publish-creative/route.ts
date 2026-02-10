@@ -142,9 +142,12 @@ export async function POST(
             link_data: {
                 message: caption,
                 image_hash: imageHash.hash,
-                link: `https://www.facebook.com/${resolvedPageId}`,
+                link: `https://m.me/${resolvedPageId}`,
                 call_to_action: {
                     type: 'MESSAGE_PAGE',
+                    value: {
+                        link: `https://m.me/${resolvedPageId}`,
+                    },
                 },
             },
         }));

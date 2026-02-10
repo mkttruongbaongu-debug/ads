@@ -951,9 +951,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
         }
     };
 
-    // Content evaluation: Bollinger Bands approach (same as campaign-level)
-    // Uses MA + σ from history, compares window avg via z-score
-    const getContentBadge = (ad: Ad, totalCampaignSpend: number) => {
+    // Content evaluation: 2-layer approach
+    // Layer 1: Absolute CPP vs campaign avg (is this content cheap or expensive?)
+    // Layer 2: Z-score trend (is it improving or deteriorating?)
+    const getContentBadge = (ad: Ad, totalCampaignSpend: number, campaignAvgCpp: number) => {
         const daily = ad.dailyMetrics || [];
         const totalSpend = ad.totals.spend;
         const spendShare = totalCampaignSpend > 0 ? (totalSpend / totalCampaignSpend) * 100 : 0;
@@ -1022,10 +1023,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             `Z-Score: CPP ${fmtZ(cppZ)} · CTR ${fmtZ(ctrZ)}`,
         ];
 
-        // --- Badge logic based on z-scores ---
-        // Check for no recent purchases but still spending
+        // --- 2-LAYER BADGE LOGIC ---
+        // Layer 1: Absolute CPP check (recent window vs campaign average)
         const recentSpend = windowDays.reduce((s, d) => s + d.spend, 0);
         const recentPurchases = windowDays.reduce((s, d) => s + d.purchases, 0);
+        const absolutelyCheap = campaignAvgCpp > 0 && cppWindowAvg > 0 && cppWindowAvg < campaignAvgCpp;
+
+        // Priority 1: KÉM — chi tiền nhưng 0 đơn gần đây
         if (recentPurchases === 0 && recentSpend > totalCampaignSpend * 0.03) {
             return {
                 badge: { text: 'Kém', bg: '#EF444420', color: '#EF4444' },
@@ -1034,26 +1038,26 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             };
         }
 
-        // BÃO HOÀ: CPP vượt +1.5σ VÀ CTR dưới -1σ
-        if (cppZ >= 1.5 && ctrZ <= -1.0) {
-            return {
-                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
-            };
+        // Priority 2: BÃO HOÀ — CHỈ KHI CPP đắt hơn TB campaign
+        if (!absolutelyCheap) {
+            if (cppZ >= 1.5 && ctrZ <= -1.0) {
+                return {
+                    badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                    spendShare,
+                    tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} + CTR sụt ${fmtZ(ctrZ)} → Content đang bão hoà`,
+                };
+            }
+            if (cppZ >= 2.0) {
+                return {
+                    badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
+                    spendShare,
+                    tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
+                };
+            }
         }
 
-        // CPP tăng mạnh bất thường (vượt +2σ)
-        if (cppZ >= 2.0) {
-            return {
-                badge: { text: 'Bão hoà', bg: '#F9731620', color: '#F97316' },
-                spendShare,
-                tip: tipParts.join('\n') + `\n⚠️ CPP vượt ${fmtZ(cppZ)} → Chi phí leo thang bất thường`,
-            };
-        }
-
-        // YẾU: CPP tăng >1σ hoặc CTR giảm >1.5σ
-        if (cppZ >= 1.0 || ctrZ <= -1.5) {
+        // Priority 3: YẾU — CHỈ KHI CPP đắt hơn TB campaign
+        if (!absolutelyCheap && (cppZ >= 1.0 || ctrZ <= -1.5)) {
             return {
                 badge: { text: 'Yếu', bg: '#F9731620', color: '#F97316' },
                 spendShare,
@@ -1061,7 +1065,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             };
         }
 
-        // ĐANG TỐT: CPP ổn định hoặc giảm (z ≤ 0.5), CTR không sụt (z ≥ -0.5)
+        // Priority 4: ĐANG TỐT — CPP cải thiện mạnh (-1σ) HOẶC metrics ổn
+        if (cppZ <= -1.0) {
+            return {
+                badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
+                spendShare,
+                tip: tipParts.join('\n') + `\n✅ CPP giảm ${fmtZ(cppZ)} so với lịch sử — Hiệu suất đang cải thiện`,
+            };
+        }
         if (cppZ <= 0.5 && ctrZ >= -0.5) {
             return {
                 badge: { text: 'Đang tốt', bg: '#22C55E20', color: '#22C55E' },
@@ -1070,11 +1081,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             };
         }
 
-        // ỔN: Trung bình
+        // Priority 5: ỔN — default (bao gồm content rẻ nhưng trend xấu)
+        const trendWarning = absolutelyCheap && cppZ >= 1.0
+            ? `\n📉 CPP tăng ${fmtZ(cppZ)} so với lịch sử, nhưng vẫn rẻ hơn TB campaign (${formatMoney(campaignAvgCpp)})`
+            : '';
         return {
             badge: { text: 'Ổn', bg: '#3B82F620', color: '#3B82F6' },
             spendShare,
-            tip: tipParts.join('\n'),
+            tip: tipParts.join('\n') + trendWarning,
         };
     };
 
@@ -1490,8 +1504,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         <button
                                             onClick={() => {
                                                 const totalSpend = campaign.totals.spend;
+                                                const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
                                                 const debugLines = ads.map((ad, i) => {
-                                                    const ev = getContentBadge(ad, totalSpend);
+                                                    const ev = getContentBadge(ad, totalSpend, avgCpp);
                                                     return [
                                                         `--- Content ${i + 1}: ${ad.name} ---`,
                                                         `Badge: [${ev.badge.text}] | FB chi: ${ev.spendShare.toFixed(1)}%`,
@@ -1522,7 +1537,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
                                         {ads.slice(0, 10).map((ad, i) => {
-                                            const ev = getContentBadge(ad, campaign.totals.spend);
+                                            const avgCpp2 = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
+                                            const ev = getContentBadge(ad, campaign.totals.spend, avgCpp2);
                                             return (
                                                 <div key={ad.id} style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px',
@@ -1752,8 +1768,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     <button
                                         onClick={() => {
                                             const totalSpend = campaign.totals.spend;
+                                            const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
                                             const debugLines = ads.map((ad, i) => {
-                                                const ev = getContentBadge(ad, totalSpend);
+                                                const ev = getContentBadge(ad, totalSpend, avgCpp);
                                                 return [
                                                     `--- Content ${i + 1}: ${ad.name} ---`,
                                                     `ID: ${ad.id} | Status: ${ad.status}`,
@@ -1814,7 +1831,8 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                             )}
 
                             {ads.map((ad) => {
-                                const evaluation = getContentBadge(ad, campaign.totals.spend);
+                                const campaignAvgCpp = campaign.totals.purchases > 0 ? campaign.totals.spend / campaign.totals.purchases : 0;
+                                const evaluation = getContentBadge(ad, campaign.totals.spend, campaignAvgCpp);
                                 return (
                                     <div key={ad.id} style={{
                                         background: colors.bgCard,

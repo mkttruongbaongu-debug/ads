@@ -135,28 +135,26 @@ export async function POST(
         // ─── Step 3: Create Ad Creative ──────────────────────────────
         console.log('[PUBLISH_CREATIVE] 🎨 Step 3: Creating ad creative...');
 
-        const creativePayload = {
-            name: adName || `Creative Studio - ${new Date().toLocaleDateString('vi-VN')}`,
-            object_story_spec: JSON.stringify({
-                page_id: resolvedPageId,
-                link_data: {
-                    message: caption,
-                    image_hash: imageHash.hash,
-                    link: `https://www.facebook.com/${resolvedPageId}`,
-                    call_to_action: {
-                        type: 'MESSAGE_PAGE',
-                    },
+        const creativeForm = new URLSearchParams();
+        creativeForm.append('name', adName || `Creative Studio - ${new Date().toLocaleDateString('vi-VN')}`);
+        creativeForm.append('object_story_spec', JSON.stringify({
+            page_id: resolvedPageId,
+            link_data: {
+                message: caption,
+                image_hash: imageHash.hash,
+                link: `https://www.facebook.com/${resolvedPageId}`,
+                call_to_action: {
+                    type: 'MESSAGE_PAGE',
                 },
-            }),
-            access_token: accessToken,
-        };
+            },
+        }));
+        creativeForm.append('access_token', accessToken);
 
         const creativeRes = await fetch(
             `${FB_API_BASE}/${adAccountId}/adcreatives`,
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(creativePayload),
+                body: creativeForm,
             }
         );
         const creativeData = await creativeRes.json();
@@ -174,20 +172,18 @@ export async function POST(
         // ─── Step 4: Create Ad (PAUSED) ──────────────────────────────
         console.log('[PUBLISH_CREATIVE] 📢 Step 4: Creating ad (PAUSED)...');
 
-        const adPayload = {
-            name: adName || `CS ${new Date().toLocaleDateString('vi-VN')} - ${caption.substring(0, 30)}...`,
-            adset_id: adSetId,
-            creative: JSON.stringify({ creative_id: creativeId }),
-            status: 'PAUSED',
-            access_token: accessToken,
-        };
+        const adForm = new URLSearchParams();
+        adForm.append('name', adName || `CS ${new Date().toLocaleDateString('vi-VN')} - ${caption.substring(0, 30)}...`);
+        adForm.append('adset_id', adSetId);
+        adForm.append('creative', JSON.stringify({ creative_id: creativeId }));
+        adForm.append('status', 'PAUSED');
+        adForm.append('access_token', accessToken);
 
         const adRes = await fetch(
             `${FB_API_BASE}/${adAccountId}/ads`,
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(adPayload),
+                body: adForm,
             }
         );
         const adData = await adRes.json();

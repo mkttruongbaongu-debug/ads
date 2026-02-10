@@ -361,6 +361,7 @@ export default function DashboardPage() {
     // Autopilot state
     const [autopilotRunning, setAutopilotRunning] = useState(false);
     const [autopilotResult, setAutopilotResult] = useState<any>(null);
+    const [autopilotStatus, setAutopilotStatus] = useState<{ step: number; message: string } | null>(null);
 
     // Date range - fixed 60 days (optimal for pattern analysis)
     const [endDate] = useState(() => {
@@ -991,18 +992,49 @@ export default function DashboardPage() {
                                         if (autopilotRunning) return;
                                         setAutopilotRunning(true);
                                         setAutopilotResult(null);
+                                        setAutopilotStatus(null);
                                         try {
                                             const res = await fetch('/api/cron/autopilot', {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ maxCampaigns: 20 }),
                                             });
-                                            const json = await res.json();
-                                            setAutopilotResult(json.data || json);
+                                            const reader = res.body?.getReader();
+                                            if (!reader) throw new Error('No response body');
+                                            const decoder = new TextDecoder();
+                                            let buffer = '';
+                                            while (true) {
+                                                const { done, value } = await reader.read();
+                                                if (done) break;
+                                                buffer += decoder.decode(value, { stream: true });
+                                                const lines = buffer.split('\n');
+                                                buffer = lines.pop() || '';
+                                                for (const line of lines) {
+                                                    const trimmed = line.trim();
+                                                    if (!trimmed) continue;
+                                                    if (trimmed.startsWith('STEP:')) {
+                                                        const parts = trimmed.split(':');
+                                                        const stepNum = parseInt(parts[1]);
+                                                        const msg = parts.slice(2).join(':');
+                                                        setAutopilotStatus({ step: stepNum, message: msg });
+                                                    } else if (trimmed.startsWith('RESULT:')) {
+                                                        const json = JSON.parse(trimmed.substring(7));
+                                                        setAutopilotResult(json.data || json);
+                                                    }
+                                                }
+                                            }
+                                            if (buffer.trim()) {
+                                                const trimmed = buffer.trim();
+                                                if (trimmed.startsWith('RESULT:')) {
+                                                    const json = JSON.parse(trimmed.substring(7));
+                                                    setAutopilotResult(json.data || json);
+                                                }
+                                            }
                                         } catch (err) {
                                             setAutopilotResult({ error: 'Connection failed' });
                                         } finally {
                                             setAutopilotRunning(false);
+                                            setAutopilotStatus(null);
                                         }
                                     }}
                                     disabled={autopilotRunning}
@@ -1042,13 +1074,18 @@ export default function DashboardPage() {
                                             width: '28px', height: '28px',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             borderRadius: '50%',
-                                            background: autopilotRunning && !autopilotResult ? `${colors.accent}30` : `${colors.textSubtle}30`,
-                                            color: autopilotRunning && !autopilotResult ? colors.accent : colors.textSubtle,
+                                            background: autopilotStatus?.step === step ? `${colors.accent}40` :
+                                                (autopilotStatus && autopilotStatus.step > step) ? `${colors.accent}20` : `${colors.textSubtle}30`,
+                                            color: autopilotStatus?.step === step ? colors.accent :
+                                                (autopilotStatus && autopilotStatus.step > step) ? colors.accent : colors.textSubtle,
                                             fontSize: '0.75rem', fontWeight: 700,
-                                        }}>{icon}</span>
+                                            transition: 'all 0.3s ease',
+                                        }}>{(autopilotStatus && autopilotStatus.step > step) ? '✓' : icon}</span>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.text, letterSpacing: '0.05em' }}>{label}</div>
-                                            <div style={{ fontSize: '0.6875rem', color: colors.textMuted }}>{desc}</div>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: autopilotStatus?.step === step ? colors.accent : colors.text, letterSpacing: '0.05em' }}>{label}</div>
+                                            <div style={{ fontSize: '0.6875rem', color: autopilotStatus?.step === step ? colors.accent : colors.textMuted }}>
+                                                {autopilotStatus?.step === step ? autopilotStatus.message : desc}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

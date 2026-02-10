@@ -1,17 +1,23 @@
 /**
  * ===================================================================
- * API ENDPOINT: AUTOPILOT (FULL AUTOMATION PIPELINE)
+ * API ENDPOINT: AUTOPILOT (FULL AUTOMATION PIPELINE) — STREAMING
  * ===================================================================
  * Route: POST /api/cron/autopilot
  *
  * Chạy toàn bộ pipeline tự động:
  * 1. Scan tất cả campaigns đang ACTIVE
  * 2. Chạy AI phân tích cho mỗi campaign
- * 3. Tự tạo đề xuất khi phát hiện vấn đề
- * 4. Auto-execute đề xuất low-risk (THAP priority)
- * 5. Chạy monitoring check cho đề xuất đang giám sát
+ * 3. Check pending proposals
+ * 4. Auto-execute approved proposals
+ * 5. Chạy monitoring check
  *
- * Bảo mật: Requires CRON_SECRET header hoặc authenticated session
+ * Uses STREAMING response to prevent 504 Gateway Timeout.
+ * Sends progress lines + heartbeat while o4-mini processes.
+ *
+ * Protocol:
+ *   STEP:N:message   → progress update
+ *   RESULT:{json}    → final pipeline result
+ *   \n               → heartbeat (ignored by client)
  * ===================================================================
  */
 
@@ -80,328 +86,315 @@ interface AutopilotResult {
 }
 
 // ===================================================================
-// GET + POST HANDLER (cron-job.org sends GET by default)
+// HANDLERS
 // ===================================================================
 
+export const maxDuration = 300; // Allow up to 5 min for full pipeline
+
 export async function GET(request: NextRequest) {
-    return runPipeline(request, {});
+    return runStreamingPipeline(request, {});
 }
 
 export async function POST(request: NextRequest) {
     let body = {};
     try { body = await request.json().catch(() => ({})); } catch { }
-    return runPipeline(request, body);
+    return runStreamingPipeline(request, body);
 }
 
-async function runPipeline(request: NextRequest, body: any) {
-    const startTime = Date.now();
-    const errors: string[] = [];
+// ===================================================================
+// STREAMING PIPELINE
+// ===================================================================
 
-    console.log('[AUTOPILOT] 🤖 ═══════════════════════════════════════');
-    console.log('[AUTOPILOT] 🤖 Starting Full Automation Pipeline');
-    console.log('[AUTOPILOT] 🤖 ═══════════════════════════════════════');
+function runStreamingPipeline(request: NextRequest, body: any): Response {
+    const encoder = new TextEncoder();
 
-    // Auth: optional — log user if session exists
-    const session = await getServerSession(authOptions).catch(() => null);
-    if (session?.user) {
-        console.log(`[AUTOPILOT] 🔐 Triggered by: ${session.user.email}`);
-    } else {
-        console.log('[AUTOPILOT] 🔐 Triggered by: Cron / External');
-    }
+    const stream = new ReadableStream({
+        async start(controller) {
+            const send = (msg: string) => {
+                try { controller.enqueue(encoder.encode(msg + '\n')); } catch { }
+            };
 
-    // Parse options from body
-    let options = {
-        autoExecute: false,       // Auto-execute low-risk proposals?
-        maxCampaigns: 20,         // Max campaigns to analyze
-        skipAnalysis: false,      // Skip AI analysis (only monitor)?
-        dryRun: false,            // Log only, don't write anything?
-    };
+            // Heartbeat: gửi \n mỗi 5s để giữ connection sống
+            const heartbeat = setInterval(() => {
+                try { controller.enqueue(encoder.encode('\n')); } catch { clearInterval(heartbeat); }
+            }, 5000);
 
-    options = { ...options, ...body };
+            const startTime = Date.now();
+            const errors: string[] = [];
 
-    console.log(`[AUTOPILOT] ⚙️ Options:`, JSON.stringify(options));
+            const result: AutopilotResult = {
+                timestamp: new Date().toISOString(),
+                duration_ms: 0,
+                pipeline: {
+                    step1_scan: { accounts_scanned: 0, campaigns_found: 0, active_campaigns: 0 },
+                    step2_analyze: { campaigns_analyzed: 0, issues_found: 0, verdicts: {} },
+                    step3_proposals: { proposals_created: 0, auto_approved: 0 },
+                    step4_execute: { proposals_executed: 0, success: 0, failed: 0 },
+                    step5_monitor: { proposals_checked: 0, observations_created: 0, completed: 0 },
+                },
+                errors: [],
+                summary: '',
+            };
 
-    const result: AutopilotResult = {
-        timestamp: new Date().toISOString(),
-        duration_ms: 0,
-        pipeline: {
-            step1_scan: { accounts_scanned: 0, campaigns_found: 0, active_campaigns: 0 },
-            step2_analyze: { campaigns_analyzed: 0, issues_found: 0, verdicts: {} },
-            step3_proposals: { proposals_created: 0, auto_approved: 0 },
-            step4_execute: { proposals_executed: 0, success: 0, failed: 0 },
-            step5_monitor: { proposals_checked: 0, observations_created: 0, completed: 0 },
-        },
-        errors: [],
-        summary: '',
-    };
+            try {
+                // Auth
+                const session = await getServerSession(authOptions).catch(() => null);
+                if (session?.user) {
+                    console.log(`[AUTOPILOT] 🔐 Triggered by: ${session.user.email}`);
+                }
 
-    try {
-        // ===============================================================
-        // STEP 1: SCAN CAMPAIGNS
-        // ===============================================================
-        console.log('[AUTOPILOT] ── Step 1: Scan Campaigns ──');
+                const options = {
+                    autoExecute: false,
+                    maxCampaigns: 20,
+                    skipAnalysis: false,
+                    dryRun: false,
+                    ...body,
+                };
 
-        let fb;
-        try {
-            fb = await getDynamicFacebookClient();
-        } catch (err) {
-            errors.push(`FB connection failed: ${err instanceof Error ? err.message : String(err)}`);
-            return buildResponse(result, errors, startTime);
-        }
+                // ===============================================================
+                // STEP 1: SCAN CAMPAIGNS
+                // ===============================================================
+                send('STEP:1:Đang scan ad accounts...');
 
-        const accounts = await fb.getAdAccounts();
-        result.pipeline.step1_scan.accounts_scanned = accounts.length;
-        console.log(`[AUTOPILOT] 📂 ${accounts.length} ad accounts found`);
-
-        // Fetch campaigns from first account (primary)
-        if (accounts.length === 0) {
-            errors.push('No ad accounts found');
-            return buildResponse(result, errors, startTime);
-        }
-
-        const primaryAccount = accounts[0];
-        const campaigns = await fb.getCampaigns(primaryAccount.id);
-        result.pipeline.step1_scan.campaigns_found = campaigns.length;
-
-        // Log status distribution for debugging
-        const statusCounts: Record<string, number> = {};
-        campaigns.forEach((c: any) => {
-            const s = c.status || 'UNKNOWN';
-            statusCounts[s] = (statusCounts[s] || 0) + 1;
-        });
-        console.log(`[AUTOPILOT] 📊 Status distribution:`, JSON.stringify(statusCounts));
-
-        const activeCampaigns = campaigns.filter(
-            (c: any) => c.status === 'ACTIVE'
-        );
-        result.pipeline.step1_scan.active_campaigns = activeCampaigns.length;
-        console.log(`[AUTOPILOT] 📊 ${activeCampaigns.length}/${campaigns.length} active campaigns`);
-
-        // ===============================================================
-        // STEP 2: AI ANALYSIS
-        // ===============================================================
-        if (!options.skipAnalysis) {
-            console.log('[AUTOPILOT] ── Step 2: AI Analysis ──');
-
-            const campaignsToAnalyze = activeCampaigns.slice(0, options.maxCampaigns);
-
-            for (const campaign of campaignsToAnalyze) {
+                let fb;
                 try {
-                    // Fetch insights (14 days)
-                    const endDate = new Date().toISOString().split('T')[0];
-                    const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    fb = await getDynamicFacebookClient();
+                } catch (err) {
+                    errors.push(`FB connection failed: ${err instanceof Error ? err.message : String(err)}`);
+                    send(`STEP:1:❌ Không thể kết nối Facebook`);
+                    throw new Error('FB connection failed');
+                }
 
-                    const insights = await fb.getInsights(
-                        campaign.id,
-                        { startDate, endDate },
-                        'campaign'
-                    );
+                const accounts = await fb.getAdAccounts();
+                result.pipeline.step1_scan.accounts_scanned = accounts.length;
 
-                    if (!insights || insights.length < 3) {
-                        console.log(`[AUTOPILOT] ⏭️ ${campaign.name}: Insufficient data (${insights?.length || 0} days)`);
-                        continue;
+                if (accounts.length === 0) {
+                    errors.push('No ad accounts found');
+                    throw new Error('No ad accounts found');
+                }
+
+                const primaryAccount = accounts[0];
+                const campaigns = await fb.getCampaigns(primaryAccount.id);
+                result.pipeline.step1_scan.campaigns_found = campaigns.length;
+
+                const activeCampaigns = campaigns.filter((c: any) => c.status === 'ACTIVE');
+                result.pipeline.step1_scan.active_campaigns = activeCampaigns.length;
+
+                send(`STEP:1:✅ ${activeCampaigns.length} campaigns active / ${campaigns.length} total`);
+
+                // ===============================================================
+                // STEP 2: AI ANALYSIS
+                // ===============================================================
+                if (!options.skipAnalysis && activeCampaigns.length > 0) {
+                    const campaignsToAnalyze = activeCampaigns.slice(0, options.maxCampaigns);
+                    send(`STEP:2:Bắt đầu AI analysis cho ${campaignsToAnalyze.length} campaigns...`);
+
+                    for (let i = 0; i < campaignsToAnalyze.length; i++) {
+                        const campaign = campaignsToAnalyze[i];
+                        try {
+                            send(`STEP:2:Analyzing ${i + 1}/${campaignsToAnalyze.length}: ${campaign.name}`);
+
+                            const endDate = new Date().toISOString().split('T')[0];
+                            const startDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+                            const insights = await fb.getInsights(
+                                campaign.id,
+                                { startDate, endDate },
+                                'campaign'
+                            );
+
+                            if (!insights || insights.length < 3) {
+                                send(`STEP:2:⏭️ ${campaign.name}: Chưa đủ data (${insights?.length || 0} ngày)`);
+                                continue;
+                            }
+
+                            const dailyMetrics = insights.map((day: any) => {
+                                const spend = parseFloat(day.spend || '0');
+                                const impressions = parseInt(day.impressions || '0');
+                                const clicks = parseInt(day.clicks || '0');
+                                const purchaseAction = (day.actions || []).find((a: any) => a.action_type === 'purchase' || a.action_type === 'omni_purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+                                const revenueAction = (day.action_values || []).find((a: any) => a.action_type === 'purchase' || a.action_type === 'omni_purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+                                const purchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
+                                const revenue = revenueAction ? parseFloat(revenueAction.value) : 0;
+                                return {
+                                    date: day.date_start,
+                                    spend, impressions, clicks, purchases, revenue,
+                                    cpp: purchases > 0 ? spend / purchases : 0,
+                                    roas: spend > 0 ? revenue / spend : 0,
+                                    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                                    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+                                };
+                            });
+
+                            const preprocessed = preprocessCampaignData(dailyMetrics);
+
+                            const context = {
+                                campaign: { id: campaign.id, name: campaign.name, status: campaign.status },
+                                metrics: {
+                                    spend: preprocessed.basics.totalSpend,
+                                    purchases: preprocessed.basics.totalPurchases,
+                                    revenue: preprocessed.basics.totalSpend * preprocessed.basics.avgRoas,
+                                    cpp: preprocessed.basics.avgCpp,
+                                    ctr: preprocessed.basics.avgCtr,
+                                    roas: preprocessed.basics.avgRoas,
+                                    cpm: 0,
+                                },
+                                dailyTrend: dailyMetrics.map(d => ({
+                                    date: d.date, spend: d.spend, purchases: d.purchases,
+                                    cpp: d.cpp, ctr: d.ctr, revenue: d.revenue,
+                                })),
+                                issues: [] as Array<{ type: string; severity: string; message: string; detail: string }>,
+                                ads: [],
+                                dateRange: { startDate, endDate },
+                            };
+
+                            const aiResult = await analyzeWithAI(context);
+                            result.pipeline.step2_analyze.campaigns_analyzed++;
+
+                            const verdict = aiResult.verdict?.action || 'UNKNOWN';
+                            result.pipeline.step2_analyze.verdicts[verdict] =
+                                (result.pipeline.step2_analyze.verdicts[verdict] || 0) + 1;
+
+                            if (verdict === 'REDUCE' || verdict === 'STOP') {
+                                result.pipeline.step2_analyze.issues_found++;
+                                send(`STEP:2:⚠️ ${campaign.name}: ${verdict} - ${aiResult.verdict?.headline}`);
+                            } else {
+                                send(`STEP:2:✅ ${campaign.name}: ${verdict}`);
+                            }
+
+                        } catch (err) {
+                            const msg = `Analysis error for ${campaign.name}: ${err instanceof Error ? err.message : String(err)}`;
+                            errors.push(msg);
+                            send(`STEP:2:❌ ${campaign.name}: Error`);
+                        }
                     }
 
-                    // Transform raw FB data to DailyMetric[]
-                    const dailyMetrics = insights.map((day: any) => {
-                        const spend = parseFloat(day.spend || '0');
-                        const impressions = parseInt(day.impressions || '0');
-                        const clicks = parseInt(day.clicks || '0');
-                        const purchaseAction = (day.actions || []).find((a: any) => a.action_type === 'purchase' || a.action_type === 'omni_purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
-                        const revenueAction = (day.action_values || []).find((a: any) => a.action_type === 'purchase' || a.action_type === 'omni_purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
-                        const purchases = purchaseAction ? parseInt(purchaseAction.value) : 0;
-                        const revenue = revenueAction ? parseFloat(revenueAction.value) : 0;
-                        return {
-                            date: day.date_start,
-                            spend,
-                            impressions,
-                            clicks,
-                            purchases,
-                            revenue,
-                            cpp: purchases > 0 ? spend / purchases : 0,
-                            roas: spend > 0 ? revenue / spend : 0,
-                            ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-                            cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
-                        };
+                    send(`STEP:2:✅ Analyzed ${result.pipeline.step2_analyze.campaigns_analyzed}, Issues: ${result.pipeline.step2_analyze.issues_found}`);
+                }
+
+                // ===============================================================
+                // STEP 3: CHECK PENDING PROPOSALS
+                // ===============================================================
+                send('STEP:3:Checking pending proposals...');
+
+                let pendingProposals: any[] = [];
+                let approvedProposals: any[] = [];
+                try {
+                    pendingProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'CHO_DUYET' });
+                    send(`STEP:3:✅ ${pendingProposals.length} proposals pending`);
+                } catch (err) {
+                    errors.push(`Sheets error (step3): ${err instanceof Error ? err.message : String(err)}`);
+                    send('STEP:3:⚠️ Could not fetch proposals');
+                }
+
+                // ===============================================================
+                // STEP 4: AUTO-EXECUTE APPROVED PROPOSALS
+                // ===============================================================
+                send('STEP:4:Checking approved proposals...');
+
+                try {
+                    approvedProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'DA_DUYET' });
+                } catch (err) {
+                    errors.push(`Sheets error (step4): ${err instanceof Error ? err.message : String(err)}`);
+                }
+
+                for (const deXuat of approvedProposals) {
+                    try {
+                        send(`STEP:4:🚀 Executing: ${deXuat.tenCampaign}`);
+
+                        const baseUrl = request.nextUrl.origin;
+                        const res = await fetch(`${baseUrl}/api/de-xuat/thuc-thi`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Cookie': request.headers.get('cookie') || '',
+                            },
+                            body: JSON.stringify({ deXuatId: deXuat.id }),
+                        });
+
+                        const json = await res.json();
+                        result.pipeline.step4_execute.proposals_executed++;
+
+                        if (json.success) {
+                            result.pipeline.step4_execute.success++;
+                            send(`STEP:4:✅ Executed: ${deXuat.tenCampaign}`);
+                        } else {
+                            result.pipeline.step4_execute.failed++;
+                            errors.push(`Execute failed: ${deXuat.tenCampaign} - ${json.error}`);
+                        }
+                    } catch (err) {
+                        result.pipeline.step4_execute.failed++;
+                        errors.push(`Execute error: ${deXuat.tenCampaign} - ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                }
+
+                send(`STEP:4:✅ ${result.pipeline.step4_execute.success}/${result.pipeline.step4_execute.proposals_executed} executed`);
+
+                // ===============================================================
+                // STEP 5: MONITORING CHECK
+                // ===============================================================
+                send('STEP:5:Running monitoring check...');
+
+                try {
+                    const baseUrl = request.nextUrl.origin;
+                    const monitorRes = await fetch(`${baseUrl}/api/giam-sat/kiem-tra`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Cookie': request.headers.get('cookie') || '',
+                        },
                     });
 
-                    // Preprocess
-                    const preprocessed = preprocessCampaignData(dailyMetrics);
-
-                    // Build context for AI
-                    const context = {
-                        campaign: {
-                            id: campaign.id,
-                            name: campaign.name,
-                            status: campaign.status,
-                        },
-                        metrics: {
-                            spend: preprocessed.basics.totalSpend,
-                            purchases: preprocessed.basics.totalPurchases,
-                            revenue: preprocessed.basics.totalSpend * preprocessed.basics.avgRoas,
-                            cpp: preprocessed.basics.avgCpp,
-                            ctr: preprocessed.basics.avgCtr,
-                            roas: preprocessed.basics.avgRoas,
-                            cpm: 0,
-                        },
-                        dailyTrend: dailyMetrics.map(d => ({
-                            date: d.date,
-                            spend: d.spend,
-                            purchases: d.purchases,
-                            cpp: d.cpp,
-                            ctr: d.ctr,
-                            revenue: d.revenue,
-                        })),
-                        issues: [] as Array<{ type: string; severity: string; message: string; detail: string }>,
-                        ads: [],
-                        dateRange: { startDate, endDate },
-                    };
-
-                    // Run AI analysis
-                    const aiResult = await analyzeWithAI(context);
-                    result.pipeline.step2_analyze.campaigns_analyzed++;
-
-                    // Track verdicts
-                    const verdict = aiResult.verdict?.action || 'UNKNOWN';
-                    result.pipeline.step2_analyze.verdicts[verdict] =
-                        (result.pipeline.step2_analyze.verdicts[verdict] || 0) + 1;
-
-                    // Check if issues found
-                    if (verdict === 'REDUCE' || verdict === 'STOP') {
-                        result.pipeline.step2_analyze.issues_found++;
-                        console.log(`[AUTOPILOT] ⚠️ ${campaign.name}: ${verdict} - ${aiResult.verdict?.headline}`);
-                    } else {
-                        console.log(`[AUTOPILOT] ✅ ${campaign.name}: ${verdict}`);
+                    const monitorJson = await monitorRes.json();
+                    if (monitorJson.success && monitorJson.data) {
+                        result.pipeline.step5_monitor = {
+                            proposals_checked: monitorJson.data.processed,
+                            observations_created: monitorJson.data.observations_created,
+                            completed: 0,
+                        };
                     }
-
+                    send(`STEP:5:✅ ${monitorJson.data?.processed || 0} monitored`);
                 } catch (err) {
-                    const msg = `Analysis error for ${campaign.name}: ${err instanceof Error ? err.message : String(err)}`;
-                    console.error(`[AUTOPILOT] ❌ ${msg}`);
-                    errors.push(msg);
+                    errors.push(`Monitor check error: ${err instanceof Error ? err.message : String(err)}`);
+                    send('STEP:5:⚠️ Monitor check failed');
+                }
+
+            } catch (fatalError) {
+                console.error('[AUTOPILOT] ❌ Fatal error:', fatalError);
+                if (fatalError instanceof Error && !errors.includes(fatalError.message)) {
+                    errors.push(`Fatal: ${fatalError.message}`);
                 }
             }
 
-            console.log(`[AUTOPILOT] 📈 Analyzed: ${result.pipeline.step2_analyze.campaigns_analyzed}, Issues: ${result.pipeline.step2_analyze.issues_found}`);
-        }
+            // Final result
+            result.duration_ms = Date.now() - startTime;
+            result.errors = errors;
+            result.summary = buildSummary(result);
 
-        // ===============================================================
-        // STEP 3: CHECK PENDING PROPOSALS (skip creation for now)
-        // ===============================================================
-        console.log('[AUTOPILOT] ── Step 3: Pending Proposals ──');
+            console.log(`[AUTOPILOT] ✅ Pipeline Complete in ${result.duration_ms}ms`);
 
-        let pendingProposals: any[] = [];
-        let approvedProposals: any[] = [];
-        try {
-            pendingProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'CHO_DUYET' });
-            console.log(`[AUTOPILOT] 📋 ${pendingProposals.length} proposals pending approval`);
-        } catch (err) {
-            const msg = `Sheets error (step3): ${err instanceof Error ? err.message : String(err)}`;
-            console.warn(`[AUTOPILOT] ⚠️ ${msg}`);
-            errors.push(msg);
-        }
+            send(`RESULT:${JSON.stringify({
+                success: errors.length === 0 || result.pipeline.step2_analyze.campaigns_analyzed > 0,
+                data: result,
+            })}`);
 
-        // ===============================================================
-        // STEP 4: AUTO-EXECUTE APPROVED PROPOSALS
-        // ===============================================================
-        console.log('[AUTOPILOT] ── Step 4: Auto-Execute ──');
+            clearInterval(heartbeat);
+            controller.close();
+        },
+    });
 
-        try {
-            approvedProposals = await layDanhSachDeXuatViaAppsScript({ trangThai: 'DA_DUYET' });
-        } catch (err) {
-            const msg = `Sheets error (step4): ${err instanceof Error ? err.message : String(err)}`;
-            console.warn(`[AUTOPILOT] ⚠️ ${msg}`);
-            errors.push(msg);
-        }
-
-        for (const deXuat of approvedProposals) {
-            try {
-                console.log(`[AUTOPILOT] 🚀 Executing: ${deXuat.tenCampaign} (${deXuat.hanhDong.loai})`);
-
-                const baseUrl = request.nextUrl.origin;
-                const res = await fetch(`${baseUrl}/api/de-xuat/thuc-thi`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cookie': request.headers.get('cookie') || '',
-                    },
-                    body: JSON.stringify({ deXuatId: deXuat.id }),
-                });
-
-                const json = await res.json();
-                result.pipeline.step4_execute.proposals_executed++;
-
-                if (json.success) {
-                    result.pipeline.step4_execute.success++;
-                    console.log(`[AUTOPILOT] ✅ Executed: ${deXuat.tenCampaign}`);
-                } else {
-                    result.pipeline.step4_execute.failed++;
-                    errors.push(`Execute failed: ${deXuat.tenCampaign} - ${json.error}`);
-                }
-            } catch (err) {
-                result.pipeline.step4_execute.failed++;
-                errors.push(`Execute error: ${deXuat.tenCampaign} - ${err instanceof Error ? err.message : String(err)}`);
-            }
-        }
-
-        // ===============================================================
-        // STEP 5: MONITORING CHECK
-        // ===============================================================
-        console.log('[AUTOPILOT] ── Step 5: Monitoring Check ──');
-
-        try {
-            const baseUrl = request.nextUrl.origin;
-            const monitorRes = await fetch(`${baseUrl}/api/giam-sat/kiem-tra`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cookie': request.headers.get('cookie') || '',
-                },
-            });
-
-            const monitorJson = await monitorRes.json();
-            if (monitorJson.success && monitorJson.data) {
-                result.pipeline.step5_monitor = {
-                    proposals_checked: monitorJson.data.processed,
-                    observations_created: monitorJson.data.observations_created,
-                    completed: 0,
-                };
-            }
-        } catch (err) {
-            errors.push(`Monitor check error: ${err instanceof Error ? err.message : String(err)}`);
-        }
-
-        return buildResponse(result, errors, startTime);
-
-    } catch (error) {
-        console.error('[AUTOPILOT] ❌ Fatal error:', error);
-        errors.push(`Fatal: ${error instanceof Error ? error.message : String(error)}`);
-        return buildResponse(result, errors, startTime);
-    }
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-cache',
+            'Transfer-Encoding': 'chunked',
+        },
+    });
 }
 
 // ===================================================================
 // HELPERS
 // ===================================================================
-
-function buildResponse(
-    result: AutopilotResult,
-    errors: string[],
-    startTime: number
-): NextResponse {
-    result.duration_ms = Date.now() - startTime;
-    result.errors = errors;
-    result.summary = buildSummary(result);
-
-    console.log('[AUTOPILOT] 🤖 ═══════════════════════════════════════');
-    console.log(`[AUTOPILOT] 🤖 Pipeline Complete in ${result.duration_ms}ms`);
-    console.log(`[AUTOPILOT] 🤖 ${result.summary}`);
-    console.log('[AUTOPILOT] 🤖 ═══════════════════════════════════════');
-
-    return NextResponse.json({
-        success: errors.length === 0 || result.pipeline.step2_analyze.campaigns_analyzed > 0,
-        data: result,
-    });
-}
 
 function buildSummary(result: AutopilotResult): string {
     const { step1_scan, step2_analyze, step4_execute, step5_monitor } = result.pipeline;

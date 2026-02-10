@@ -33,6 +33,7 @@ export type LoaiHanhDong =
     | 'THAY_DOI_NGAN_SACH'    // Increase/decrease budget
     | 'LAM_MOI_CREATIVE'      // Suggest creative refresh
     | 'DIEU_CHINH_DOI_TUONG'  // Adjust targeting/audience
+    | 'GIU_NGUYEN'            // Keep current strategy (no changes)
     | 'DUNG_VINH_VIEN';       // Stop campaign permanently
 
 /**

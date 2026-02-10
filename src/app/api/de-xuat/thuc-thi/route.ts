@@ -179,12 +179,22 @@ export async function POST(request: NextRequest) {
                 case 'DIEU_CHINH_DOI_TUONG':
                     // These actions cannot be automated via API
                     // Require manual intervention
-                    thanhCong = false;
-                    thongDiep = 'Action này cần thực hiện manual. Vui lòng vào Facebook Ads Manager để thực hiện.';
+                    thanhCong = true;
+                    thongDiep = 'Đã ghi nhận. Action này cần thực hiện manual trong Facebook Ads Manager.';
+                    fbResponse = { note: 'Manual action required' };
+                    break;
+
+                case 'GIU_NGUYEN':
+                    // No changes needed — campaign stays as is
+                    thanhCong = true;
+                    thongDiep = 'Giữ nguyên chiến lược hiện tại. Không thay đổi gì trên Facebook.';
+                    fbResponse = { note: 'No changes applied' };
                     break;
 
                 default:
-                    throw new Error(`Unsupported action type: ${deXuat.hanhDong.loai}`);
+                    thanhCong = false;
+                    thongDiep = `Action type "${deXuat.hanhDong.loai}" chưa được hỗ trợ tự động.`;
+                    fbResponse = { unsupported: deXuat.hanhDong.loai };
             }
         } catch (error: any) {
             console.error('[API:THUC_THI_DE_XUAT] ❌ Facebook API error:', error);

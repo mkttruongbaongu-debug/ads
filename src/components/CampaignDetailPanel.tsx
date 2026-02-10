@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface AIAnalysis {
     // NEW: Cơ sở phân tích
@@ -698,6 +698,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
+
+    // Guard: prevent duplicate concurrent AI analysis calls
+    const aiInFlightRef = useRef(false);
     const [dailyTrend, setDailyTrend] = useState<Array<{
         date: string;
         spend: number;
@@ -802,6 +805,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     };
 
     const handleAnalyzeAI = async (retryCount = 0) => {
+        // Guard: skip if already in-flight (prevent duplicate calls from React strict mode / rapid triggers)
+        if (retryCount === 0 && aiInFlightRef.current) {
+            console.log('[AI_ANALYSIS] ⏭️ Already in-flight, skipping duplicate call');
+            return;
+        }
+        aiInFlightRef.current = true;
         setIsLoadingAI(true);
         setAiError(null);
 
@@ -835,12 +844,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             // Strip heartbeat newlines, find JSON
             const jsonText = fullText.trim();
             if (!jsonText) {
-                if (retryCount < 1) {
-                    console.warn(`[AI_ANALYSIS] ⚠️ Empty response, auto-retrying in 2s... (attempt ${retryCount + 1}/2)`);
-                    await new Promise(r => setTimeout(r, 2000));
+                if (retryCount < 3) {
+                    const delay = (retryCount + 1) * 2;
+                    console.warn(`[AI_ANALYSIS] ⚠️ Empty response, auto-retrying in ${delay}s... (attempt ${retryCount + 1}/3)`);
+                    await new Promise(r => setTimeout(r, delay * 1000));
                     return handleAnalyzeAI(retryCount + 1);
                 }
-                throw new Error('Server trả về response rỗng');
+                throw new Error('Server trả về response rỗng sau 3 lần thử');
             }
 
             const json = JSON.parse(jsonText);
@@ -871,6 +881,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             setAiError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
         } finally {
             setIsLoadingAI(false);
+            aiInFlightRef.current = false;
         }
     };
 

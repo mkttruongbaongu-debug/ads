@@ -270,6 +270,18 @@ export async function POST(
                         ctr,
                         roas,
                         zScoreTip,
+                        dailyMetrics: days.map(d => {
+                            const s = parseFloat(d.spend || '0');
+                            const p = d.actions?.find(a => a.action_type === 'purchase' || a.action_type === 'omni_purchase');
+                            const pc = p ? parseInt(p.value) : 0;
+                            return {
+                                date: d.date_start,
+                                spend: s,
+                                purchases: pc,
+                                cpp: pc > 0 ? s / pc : 0,
+                                ctr: parseFloat(d.ctr || '0'),
+                            };
+                        }),
                     };
                 });
 

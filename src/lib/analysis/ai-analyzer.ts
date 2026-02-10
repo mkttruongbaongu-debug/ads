@@ -68,6 +68,13 @@ export interface CampaignContext {
         ctr: number;
         roas: number;
         zScoreTip: string;
+        dailyMetrics?: Array<{
+            date: string;
+            spend: number;
+            purchases: number;
+            cpp: number;
+            ctr: number;
+        }>;
     }>;
 }
 
@@ -489,7 +496,15 @@ ${preprocessedSection}
 ${contentAnalysis && contentAnalysis.length > 0 ? `===== PHÂN TÍCH TỪNG CONTENT (${contentAnalysis.length} ads) =====
 ${contentAnalysis.map((c, i) => {
         const roasText = c.roas > 0 ? c.roas.toFixed(2) + 'x' : 'N/A';
-        return `${i + 1}. [${c.badge}] "${c.name}" — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
+        const summary = `${i + 1}. [${c.badge}] "${c.name}" — FB chi ${c.spendShare.toFixed(0)}% — Chi: ${formatMoney(c.spend)} — Thu: ${formatMoney(c.revenue)} — ${c.purchases} đơn — CPP: ${formatMoney(c.cpp)} — CTR: ${c.ctr.toFixed(2)}% — ROAS: ${roasText}\n   → ${c.zScoreTip}`;
+        // Include daily breakdown for top 5 content (by spend) to keep token usage reasonable
+        const dailyText = c.dailyMetrics && i < 5
+            ? '\n   Diễn biến: ' + c.dailyMetrics.slice(-10).map(d => {
+                const cppText = d.purchases > 0 ? formatMoney(d.cpp) : '-';
+                return `${d.date.slice(5)}: ${d.purchases}đơn CPP=${cppText} CTR=${d.ctr.toFixed(1)}%`;
+            }).join(' | ')
+            : '';
+        return summary + dailyText;
     }).join('\n')}
 
 LƯU Ý CONTENT:

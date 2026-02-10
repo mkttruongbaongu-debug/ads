@@ -183,27 +183,35 @@ export async function GET(
         });
 
         // ===================================================================
-        // STEP 2: Batch fetch hi-res images from Facebook Posts
-        // Each ad has effective_object_story_id = Facebook Post ID
-        // Fetching full_picture + attachments + subattachments (carousel)
+        // IMAGE UPGRADE PIPELINE
+        // Strategy: Run ALL steps for ALL ads. Later steps override earlier.
+        // We CANNOT detect image quality from URL alone (FB serves 64px via
+        // normal-looking URLs), so we track upgrade source instead.
+        //
+        // Priority (lowest → highest, later wins):
+        //   STEP 1: effective_image_url (already done above, ~720px for some)
+        //   STEP 2: Post attachments/subattachments (carousel support)
+        //   STEP 3: Video /{video_id}?fields=picture,format (ALWAYS for video ads)
+        //   STEP 4: Creative effective_image_url (for non-video ads)
+        //
+        // Track which ads have been upgraded by reliable sources:
         // ===================================================================
-        // Helper: detect low-res URLs (used by multiple steps)
-        const isLowResUrl = (url: string): boolean => {
-            if (!url) return true;
-            // Known low-res patterns
-            if (url.includes('/t45')) return true;         // FB thumbnail prefix
-            if (url.match(/\/s\d{1,2}x\d{1,2}\//)) return true;  // /s64x64/ etc
-            if (url.match(/\/p\d{1,2}x\d{1,2}\//)) return true;  // /p64x64/ etc
-            if (url.match(/\/c\d{1,3}\.\d{1,3}\./)) return true;  // crop params
-            // Check query params for small dimensions
-            const widthMatch = url.match(/width=(\d+)/);
-            const heightMatch = url.match(/height=(\d+)/);
-            if (widthMatch && parseInt(widthMatch[1]) < 200) return true;
-            if (heightMatch && parseInt(heightMatch[1]) < 200) return true;
-            return false;
-        };
+        const upgradedBy = new Map<number, string>(); // adIndex → step that upgraded it
 
-        const storyIdMap = new Map<string, number[]>(); // storyId → [adIndex, ...]
+        // Mark ads that already have effective_image_url (STEP 1)
+        ads.forEach((ad: { thumbnail: string | null }, idx: number) => {
+            const rawAd = (adsData.data || [])[idx];
+            if (rawAd?.effective_image_url && ad.thumbnail === rawAd.effective_image_url) {
+                upgradedBy.set(idx, 'step1_effective');
+            }
+        });
+
+        // ===================================================================
+        // STEP 2: Batch fetch images from Facebook Posts
+        // Uses attachments + subattachments (for carousel)
+        // Only upgrades ads NOT yet upgraded by STEP 1
+        // ===================================================================
+        const storyIdMap = new Map<string, number[]>();
         ads.forEach((ad: { postUrl: string | null }, idx: number) => {
             const rawAd = (adsData.data || [])[idx];
             const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
@@ -221,59 +229,72 @@ export async function GET(
                 );
                 const postData = await postRes.json();
 
-                // Map highest-res image URLs back to ads
                 for (const [storyId, adIndexes] of storyIdMap) {
                     const postInfo = postData[storyId];
                     if (!postInfo) continue;
 
-                    // Try attachments first — returns original upload resolution
-                    let bestImage = '';
+                    // Collect all candidate images from post
+                    const candidates: Array<{ src: string; width: number; source: string }> = [];
                     const attachment = postInfo.attachments?.data?.[0];
 
+                    // Main attachment image
                     if (attachment?.media?.image?.src) {
-                        bestImage = attachment.media.image.src;
+                        candidates.push({
+                            src: attachment.media.image.src,
+                            width: attachment.media.image.width || 0,
+                            source: 'attachment',
+                        });
                     }
 
-                    // For carousel: check subattachments for higher quality
-                    if (!bestImage || isLowResUrl(bestImage)) {
-                        const subs = attachment?.subattachments?.data || [];
-                        for (const sub of subs) {
-                            const subSrc = sub?.media?.image?.src;
-                            if (subSrc && !isLowResUrl(subSrc)) {
-                                bestImage = subSrc;
-                                break; // Use first hi-res carousel card as thumbnail
-                            }
+                    // Carousel subattachments
+                    const subs = attachment?.subattachments?.data || [];
+                    for (const sub of subs) {
+                        if (sub?.media?.image?.src) {
+                            candidates.push({
+                                src: sub.media.image.src,
+                                width: sub.media.image.width || 0,
+                                source: 'subattachment',
+                            });
                         }
                     }
 
-                    // Fallback to full_picture
-                    if (!bestImage || isLowResUrl(bestImage)) {
-                        if (postInfo.full_picture && !isLowResUrl(postInfo.full_picture)) {
-                            bestImage = postInfo.full_picture;
-                        }
+                    // full_picture (usually lower quality but always available)
+                    if (postInfo.full_picture) {
+                        candidates.push({
+                            src: postInfo.full_picture,
+                            width: 0, // unknown
+                            source: 'full_picture',
+                        });
                     }
 
-                    if (bestImage && !isLowResUrl(bestImage)) {
-                        for (const idx of adIndexes) {
-                            ads[idx].thumbnail = bestImage;
+                    if (candidates.length === 0) continue;
+
+                    // Pick highest-width candidate, or first attachment
+                    const sorted = [...candidates].sort((a, b) => b.width - a.width);
+                    const best = sorted[0].width > 0 ? sorted[0] : candidates[0];
+
+                    for (const idx of adIndexes) {
+                        // Only upgrade if NOT already upgraded by STEP 1
+                        if (!upgradedBy.has(idx)) {
+                            ads[idx].thumbnail = best.src;
+                            upgradedBy.set(idx, `step2_${best.source}`);
                         }
                     }
                 }
-                console.log(`[API:ADS] 🖼️ Batch fetched ${storyIdMap.size} post images (attachments+subattachments+full_picture)`);
+                console.log(`[API:ADS] 🖼️ STEP 2: Fetched ${storyIdMap.size} post images`);
             } catch (err) {
-                console.warn('[API:ADS] ⚠️ Failed to batch fetch post images:', err);
+                console.warn('[API:ADS] ⚠️ STEP 2 failed:', err);
             }
         }
 
         // ===================================================================
-        // STEP 3: Batch fetch video thumbnails for ads STILL at low-res
-        // Video ads often have no effective_image_url or effective_object_story_id
-        // → fetch /{video_id}?fields=picture for 720px+ video poster
+        // STEP 3: Video thumbnails — ALWAYS runs for ALL video ads
+        // Video thumbnail from /{video_id}?fields=picture,format is the
+        // most reliable source for video ads (720px+ guaranteed)
+        // This OVERRIDES any previous step for video ads
         // ===================================================================
-        const videoMap = new Map<string, number[]>(); // videoId → [adIndex]
-        ads.forEach((ad: { thumbnail: string | null }, idx: number) => {
-            if (!isLowResUrl(ad.thumbnail || '')) return; // Already hi-res
-
+        const videoMap = new Map<string, number[]>();
+        ads.forEach((_ad: { thumbnail: string | null }, idx: number) => {
             const rawAd = (adsData.data || [])[idx];
             const videoId = rawAd?.creative?.video_id || rawAd?.creative?.object_story_spec?.video_data?.video_id;
             if (videoId) {
@@ -295,6 +316,7 @@ export async function GET(
                     const vidInfo = vidData[videoId];
                     if (!vidInfo) continue;
 
+                    // Pick largest format, fallback to picture
                     let bestPic = '';
                     if (vidInfo.format && Array.isArray(vidInfo.format)) {
                         const sorted = [...vidInfo.format].sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
@@ -304,26 +326,28 @@ export async function GET(
 
                     if (bestPic) {
                         for (const idx of adIndexes) {
-                            ads[idx].thumbnail = bestPic;
+                            ads[idx].thumbnail = bestPic; // ALWAYS override for video ads
+                            upgradedBy.set(idx, 'step3_video');
                         }
                         upgraded++;
                     }
                 }
-                console.log(`[API:ADS] 🎬 Video thumbnails: ${upgraded}/${videoMap.size} upgraded to hi-res`);
+                console.log(`[API:ADS] 🎬 STEP 3: Video thumbnails ${upgraded}/${videoMap.size} upgraded`);
             } catch (err) {
-                console.warn('[API:ADS] ⚠️ Failed to fetch video thumbnails:', err);
+                console.warn('[API:ADS] ⚠️ STEP 3 failed:', err);
             }
         }
 
         // ===================================================================
-        // STEP 4: Batch fetch creative images for ads STILL at low-res
-        // Last resort: fetch /{creative_id}?fields=effective_image_url,image_url
-        // This catches image/carousel ads that STEP 2 missed
+        // STEP 4: Creative images — for NON-VIDEO ads not yet upgraded
+        // Fetch /{creative_id}?fields=effective_image_url,image_url
+        // effective_image_url from creative API returns full-size (~720px)
         // ===================================================================
-        const creativeMap = new Map<string, number[]>(); // creativeId → [adIndex]
+        const creativeMap = new Map<string, number[]>();
         ads.forEach((ad: { thumbnail: string | null; creativeId?: string }, idx: number) => {
-            const thumb = ad.thumbnail || '';
-            if (!isLowResUrl(thumb) && thumb) return; // Already hi-res
+            // Skip ads already upgraded by a reliable source (step1, step3)
+            const source = upgradedBy.get(idx);
+            if (source === 'step1_effective' || source === 'step3_video') return;
 
             const rawAd = (adsData.data || [])[idx];
             const creativeId = ad.creativeId || rawAd?.creative?.id;
@@ -347,33 +371,29 @@ export async function GET(
                     if (!info) continue;
 
                     // Priority: effective_image_url > image_url > link_data.picture > photo_data.url
-                    const candidates = [
-                        info.effective_image_url,
-                        info.image_url,
-                        info.object_story_spec?.link_data?.picture,
-                        info.object_story_spec?.photo_data?.url,
-                    ].filter(Boolean);
+                    const bestImage = info.effective_image_url
+                        || info.image_url
+                        || info.object_story_spec?.link_data?.picture
+                        || info.object_story_spec?.photo_data?.url;
 
-                    const bestImage = candidates.find(u => !isLowResUrl(u)) || candidates[0];
-
-                    if (bestImage && !isLowResUrl(bestImage)) {
+                    if (bestImage) {
                         for (const idx of adIndexes) {
                             ads[idx].thumbnail = bestImage;
+                            upgradedBy.set(idx, 'step4_creative');
                         }
                         upgraded++;
                     }
                 }
-                console.log(`[API:ADS] 🎨 Creative images: ${upgraded}/${creativeMap.size} upgraded to hi-res`);
+                console.log(`[API:ADS] 🎨 STEP 4: Creative images ${upgraded}/${creativeMap.size} upgraded`);
             } catch (err) {
-                console.warn('[API:ADS] ⚠️ Failed to fetch creative images:', err);
+                console.warn('[API:ADS] ⚠️ STEP 4 failed:', err);
             }
         }
 
-        // Log final image resolution stats
-        const hiRes = ads.filter((a: { thumbnail: string | null }) => {
-            return !isLowResUrl(a.thumbnail || '');
-        }).length;
-        console.log(`[API:ADS] 📊 Image quality: ${hiRes}/${ads.length} ads have hi-res images`);
+        // Log final stats
+        const stats: Record<string, number> = {};
+        upgradedBy.forEach(source => { stats[source] = (stats[source] || 0) + 1; });
+        console.log(`[API:ADS] 📊 Image sources: ${JSON.stringify(stats)} (${upgradedBy.size}/${ads.length} upgraded)`);
 
         // Sort by spend (highest first) to show most impactful ads first
         ads.sort((a: { totals: { spend: number } }, b: { totals: { spend: number } }) => b.totals.spend - a.totals.spend);

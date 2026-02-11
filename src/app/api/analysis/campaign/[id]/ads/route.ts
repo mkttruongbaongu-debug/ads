@@ -108,7 +108,7 @@ export async function GET(
                 body?: string;
                 effective_object_story_id?: string;
                 object_story_spec?: {
-                    link_data?: { message?: string; link?: string; image_hash?: string };
+                    link_data?: { message?: string; link?: string; image_hash?: string; picture?: string; child_attachments?: Array<{ picture?: string; image_hash?: string; link?: string }> };
                     video_data?: { message?: string; video_id?: string; image_url?: string };
                     photo_data?: { caption?: string; url?: string };
                 };
@@ -166,14 +166,27 @@ export async function GET(
             const storyId = ad.effective_object_story_id || ad.creative?.effective_object_story_id;
             const postUrl = storyId ? `https://www.facebook.com/${storyId.replace('_', '/posts/')}` : null;
 
-            // Use full image — ưu tiên effective_image_url (ad-level) > image_url > thumbnail
+            // Use full image — ưu tiên effective_image_url (ad-level) > image_url > link_data > thumbnail
             // effective_image_url returns ~720px, image_url varies, thumbnail_url is only ~64px
             let imageUrl = ad.effective_image_url
                 || ad.creative?.image_url
                 || storySpec?.video_data?.image_url
                 || storySpec?.photo_data?.url
-                || ad.creative?.thumbnail_url
                 || null;
+
+            // Extract child_attachments for carousel from object_story_spec
+            const childAttachments = storySpec?.link_data?.child_attachments || [];
+            const linkDataPicture = storySpec?.link_data?.picture || null;
+
+            // If no high-res URL yet, try link_data.picture (may have full-res)
+            if (!imageUrl && linkDataPicture) {
+                imageUrl = extractHighResUrl(linkDataPicture);
+            }
+
+            // Last resort: thumbnail_url
+            if (!imageUrl) {
+                imageUrl = ad.creative?.thumbnail_url || null;
+            }
 
             // Enhance thumbnail URLs: try multiple fbcdn patterns for higher resolution
             if (imageUrl && imageUrl.includes('fbcdn')) {
@@ -193,13 +206,26 @@ export async function GET(
                 // changing any param invalidates the signature → 403 Forbidden
             }
 
+            // Build carousel thumbnails from child_attachments
+            let carouselThumbnails: string[] = [];
+            if (childAttachments.length > 1) {
+                carouselThumbnails = childAttachments
+                    .map((c: any) => c.picture ? extractHighResUrl(c.picture) : null)
+                    .filter((u: string | null): u is string => u !== null);
+                // Use first carousel image as main thumbnail if current is low-res
+                if (carouselThumbnails.length > 0 && imageUrl?.includes('p64x64')) {
+                    imageUrl = carouselThumbnails[0];
+                }
+            }
+
             return {
                 id: ad.id,
                 name: ad.name,
                 status: ad.status,
                 thumbnail: imageUrl,
+                thumbnails: carouselThumbnails.length > 1 ? carouselThumbnails : undefined,
                 creativeId: ad.creative?.id,
-                imageHash: ad.creative?.image_hash || null,
+                imageHash: ad.creative?.image_hash || storySpec?.link_data?.image_hash || null,
                 message,
                 link,
                 postUrl,
@@ -209,6 +235,8 @@ export async function GET(
                     step1_creative_thumbnail_url: ad.creative?.thumbnail_url || null,
                     step1_video_image_url: storySpec?.video_data?.image_url || null,
                     step1_photo_url: storySpec?.photo_data?.url || null,
+                    step1_link_data_picture: linkDataPicture,
+                    step1_child_attachments_count: childAttachments.length,
                     step1_final: imageUrl,
                     step1_image_hash: ad.creative?.image_hash || storySpec?.link_data?.image_hash || null,
                     hasStoryId: !!(ad.effective_object_story_id || ad.creative?.effective_object_story_id),

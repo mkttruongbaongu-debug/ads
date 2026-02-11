@@ -13,11 +13,18 @@ const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 function extractHighResUrl(url: string): string {
     if (!url) return url;
     try {
-        // Pattern: https://external.xx.fbcdn.net/safe_image.php?d=xxx&url=ENCODED_URL
+        // Pattern 1: https://external.xx.fbcdn.net/safe_image.php?d=xxx&url=ENCODED_URL
         if (url.includes('safe_image.php')) {
             const parsed = new URL(url);
             const originalUrl = parsed.searchParams.get('url');
             if (originalUrl) return originalUrl;
+        }
+        // Pattern 2: https://external-*.fbcdn.net/emg1/...?url=ENCODED_URL 
+        // Facebook's emg proxy also embeds original URL in `url` param
+        if ((url.includes('/emg1/') || url.includes('/emg/') || url.includes('external-')) && url.includes('url=')) {
+            const parsed = new URL(url);
+            const originalUrl = parsed.searchParams.get('url');
+            if (originalUrl && !originalUrl.includes('p64x64')) return originalUrl;
         }
     } catch { /* ignore parse errors */ }
     return url;
@@ -182,15 +189,8 @@ export async function GET(
                 if (imageUrl.includes('width=') && imageUrl.includes('height=')) {
                     imageUrl = imageUrl.replace(/width=\d+/, 'width=720').replace(/height=\d+/, 'height=720');
                 }
-                // Pattern 4: stp= param contains p64x64 (Facebook thumbnail transform)
-                // e.g. stp=c0.5000x0.5000f_dst-emg0_p64x64_q75_tt6 → p720x720
-                if (imageUrl.match(/[?&]stp=/) && imageUrl.match(/p\d+x\d+/)) {
-                    imageUrl = imageUrl.replace(/p\d+x\d+/, 'p720x720');
-                }
-                // Pattern 5: dst-emg0 (emoji/sticker transform) — strip entirely for original
-                if (imageUrl.includes('dst-emg0')) {
-                    imageUrl = imageUrl.replace(/_dst-emg0/, '');
-                }
+                // NOTE: DO NOT modify stp= param (p64x64→p720x720): URLs are signed with `oh=`,
+                // changing any param invalidates the signature → 403 Forbidden
             }
 
             return {
@@ -333,6 +333,84 @@ export async function GET(
             } catch (err) {
                 console.warn('[API:ADS] ⚠️ STEP 2 failed:', err);
             }
+        }
+
+        // ===================================================================
+        // STEP 2.5: Individual post fetch for ads STILL with p64x64 URLs
+        // Batch requests sometimes fail to return full_picture for some posts.
+        // Try individual fetch for each remaining low-res ad.
+        // ===================================================================
+        const lowResAdsForStep25: Array<{ idx: number; storyId: string }> = [];
+        ads.forEach((ad: any, idx: number) => {
+            if (videoAdIndexes.has(idx)) return;
+            const thumb = ad.thumbnail || '';
+            if (thumb.includes('p64x64') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
+                const rawAd = (adsData.data || [])[idx];
+                const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
+                if (storyId) {
+                    lowResAdsForStep25.push({ idx, storyId });
+                }
+            }
+        });
+
+        if (lowResAdsForStep25.length > 0) {
+            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying individual fetch`);
+            const results = await Promise.allSettled(
+                lowResAdsForStep25.map(async ({ idx, storyId }) => {
+                    const res = await fetch(
+                        `${FB_API_BASE}/${storyId}?fields=full_picture,source,picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${accessToken}`
+                    );
+                    const data = await res.json();
+
+                    // Try subattachments first (carousel)
+                    const subs = data.attachments?.data?.[0]?.subattachments?.data || [];
+                    if (subs.length > 1) {
+                        const allImages = subs
+                            .map((s: any) => s?.media?.image?.src ? extractHighResUrl(s.media.image.src) : null)
+                            .filter(Boolean);
+                        if (allImages.length > 0) {
+                            ads[idx].thumbnails = allImages;
+                            ads[idx].thumbnail = allImages[0];
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step25 = 'carousel';
+                                ads[idx]._debug.step25_count = allImages.length;
+                            }
+                            return;
+                        }
+                    }
+
+                    // Single: try attachment > full_picture > source > picture
+                    const attachment = data.attachments?.data?.[0];
+                    const bestUrl = attachment?.media?.image?.src
+                        || data.full_picture
+                        || data.source
+                        || data.picture;
+                    if (bestUrl) {
+                        const upgraded = extractHighResUrl(bestUrl);
+                        // Only upgrade if new URL doesn't contain p64x64
+                        if (!upgraded.includes('p64x64')) {
+                            ads[idx].thumbnail = upgraded;
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step25 = 'upgraded';
+                                ads[idx]._debug.step25_url = upgraded;
+                                ads[idx]._debug.step25_source = attachment?.media?.image?.src ? 'attachment' : data.full_picture ? 'full_picture' : data.source ? 'source' : 'picture';
+                            }
+                        } else if (ads[idx]._debug) {
+                            ads[idx]._debug.step25 = 'STILL_LOW_RES';
+                            ads[idx]._debug.step25_full_picture = data.full_picture || null;
+                            ads[idx]._debug.step25_source = data.source || null;
+                            ads[idx]._debug.step25_picture = data.picture || null;
+                            ads[idx]._debug.step25_attachment = attachment?.media?.image?.src || null;
+                            ads[idx]._debug.step25_keys = Object.keys(data);
+                        }
+                    } else if (ads[idx]._debug) {
+                        ads[idx]._debug.step25 = 'NO_DATA';
+                        ads[idx]._debug.step25_keys = Object.keys(data);
+                    }
+                })
+            );
+            const upgraded25 = results.filter(r => r.status === 'fulfilled').length;
+            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} individual fetches completed`);
         }
 
         // ===================================================================

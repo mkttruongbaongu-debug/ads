@@ -182,6 +182,15 @@ export async function GET(
                 if (imageUrl.includes('width=') && imageUrl.includes('height=')) {
                     imageUrl = imageUrl.replace(/width=\d+/, 'width=720').replace(/height=\d+/, 'height=720');
                 }
+                // Pattern 4: stp= param contains p64x64 (Facebook thumbnail transform)
+                // e.g. stp=c0.5000x0.5000f_dst-emg0_p64x64_q75_tt6 → p720x720
+                if (imageUrl.match(/[?&]stp=/) && imageUrl.match(/p\d+x\d+/)) {
+                    imageUrl = imageUrl.replace(/p\d+x\d+/, 'p720x720');
+                }
+                // Pattern 5: dst-emg0 (emoji/sticker transform) — strip entirely for original
+                if (imageUrl.includes('dst-emg0')) {
+                    imageUrl = imageUrl.replace(/_dst-emg0/, '');
+                }
             }
 
             return {
@@ -303,6 +312,18 @@ export async function GET(
                                     ads[idx]._debug.step2_url = bestImage;
                                     ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
                                     ads[idx]._debug.step2_attachment_src = attachment?.media?.image?.src || null;
+                                }
+                            }
+                        } else {
+                            // Debug: STEP 2 found post but no usable image
+                            for (const idx of adIndexes) {
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step2 = 'NO_IMAGE';
+                                    ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
+                                    ads[idx]._debug.step2_attachment_src = attachment?.media?.image?.src || null;
+                                    ads[idx]._debug.step2_has_attachment = !!attachment;
+                                    ads[idx]._debug.step2_sub_count = subs.length;
+                                    ads[idx]._debug.step2_post_keys = Object.keys(postInfo);
                                 }
                             }
                         }

@@ -336,119 +336,96 @@ export async function GET(
         }
 
         // ===================================================================
-        // STEP 2.5: Individual post fetch for ads STILL with p64x64 URLs
-        // Batch requests sometimes fail to return full_picture for some posts.
-        // Try individual fetch for each remaining low-res ad.
+        // STEP 2.5: Ad Preview API for ads STILL with p64x64 URLs
+        // Uses /{adId}/previews — only needs ads_read permission (no pages_read_engagement)
+        // Parses HTML preview to extract full-res image URLs
         // ===================================================================
-        const lowResAdsForStep25: Array<{ idx: number; storyId: string }> = [];
+        const lowResAdsForStep25: Array<{ idx: number; adId: string }> = [];
         ads.forEach((ad: any, idx: number) => {
             if (videoAdIndexes.has(idx)) return;
             const thumb = ad.thumbnail || '';
-            if (thumb.includes('p64x64') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
-                const rawAd = (adsData.data || [])[idx];
-                const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
-                if (storyId) {
-                    lowResAdsForStep25.push({ idx, storyId });
-                }
+            if (thumb.includes('p64x64') || thumb.includes('dst-emg0') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
+                lowResAdsForStep25.push({ idx, adId: ad.id });
             }
         });
 
         if (lowResAdsForStep25.length > 0) {
-            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying individual fetch`);
+            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying Ad Preview API`);
+            let upgraded25 = 0;
             const results = await Promise.allSettled(
-                lowResAdsForStep25.map(async ({ idx, storyId }) => {
-                    const res = await fetch(
-                        `${FB_API_BASE}/${storyId}?fields=full_picture,source,picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${accessToken}`
-                    );
-                    const data = await res.json();
+                lowResAdsForStep25.map(async ({ idx, adId }) => {
+                    try {
+                        const res = await fetch(
+                            `${FB_API_BASE}/${adId}/previews?ad_format=DESKTOP_FEED_STANDARD&access_token=${accessToken}`
+                        );
+                        const data = await res.json();
 
-                    // If Facebook returned an error, log it and try creative fallback
-                    if (data.error) {
-                        if (ads[idx]._debug) {
-                            ads[idx]._debug.step25 = 'FB_ERROR';
-                            ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 80)}`;
-                            ads[idx]._debug.step25_error_type = data.error.type;
-                        }
-                        // FALLBACK: Try fetching creative directly for effective_image_url
-                        const creativeId = ads[idx].creativeId;
-                        if (creativeId) {
-                            try {
-                                const cRes = await fetch(
-                                    `${FB_API_BASE}/${creativeId}?fields=effective_image_url,image_url,image_hash,thumbnail_url&access_token=${accessToken}`
-                                );
-                                const cData = await cRes.json();
-                                const bestCreativeUrl = cData.effective_image_url || cData.image_url;
-                                if (bestCreativeUrl && !bestCreativeUrl.includes('p64x64')) {
-                                    ads[idx].thumbnail = bestCreativeUrl;
-                                    if (ads[idx]._debug) {
-                                        ads[idx]._debug.step25 = 'creative_fallback';
-                                        ads[idx]._debug.step25_url = bestCreativeUrl;
-                                        ads[idx]._debug.step25_effective = cData.effective_image_url || null;
-                                        ads[idx]._debug.step25_image_url = cData.image_url || null;
-                                    }
-                                } else if (ads[idx]._debug) {
-                                    ads[idx]._debug.step25_creative_effective = cData.effective_image_url || null;
-                                    ads[idx]._debug.step25_creative_image_url = cData.image_url || null;
-                                    ads[idx]._debug.step25_creative_hash = cData.image_hash || null;
-                                    // If we got image_hash from creative, save it for STEP 5
-                                    if (cData.image_hash) {
-                                        ads[idx].imageHash = cData.image_hash;
-                                    }
-                                }
-                            } catch { /* creative fallback failed */ }
-                        }
-                        return;
-                    }
-
-                    // Try subattachments first (carousel)
-                    const subs = data.attachments?.data?.[0]?.subattachments?.data || [];
-                    if (subs.length > 1) {
-                        const allImages = subs
-                            .map((s: any) => s?.media?.image?.src ? extractHighResUrl(s.media.image.src) : null)
-                            .filter(Boolean);
-                        if (allImages.length > 0) {
-                            ads[idx].thumbnails = allImages;
-                            ads[idx].thumbnail = allImages[0];
+                        if (data.error) {
                             if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'carousel';
-                                ads[idx]._debug.step25_count = allImages.length;
+                                ads[idx]._debug.step25 = 'PREVIEW_ERROR';
+                                ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 100)}`;
                             }
                             return;
                         }
-                    }
 
-                    // Single: try attachment > full_picture > source > picture
-                    const attachment = data.attachments?.data?.[0];
-                    const bestUrl = attachment?.media?.image?.src
-                        || data.full_picture
-                        || data.source
-                        || data.picture;
-                    if (bestUrl) {
-                        const upgraded = extractHighResUrl(bestUrl);
-                        // Only upgrade if new URL doesn't contain p64x64
-                        if (!upgraded.includes('p64x64')) {
-                            ads[idx].thumbnail = upgraded;
-                            if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'upgraded';
-                                ads[idx]._debug.step25_url = upgraded;
-                                ads[idx]._debug.step25_source = attachment?.media?.image?.src ? 'attachment' : data.full_picture ? 'full_picture' : data.source ? 'source' : 'picture';
-                            }
-                        } else if (ads[idx]._debug) {
-                            ads[idx]._debug.step25 = 'STILL_LOW_RES';
-                            ads[idx]._debug.step25_full_picture = data.full_picture || null;
-                            ads[idx]._debug.step25_source = data.source || null;
-                            ads[idx]._debug.step25_picture = data.picture || null;
-                            ads[idx]._debug.step25_attachment = attachment?.media?.image?.src || null;
-                            ads[idx]._debug.step25_keys = Object.keys(data);
+                        const html = data.data?.[0]?.body || '';
+                        if (!html) {
+                            if (ads[idx]._debug) ads[idx]._debug.step25 = 'NO_HTML';
+                            return;
                         }
-                    } else if (ads[idx]._debug) {
-                        ads[idx]._debug.step25 = 'NO_DATA';
-                        ads[idx]._debug.step25_keys = Object.keys(data);
+
+                        // Extract all img src URLs from HTML preview
+                        const imgRegex = /src="(https?:\/\/[^"]+)"/g;
+                        const allUrls: string[] = [];
+                        let match;
+                        while ((match = imgRegex.exec(html)) !== null) {
+                            let url = match[1]
+                                .replace(/&amp;/g, '&')  // Decode HTML entities
+                                .replace(/\\"/g, '"');
+                            // Filter: only keep scontent/fbcdn image URLs, skip icons/emojis/logos
+                            if ((url.includes('scontent') || url.includes('fbcdn')) &&
+                                !url.includes('emoji') && !url.includes('rsrc.php') &&
+                                !url.includes('/icons/') && !url.includes('logo')) {
+                                // Skip if still 64px
+                                if (!url.includes('p64x64') && !url.includes('s64x64')) {
+                                    allUrls.push(url);
+                                }
+                            }
+                        }
+
+                        // Deduplicate
+                        const uniqueUrls = [...new Set(allUrls)];
+
+                        if (uniqueUrls.length > 1) {
+                            // Carousel detected!
+                            ads[idx].thumbnails = uniqueUrls;
+                            ads[idx].thumbnail = uniqueUrls[0];
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step25 = 'preview_carousel';
+                                ads[idx]._debug.step25_count = uniqueUrls.length;
+                            }
+                            upgraded25++;
+                        } else if (uniqueUrls.length === 1) {
+                            // Single image
+                            ads[idx].thumbnail = uniqueUrls[0];
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step25 = 'preview_single';
+                                ads[idx]._debug.step25_url = uniqueUrls[0];
+                            }
+                            upgraded25++;
+                        } else if (ads[idx]._debug) {
+                            ads[idx]._debug.step25 = 'NO_URLS_IN_HTML';
+                            ads[idx]._debug.step25_html_length = html.length;
+                        }
+                    } catch (err: any) {
+                        if (ads[idx]._debug) {
+                            ads[idx]._debug.step25 = 'FETCH_ERROR';
+                            ads[idx]._debug.step25_error = err?.message?.substring(0, 80) || 'unknown';
+                        }
                     }
                 })
             );
-            const upgraded25 = results.filter(r => r.status === 'fulfilled').length;
-            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} individual fetches completed`);
+            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Ad Preview API`);
         }
 
         // ===================================================================

@@ -416,6 +416,7 @@ export async function GET(
                         } else if (ads[idx]._debug) {
                             ads[idx]._debug.step25 = 'NO_URLS_IN_HTML';
                             ads[idx]._debug.step25_html_length = html.length;
+                            ads[idx]._debug.step25_html_snippet = html.substring(0, 300);
                         }
                     } catch (err: any) {
                         if (ads[idx]._debug) {

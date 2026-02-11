@@ -362,6 +362,44 @@ export async function GET(
                     );
                     const data = await res.json();
 
+                    // If Facebook returned an error, log it and try creative fallback
+                    if (data.error) {
+                        if (ads[idx]._debug) {
+                            ads[idx]._debug.step25 = 'FB_ERROR';
+                            ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 80)}`;
+                            ads[idx]._debug.step25_error_type = data.error.type;
+                        }
+                        // FALLBACK: Try fetching creative directly for effective_image_url
+                        const creativeId = ads[idx].creativeId;
+                        if (creativeId) {
+                            try {
+                                const cRes = await fetch(
+                                    `${FB_API_BASE}/${creativeId}?fields=effective_image_url,image_url,image_hash,thumbnail_url&access_token=${accessToken}`
+                                );
+                                const cData = await cRes.json();
+                                const bestCreativeUrl = cData.effective_image_url || cData.image_url;
+                                if (bestCreativeUrl && !bestCreativeUrl.includes('p64x64')) {
+                                    ads[idx].thumbnail = bestCreativeUrl;
+                                    if (ads[idx]._debug) {
+                                        ads[idx]._debug.step25 = 'creative_fallback';
+                                        ads[idx]._debug.step25_url = bestCreativeUrl;
+                                        ads[idx]._debug.step25_effective = cData.effective_image_url || null;
+                                        ads[idx]._debug.step25_image_url = cData.image_url || null;
+                                    }
+                                } else if (ads[idx]._debug) {
+                                    ads[idx]._debug.step25_creative_effective = cData.effective_image_url || null;
+                                    ads[idx]._debug.step25_creative_image_url = cData.image_url || null;
+                                    ads[idx]._debug.step25_creative_hash = cData.image_hash || null;
+                                    // If we got image_hash from creative, save it for STEP 5
+                                    if (cData.image_hash) {
+                                        ads[idx].imageHash = cData.image_hash;
+                                    }
+                                }
+                            } catch { /* creative fallback failed */ }
+                        }
+                        return;
+                    }
+
                     // Try subattachments first (carousel)
                     const subs = data.attachments?.data?.[0]?.subattachments?.data || [];
                     if (subs.length > 1) {

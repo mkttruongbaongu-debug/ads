@@ -396,28 +396,42 @@ export async function GET(
                             return;
                         }
 
-                        const html = data.data?.[0]?.body || '';
+                        let html = data.data?.[0]?.body || '';
                         if (!html) {
                             if (ads[idx]._debug) ads[idx]._debug.step25 = 'NO_HTML';
                             return;
                         }
 
-                        // Extract all img src URLs from HTML preview
-                        const imgRegex = /src="(https?:\/\/[^"]+)"/g;
-                        const allUrls: string[] = [];
-                        let match;
-                        while ((match = imgRegex.exec(html)) !== null) {
-                            let url = match[1]
-                                .replace(/&amp;/g, '&')  // Decode HTML entities
-                                .replace(/\\"/g, '"');
-                            // Filter: only keep scontent/fbcdn image URLs, skip icons/emojis/logos
-                            if ((url.includes('scontent') || url.includes('fbcdn')) &&
-                                !url.includes('emoji') && !url.includes('rsrc.php') &&
-                                !url.includes('/icons/') && !url.includes('logo')) {
-                                // Skip if still 64px
-                                if (!url.includes('p64x64') && !url.includes('s64x64')) {
-                                    allUrls.push(url);
+                        // Preview API returns iframe wrapper — extract iframe src and fetch real HTML
+                        const iframeSrcMatch = html.match(/src="(https?:[^"]+)"/);
+                        if (iframeSrcMatch && html.includes('<iframe')) {
+                            const iframeUrl = iframeSrcMatch[1].replace(/&amp;/g, '&');
+                            try {
+                                const iframeRes = await fetch(iframeUrl, {
+                                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                                });
+                                html = await iframeRes.text();
+                            } catch {
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step25 = 'IFRAME_FETCH_FAILED';
+                                    ads[idx]._debug.step25_iframe_url = iframeUrl.substring(0, 120);
                                 }
+                                return;
+                            }
+                        }
+
+                        // Extract all image src URLs from the fetched HTML
+                        const allUrls: string[] = [];
+                        const srcPattern = /src="(https?:[^"]+)"/gi;
+                        let m: RegExpExecArray | null;
+                        while ((m = srcPattern.exec(html)) !== null) {
+                            const url = m[1].replace(/&amp;/g, '&');
+                            if ((url.includes('scontent') || url.includes('fbcdn.net')) &&
+                                /\.(jpg|jpeg|png|webp)/i.test(url) &&
+                                !url.includes('emoji') && !url.includes('rsrc.php') &&
+                                !url.includes('/icons/') && !url.includes('logo') &&
+                                !url.includes('p64x64') && !url.includes('s64x64')) {
+                                allUrls.push(url);
                             }
                         }
 
@@ -425,16 +439,14 @@ export async function GET(
                         const uniqueUrls = [...new Set(allUrls)];
 
                         if (uniqueUrls.length > 1) {
-                            // Carousel detected!
                             ads[idx].thumbnails = uniqueUrls;
                             ads[idx].thumbnail = uniqueUrls[0];
                             if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'preview_carousel';
+                                ads[idx]._debug.step25 = 'preview_multi';
                                 ads[idx]._debug.step25_count = uniqueUrls.length;
                             }
                             upgraded25++;
                         } else if (uniqueUrls.length === 1) {
-                            // Single image
                             ads[idx].thumbnail = uniqueUrls[0];
                             if (ads[idx]._debug) {
                                 ads[idx]._debug.step25 = 'preview_single';
@@ -444,7 +456,14 @@ export async function GET(
                         } else if (ads[idx]._debug) {
                             ads[idx]._debug.step25 = 'NO_URLS_IN_HTML';
                             ads[idx]._debug.step25_html_length = html.length;
-                            ads[idx]._debug.step25_html_snippet = html.substring(0, 300);
+                            // Sample found src URLs for debugging
+                            const sampleSrcs: string[] = [];
+                            const debugPattern = /src="(https?:[^"]+)"/gi;
+                            let dm: RegExpExecArray | null;
+                            while ((dm = debugPattern.exec(html)) !== null && sampleSrcs.length < 3) {
+                                sampleSrcs.push(dm[1].substring(0, 100));
+                            }
+                            ads[idx]._debug.step25_sample_srcs = sampleSrcs;
                         }
                     } catch (err: any) {
                         if (ads[idx]._debug) {

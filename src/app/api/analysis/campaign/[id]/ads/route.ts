@@ -4,6 +4,25 @@ import { getValidAccessToken } from '@/lib/facebook/token';
 const FB_API_VERSION = 'v21.0';
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
+/**
+ * Extract original full-res URL from Facebook's safe_image.php proxy URLs.
+ * safe_image.php URLs return low-res (~200px) thumbnails.
+ * The actual high-res URL is embedded in the `url` query parameter.
+ * Falls back to the original URL if not a safe_image.php URL.
+ */
+function extractHighResUrl(url: string): string {
+    if (!url) return url;
+    try {
+        // Pattern: https://external.xx.fbcdn.net/safe_image.php?d=xxx&url=ENCODED_URL
+        if (url.includes('safe_image.php')) {
+            const parsed = new URL(url);
+            const originalUrl = parsed.searchParams.get('url');
+            if (originalUrl) return originalUrl;
+        }
+    } catch { /* ignore parse errors */ }
+    return url;
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -30,12 +49,28 @@ export async function GET(
         }
         const accessToken = tokenResult.accessToken;
 
+        // Fetch account_id for AdImage API (STEP 5)
+        let adAccountId = '';
+        try {
+            const campaignRes = await fetch(
+                `${FB_API_BASE}/${campaignId}?fields=account_id&access_token=${accessToken}`
+            );
+            const campaignMeta = await campaignRes.json();
+            if (campaignMeta.account_id) {
+                adAccountId = `act_${campaignMeta.account_id}`;
+                console.log(`[API:ADS] 🔑 Account ID: ${adAccountId}`);
+            }
+        } catch (err) {
+            console.warn('[API:ADS] ⚠️ Could not fetch account_id:', err);
+        }
+
         // Fetch ads with daily insights and creative info
         // video_id needed to batch-fetch hi-res video thumbnails
+        // image_hash needed for AdImage API fallback (STEP 5)
         const adsRes = await fetch(
             `${FB_API_BASE}/${campaignId}/ads?` +
             `fields=id,name,status,effective_object_story_id,effective_image_url,` +
-            `creative{id,thumbnail_url,image_url,video_id,body,object_story_spec,effective_object_story_id},` +
+            `creative{id,thumbnail_url,image_url,image_hash,video_id,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
             `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
@@ -61,6 +96,7 @@ export async function GET(
                 id: string;
                 thumbnail_url?: string;
                 image_url?: string;
+                image_hash?: string; // Added image_hash
                 video_id?: string;
                 body?: string;
                 effective_object_story_id?: string;
@@ -154,9 +190,21 @@ export async function GET(
                 status: ad.status,
                 thumbnail: imageUrl,
                 creativeId: ad.creative?.id,
+                imageHash: ad.creative?.image_hash || null,
                 message,
                 link,
                 postUrl,
+                _debug: {
+                    step1_effective_image_url: ad.effective_image_url || null,
+                    step1_creative_image_url: ad.creative?.image_url || null,
+                    step1_creative_thumbnail_url: ad.creative?.thumbnail_url || null,
+                    step1_video_image_url: storySpec?.video_data?.image_url || null,
+                    step1_photo_url: storySpec?.photo_data?.url || null,
+                    step1_final: imageUrl,
+                    step1_image_hash: ad.creative?.image_hash || storySpec?.link_data?.image_hash || null,
+                    hasStoryId: !!(ad.effective_object_story_id || ad.creative?.effective_object_story_id),
+                    hasVideoId: !!(ad.creative?.video_id || storySpec?.video_data?.video_id),
+                },
                 totals: {
                     ...totals,
                     cpp: totals.purchases > 0 ? totals.spend / totals.purchases : 0,
@@ -223,26 +271,39 @@ export async function GET(
                     const attachment = postInfo.attachments?.data?.[0];
                     const subs = attachment?.subattachments?.data || [];
 
-                    // Carousel: collect ALL subattachment images
+                    // Carousel: collect ALL subattachment images (highest quality source)
                     if (subs.length > 1) {
                         const allImages: string[] = [];
                         for (const sub of subs) {
                             if (sub?.media?.image?.src) {
-                                allImages.push(sub.media.image.src);
+                                // Extract original URL from safe_image.php proxy for full resolution
+                                allImages.push(extractHighResUrl(sub.media.image.src));
                             }
                         }
                         if (allImages.length > 0) {
                             for (const idx of adIndexes) {
                                 ads[idx].thumbnails = allImages;
                                 ads[idx].thumbnail = allImages[0];
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step2 = 'carousel';
+                                    ads[idx]._debug.step2_count = allImages.length;
+                                    ads[idx]._debug.step2_urls = allImages;
+                                }
                             }
                         }
                     } else {
                         // Single image: use attachment or full_picture
-                        const bestImage = attachment?.media?.image?.src || postInfo.full_picture;
+                        const rawImage = attachment?.media?.image?.src || postInfo.full_picture;
+                        const bestImage = rawImage ? extractHighResUrl(rawImage) : null;
                         if (bestImage) {
                             for (const idx of adIndexes) {
                                 ads[idx].thumbnail = bestImage;
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step2 = 'single';
+                                    ads[idx]._debug.step2_url = bestImage;
+                                    ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
+                                    ads[idx]._debug.step2_attachment_src = attachment?.media?.image?.src || null;
+                                }
                             }
                         }
                     }
@@ -294,6 +355,10 @@ export async function GET(
                     if (bestPic) {
                         for (const idx of adIndexes) {
                             ads[idx].thumbnail = bestPic; // ALWAYS override for video
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step3 = 'video';
+                                ads[idx]._debug.step3_url = bestPic;
+                            }
                         }
                         upgraded++;
                     }
@@ -322,11 +387,14 @@ export async function GET(
             }
         });
 
+        // Collect image_hashes for STEP 5 fallback
+        const imageHashMap = new Map<string, number[]>();
+
         if (creativeMap.size > 0) {
             try {
                 const creativeIds = Array.from(creativeMap.keys()).join(',');
                 const creativeRes = await fetch(
-                    `${FB_API_BASE}/?ids=${creativeIds}&fields=effective_image_url,image_url,object_story_spec{link_data{picture,child_attachments{image_hash,picture}},photo_data{url}}&access_token=${accessToken}`
+                    `${FB_API_BASE}/?ids=${creativeIds}&fields=effective_image_url,image_url,image_hash,object_story_spec{link_data{picture,image_hash,child_attachments{image_hash,picture}},photo_data{url}}&access_token=${accessToken}`
                 );
                 const creativeData = await creativeRes.json();
 
@@ -335,33 +403,56 @@ export async function GET(
                     const info = creativeData[creativeId];
                     if (!info) continue;
 
+                    // Collect image_hash for STEP 5 fallback
+                    const hash = info.image_hash || info.object_story_spec?.link_data?.image_hash;
+                    if (hash) {
+                        if (!imageHashMap.has(hash)) imageHashMap.set(hash, []);
+                        for (const idx of adIndexes) {
+                            imageHashMap.get(hash)!.push(idx);
+                        }
+                    }
+
                     // Carousel: child_attachments have individual pictures
                     const childAttachments = info.object_story_spec?.link_data?.child_attachments || [];
                     if (childAttachments.length > 1) {
                         const carouselImages: string[] = childAttachments
-                            .map((c: any) => c.picture)
+                            .map((c: any) => c.picture ? extractHighResUrl(c.picture) : null)
                             .filter(Boolean);
                         if (carouselImages.length > 0) {
                             for (const idx of adIndexes) {
-                                // Prefer STEP 2 subattachments (higher res) if available
+                                // STEP 2 subattachments are HIGHER quality — never override them
                                 if (!ads[idx].thumbnails || ads[idx].thumbnails.length === 0) {
                                     ads[idx].thumbnails = carouselImages;
                                 }
-                                ads[idx].thumbnail = info.effective_image_url || info.image_url || carouselImages[0];
+                                // Use first carousel image as main thumbnail (NOT effective_image_url which is often 64px)
+                                ads[idx].thumbnail = ads[idx].thumbnails?.[0] || carouselImages[0];
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step4 = 'carousel';
+                                    ads[idx]._debug.step4_count = carouselImages.length;
+                                }
                             }
                             upgraded++;
                             continue;
                         }
                     }
 
-                    // Single image
-                    const bestImage = info.effective_image_url
-                        || info.image_url
+                    // Single image — pick best source, extract from safe_image proxy
+                    const rawBest = info.image_url
+                        || info.object_story_spec?.photo_data?.url
                         || info.object_story_spec?.link_data?.picture
-                        || info.object_story_spec?.photo_data?.url;
+                        || info.effective_image_url; // effective_image_url last (often 64px)
+                    const bestImage = rawBest ? extractHighResUrl(rawBest) : null;
                     if (bestImage) {
                         for (const idx of adIndexes) {
                             ads[idx].thumbnail = bestImage;
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step4 = 'single';
+                                ads[idx]._debug.step4_url = bestImage;
+                                ads[idx]._debug.step4_image_url = info.image_url || null;
+                                ads[idx]._debug.step4_photo_url = info.object_story_spec?.photo_data?.url || null;
+                                ads[idx]._debug.step4_link_picture = info.object_story_spec?.link_data?.picture || null;
+                                ads[idx]._debug.step4_effective = info.effective_image_url || null;
+                            }
                         }
                         upgraded++;
                     }
@@ -372,9 +463,105 @@ export async function GET(
             }
         }
 
-        // Log final stats
+        // Also collect image_hash from initial ad data (for ads skipped by STEP 4)
+        ads.forEach((_ad: any, idx: number) => {
+            if (videoAdIndexes.has(idx)) return;
+            const rawAd = (adsData.data || [])[idx];
+            const hash = rawAd?.creative?.image_hash || rawAd?.creative?.object_story_spec?.link_data?.image_hash;
+            if (hash && !imageHashMap.has(hash)) {
+                imageHashMap.set(hash, [idx]);
+            }
+        });
+
+        // ===================================================================
+        // STEP 5: AdImage API fallback — for ads STILL with low-res images
+        // Fetches original uploaded images via image_hash
+        // /{act_account_id}/adimages?hashes=['hash1','hash2',...]
+        // Returns full-res `url` (temporary ~24h) and `permalink_url`
+        // ===================================================================
+        if (adAccountId && imageHashMap.size > 0) {
+            // Find ads that still have low-res thumbnails (64px indicators)
+            const lowResIndexes = new Set<number>();
+            ads.forEach((ad: any, idx: number) => {
+                if (videoAdIndexes.has(idx)) return;
+                const thumb = ad.thumbnail || '';
+                // Detect 64px images: fbcdn URLs with /s64x64/ or /p64x64/ or very short URLs
+                if (!thumb || thumb.includes('/s64x64/') || thumb.includes('/p64x64/') || thumb.includes('_s.') || thumb.length < 50) {
+                    lowResIndexes.add(idx);
+                }
+            });
+
+            if (lowResIndexes.size > 0) {
+                // Collect hashes only for low-res ads
+                const hashesNeeded = new Map<string, number[]>();
+                for (const [hash, indexes] of imageHashMap) {
+                    const needUpgrade = indexes.filter(i => lowResIndexes.has(i));
+                    if (needUpgrade.length > 0) {
+                        hashesNeeded.set(hash, needUpgrade);
+                    }
+                }
+
+                if (hashesNeeded.size > 0) {
+                    try {
+                        const hashArray = Array.from(hashesNeeded.keys());
+                        const hashParam = encodeURIComponent(JSON.stringify(hashArray));
+                        const adImageRes = await fetch(
+                            `${FB_API_BASE}/${adAccountId}/adimages?hashes=${hashParam}&fields=hash,url,permalink_url,original_height,original_width&access_token=${accessToken}`
+                        );
+                        const adImageData = await adImageRes.json();
+                        const images = adImageData.data || [];
+
+                        let upgraded = 0;
+                        for (const img of images) {
+                            const hash = img.hash;
+                            const fullUrl = img.permalink_url || img.url;
+                            if (hash && fullUrl && hashesNeeded.has(hash)) {
+                                const adIndexes = hashesNeeded.get(hash)!;
+                                for (const idx of adIndexes) {
+                                    ads[idx].thumbnail = fullUrl;
+                                    if (ads[idx]._debug) {
+                                        ads[idx]._debug.step5 = 'adimage';
+                                        ads[idx]._debug.step5_url = fullUrl;
+                                        ads[idx]._debug.step5_permalink = img.permalink_url || null;
+                                        ads[idx]._debug.step5_temp_url = img.url || null;
+                                        ads[idx]._debug.step5_original_size = `${img.original_width || '?'}x${img.original_height || '?'}`;
+                                    }
+                                }
+                                upgraded++;
+                            }
+                        }
+                        console.log(`[API:ADS] 🖼️ STEP 5: AdImage API ${upgraded}/${hashesNeeded.size} upgraded (${lowResIndexes.size} were low-res)`);
+                    } catch (err) {
+                        console.warn('[API:ADS] ⚠️ STEP 5 AdImage fallback failed:', err);
+                    }
+                }
+            }
+        }
+
+        // Record final_url in _debug for every ad
+        ads.forEach((ad: any) => {
+            if (ad._debug) {
+                ad._debug.final_url = ad.thumbnail || null;
+                ad._debug.has_carousel = !!(ad.thumbnails && ad.thumbnails.length > 1);
+                ad._debug.carousel_count = ad.thumbnails?.length || 0;
+            }
+        });
+
+        // Log final stats + debug low-res detection
         const withCarousel = ads.filter((a: any) => a.thumbnails?.length > 1).length;
-        console.log(`[API:ADS] 📊 Final: ${ads.length} ads, ${withCarousel} carousel, ${videoAdIndexes.size} video`);
+        const stillLowRes = ads.filter((ad: any) => {
+            const t = ad.thumbnail || '';
+            return !t || t.includes('/s64x64/') || t.includes('/p64x64/') || t.includes('_s.') || t.length < 50;
+        }).length;
+        console.log(`[API:ADS] 📊 Final: ${ads.length} ads, ${withCarousel} carousel, ${videoAdIndexes.size} video, ${stillLowRes} still-low-res`);
+        if (stillLowRes > 0) {
+            ads.forEach((ad: any, idx: number) => {
+                const t = ad.thumbnail || '';
+                if (!t || t.includes('/s64x64/') || t.includes('/p64x64/') || t.includes('_s.') || t.length < 50) {
+                    console.log(`[API:ADS] ⚠️ LOW-RES #${idx}: name="${ad.name}", thumb="${t.substring(0, 100)}"`);
+                }
+            });
+        }
 
         // Sort by spend (highest first) to show most impactful ads first
         ads.sort((a: { totals: { spend: number } }, b: { totals: { spend: number } }) => b.totals.spend - a.totals.spend);

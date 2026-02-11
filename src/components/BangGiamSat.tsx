@@ -1,17 +1,19 @@
 /**
  * ===================================================================
- * COMPONENT: BẢNG GIÁM SÁT (MONITORING DASHBOARD)
+ * COMPONENT: BẢNG GIÁM SÁT (MONITORING DASHBOARD) v2
  * ===================================================================
  * Mô tả:
  * Component hiển thị proposals đang được giám sát.
  * Timeline view: D+1 → D+3 → D+7 với progress indicators.
  * 
+ * v2: Hiển thị daily trend data (trước/sau) + AI analysis
+ * 
  * Features:
  * - Display proposals DANG_GIAM_SAT
- * - Timeline progress (D+1/D+3/D+7)
- * - Metrics comparison before/after
- * - Success/Fail indicators
- * - Observations history
+ * - Timeline progress (D+1/D+3/D+7) với đánh giá badges
+ * - Daily trend table (metrics theo ngày)
+ * - So sánh Trước/Sau + % thay đổi
+ * - AI analysis & dự đoán
  * 
  * Props:
  * - userId: string
@@ -24,7 +26,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { DeXuat } from '@/lib/de-xuat/types';
+import type { DeXuat, QuanSat } from '@/lib/de-xuat/types';
 import { daysUntilNextCheckpoint, getAllPassedCheckpoints } from '@/lib/monitoring/checkpoint-calculator';
 
 // ===================================================================
@@ -36,10 +38,20 @@ interface Props {
 }
 
 interface MonitoringProposal extends DeXuat {
-    observations?: any[];
+    observations?: QuanSat[];
     nextCheckpoint?: string;
     daysRemaining?: number;
 }
+
+type DailyRow = {
+    date: string;
+    spend: number;
+    purchases: number;
+    revenue: number;
+    cpp: number;
+    ctr: number;
+    roas: number;
+};
 
 // ===================================================================
 // CEX TRADING COLORS
@@ -225,7 +237,7 @@ export default function BangGiamSat({ userId }: Props) {
     const [checkResult, setCheckResult] = useState<string | null>(null);
 
     // ===================================================================
-    // FETCH MONITORING PROPOSALS
+    // FETCH MONITORING PROPOSALS + OBSERVATIONS
     // ===================================================================
     const fetchMonitoringProposals = useCallback(async () => {
         setIsLoading(true);
@@ -246,20 +258,35 @@ export default function BangGiamSat({ userId }: Props) {
 
             const allData = [...(json1.data || []), ...(json2.data || [])];
 
-            // Enrich với monitoring data
-            const enriched: MonitoringProposal[] = (allData).map((p: DeXuat) => {
-                const executedTime = p.thoiGian_ThucThi || new Date().toISOString();
-                const passedCheckpoints = getAllPassedCheckpoints(executedTime);
-                const lastCheckpoint = passedCheckpoints[passedCheckpoints.length - 1] || null;
+            // Enrich với monitoring data + fetch observations
+            const enriched: MonitoringProposal[] = await Promise.all(
+                (allData as DeXuat[]).map(async (p) => {
+                    const executedTime = p.thoiGian_ThucThi || new Date().toISOString();
+                    const passedCheckpoints = getAllPassedCheckpoints(executedTime);
+                    const lastCheckpoint = passedCheckpoints[passedCheckpoints.length - 1] || null;
 
-                return {
-                    ...p,
-                    nextCheckpoint: lastCheckpoint === 'D7' ? 'Completed' :
-                        lastCheckpoint === 'D3' ? 'D7' :
-                            lastCheckpoint === 'D1' ? 'D3' : 'D1',
-                    daysRemaining: daysUntilNextCheckpoint(executedTime, lastCheckpoint),
-                };
-            });
+                    // Fetch observations cho đề xuất này
+                    let observations: QuanSat[] = [];
+                    try {
+                        const obsRes = await fetch(`/api/giam-sat/quan-sat?deXuatId=${p.id}`);
+                        const obsJson = await obsRes.json();
+                        if (obsJson.success) {
+                            observations = obsJson.data || [];
+                        }
+                    } catch (err) {
+                        console.warn(`[GIAM_SAT UI] Không lấy được observations cho ${p.id}:`, err);
+                    }
+
+                    return {
+                        ...p,
+                        observations,
+                        nextCheckpoint: lastCheckpoint === 'D7' ? 'Completed' :
+                            lastCheckpoint === 'D3' ? 'D7' :
+                                lastCheckpoint === 'D1' ? 'D3' : 'D1',
+                        daysRemaining: daysUntilNextCheckpoint(executedTime, lastCheckpoint),
+                    };
+                })
+            );
 
             setProposals(enriched);
         } catch (err) {
@@ -313,13 +340,243 @@ export default function BangGiamSat({ userId }: Props) {
         return date.toLocaleDateString('vi-VN');
     };
 
+    const formatShortDate = (isoString: string) => {
+        const date = new Date(isoString);
+        return `${date.getDate()}/${date.getMonth() + 1}`;
+    };
+
     const formatCurrency = (value: number) => {
+        if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+        if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
         return Math.round(value).toLocaleString('de-DE') + ' ₫';
     };
 
-    const calculateChange = (before: number, after: number) => {
-        if (before === 0) return 0;
-        return ((after - before) / before) * 100;
+    const formatPercent = (value: number) => {
+        const sign = value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(1)}%`;
+    };
+
+    const getDanhGiaLabel = (danhGia: string) => {
+        const map: Record<string, { text: string; color: string }> = {
+            'CAI_THIEN': { text: 'CẢI THIỆN', color: colors.success },
+            'TRUNG_TINH': { text: 'ỔN ĐỊNH', color: colors.warning },
+            'XAU_DI': { text: 'XẤU ĐI', color: colors.error },
+        };
+        return map[danhGia] || { text: danhGia, color: colors.textMuted };
+    };
+
+    // ===================================================================
+    // RENDER: Daily Trend Table
+    // ===================================================================
+    const renderDailyTrendTable = (
+        label: string,
+        dailyData: DailyRow[],
+        bgColor: string
+    ) => {
+        if (!dailyData || dailyData.length === 0) return null;
+
+        return (
+            <div style={{ marginBottom: '16px' }}>
+                <div style={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 600,
+                    color: colors.textMuted,
+                    textTransform: 'uppercase' as any,
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px',
+                }}>{label}</div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '0.75rem',
+                    }}>
+                        <thead>
+                            <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', color: colors.textMuted, fontWeight: 500 }}>Ngày</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'right', color: colors.textMuted, fontWeight: 500 }}>Chi tiêu</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'right', color: colors.textMuted, fontWeight: 500 }}>Đơn</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'right', color: colors.textMuted, fontWeight: 500 }}>CPP</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'right', color: colors.textMuted, fontWeight: 500 }}>ROAS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dailyData.map((d, i) => (
+                                <tr key={i} style={{
+                                    borderBottom: `1px solid ${colors.border}`,
+                                    background: i % 2 === 0 ? 'transparent' : `${bgColor}08`,
+                                }}>
+                                    <td style={{ padding: '6px 8px', color: colors.text }}>
+                                        {formatShortDate(d.date)}
+                                    </td>
+                                    <td style={{ padding: '6px 8px', textAlign: 'right', color: colors.text }}>
+                                        {formatCurrency(d.spend)}
+                                    </td>
+                                    <td style={{ padding: '6px 8px', textAlign: 'right', color: d.purchases > 0 ? colors.text : colors.textSubtle }}>
+                                        {d.purchases}
+                                    </td>
+                                    <td style={{ padding: '6px 8px', textAlign: 'right', color: d.purchases > 0 ? colors.text : colors.textSubtle }}>
+                                        {d.purchases > 0 ? formatCurrency(d.cpp) : '-'}
+                                    </td>
+                                    <td style={{ padding: '6px 8px', textAlign: 'right', color: d.roas > 0 ? colors.text : colors.textSubtle }}>
+                                        {d.roas > 0 ? d.roas.toFixed(2) + 'x' : '-'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    // ===================================================================
+    // RENDER: Observation Card (per checkpoint)
+    // ===================================================================
+    const renderObservationCard = (obs: QuanSat) => {
+        const dg = getDanhGiaLabel(obs.danhGia);
+        return (
+            <div key={obs.id} style={{
+                background: colors.bg,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                padding: '16px',
+                marginBottom: '12px',
+            }}>
+                {/* Header: Checkpoint + Đánh giá */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: colors.text }}>
+                        D+{obs.checkpoint_Ngay}
+                    </span>
+                    <span style={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        color: dg.color,
+                        background: `${dg.color}15`,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase' as any,
+                    }}>
+                        {dg.text}
+                    </span>
+                </div>
+
+                {/* Metrics So Sánh: Trước → Sau */}
+                <div style={styles.metricsGrid}>
+                    {/* CPP */}
+                    <div style={{ ...styles.metricCard, padding: '12px' }}>
+                        <div style={styles.metricLabel}>CPP</div>
+                        <div style={{ fontSize: '1.125rem', fontWeight: 700, color: colors.text }}>
+                            {formatCurrency(obs.metrics_HienTai?.cpp || 0)}
+                        </div>
+                        <div style={{
+                            fontSize: '0.75rem',
+                            color: obs.cpp_ThayDoi_Percent <= 0 ? colors.success : colors.error,
+                            fontWeight: 600,
+                        }}>
+                            {formatPercent(obs.cpp_ThayDoi_Percent)}
+                            {obs.cpp_ThayDoi_Percent < 0 ? ' ▼' : obs.cpp_ThayDoi_Percent > 0 ? ' ▲' : ''}
+                        </div>
+                        <div style={{ fontSize: '0.6875rem', color: colors.textSubtle, marginTop: '2px' }}>
+                            Trước: {formatCurrency(obs.metrics_TruocKhi?.cpp || 0)}
+                        </div>
+                    </div>
+
+                    {/* ROAS */}
+                    <div style={{ ...styles.metricCard, padding: '12px' }}>
+                        <div style={styles.metricLabel}>ROAS</div>
+                        <div style={{ fontSize: '1.125rem', fontWeight: 700, color: colors.text }}>
+                            {(obs.metrics_HienTai?.roas || 0).toFixed(2)}x
+                        </div>
+                        <div style={{
+                            fontSize: '0.75rem',
+                            color: obs.roas_ThayDoi_Percent >= 0 ? colors.success : colors.error,
+                            fontWeight: 600,
+                        }}>
+                            {formatPercent(obs.roas_ThayDoi_Percent)}
+                            {obs.roas_ThayDoi_Percent > 0 ? ' ▲' : obs.roas_ThayDoi_Percent < 0 ? ' ▼' : ''}
+                        </div>
+                        <div style={{ fontSize: '0.6875rem', color: colors.textSubtle, marginTop: '2px' }}>
+                            Trước: {(obs.metrics_TruocKhi?.roas || 0).toFixed(2)}x
+                        </div>
+                    </div>
+
+                    {/* Chi Tiêu */}
+                    <div style={{ ...styles.metricCard, padding: '12px' }}>
+                        <div style={styles.metricLabel}>Chi tiêu</div>
+                        <div style={{ fontSize: '1.125rem', fontWeight: 700, color: colors.text }}>
+                            {formatCurrency(obs.metrics_HienTai?.chiTieu || 0)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: colors.textSubtle }}>
+                            {obs.metrics_HienTai?.donHang || 0} đơn
+                        </div>
+                        <div style={{ fontSize: '0.6875rem', color: colors.textSubtle, marginTop: '2px' }}>
+                            Trước: {formatCurrency(obs.metrics_TruocKhi?.chiTieu || 0)}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Daily Trend Tables */}
+                <div style={{ marginTop: '16px' }}>
+                    {renderDailyTrendTable(
+                        `Trend TRƯỚC thực thi (${(obs.dailyTrend_TruocKhi || []).length} ngày)`,
+                        obs.dailyTrend_TruocKhi || [],
+                        colors.textMuted
+                    )}
+                    {renderDailyTrendTable(
+                        `Trend SAU thực thi (${(obs.dailyTrend_SauKhi || []).length} ngày)`,
+                        obs.dailyTrend_SauKhi || [],
+                        colors.primary
+                    )}
+                </div>
+
+                {/* AI Analysis */}
+                {obs.phanTich_AI && (
+                    <div style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        background: `${colors.info}10`,
+                        border: `1px solid ${colors.info}30`,
+                        borderRadius: '6px',
+                    }}>
+                        <div style={{
+                            fontSize: '0.6875rem',
+                            fontWeight: 600,
+                            color: colors.info,
+                            textTransform: 'uppercase' as any,
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px',
+                        }}>
+                            AI PHÂN TÍCH
+                        </div>
+                        <div style={{ fontSize: '0.8125rem', color: colors.text, lineHeight: 1.5 }}>
+                            {obs.phanTich_AI.giaiThich}
+                        </div>
+                        {obs.phanTich_AI.yeuTo_AnhHuong && obs.phanTich_AI.yeuTo_AnhHuong.length > 0 && (
+                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {obs.phanTich_AI.yeuTo_AnhHuong.map((yt, i) => (
+                                    <span key={i} style={{
+                                        fontSize: '0.6875rem',
+                                        padding: '2px 8px',
+                                        background: colors.bgAlt,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '4px',
+                                        color: colors.textMuted,
+                                    }}>
+                                        {yt}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        {obs.phanTich_AI.duDoan_TiepTheo && (
+                            <div style={{ marginTop: '8px', fontSize: '0.75rem', color: colors.textMuted, fontStyle: 'italic' }}>
+                                Dự đoán: {obs.phanTich_AI.duDoan_TiepTheo}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
     };
 
     // ===================================================================
@@ -370,7 +627,7 @@ export default function BangGiamSat({ userId }: Props) {
             {/* Error */}
             {error && (
                 <div style={{ ...styles.emptyState, border: `1px solid ${colors.error}` }}>
-                    <p style={{ color: colors.error }}>❌ {error}</p>
+                    <p style={{ color: colors.error }}>Loi: {error}</p>
                 </div>
             )}
 
@@ -398,6 +655,11 @@ export default function BangGiamSat({ userId }: Props) {
                         const executedTime = proposal.thoiGian_ThucThi || new Date().toISOString();
                         const monitoringEnd = proposal.giamSat_DenNgay || new Date().toISOString();
                         const passedCheckpoints = getAllPassedCheckpoints(executedTime);
+                        const observations = proposal.observations || [];
+
+                        // Lấy observation mới nhất để hiện đánh giá trên timeline
+                        const getObsForCheckpoint = (cp: number) =>
+                            observations.find(o => o.checkpoint_Ngay === cp);
 
                         return (
                             <div key={proposal.id} style={styles.card}>
@@ -430,7 +692,14 @@ export default function BangGiamSat({ userId }: Props) {
                                             </div>
                                             <div style={styles.checkpointLabel}>D+1</div>
                                             <div style={styles.checkpointStatus}>
-                                                {passedCheckpoints.includes('D1') ? 'Hoàn thành' : 'Chờ'}
+                                                {(() => {
+                                                    const obs = getObsForCheckpoint(1);
+                                                    if (obs) {
+                                                        const dg = getDanhGiaLabel(obs.danhGia);
+                                                        return <span style={{ color: dg.color, fontWeight: 600 }}>{dg.text}</span>;
+                                                    }
+                                                    return passedCheckpoints.includes('D1') ? 'Hoàn thành' : 'Chờ';
+                                                })()}
                                             </div>
                                         </div>
 
@@ -441,7 +710,14 @@ export default function BangGiamSat({ userId }: Props) {
                                             </div>
                                             <div style={styles.checkpointLabel}>D+3</div>
                                             <div style={styles.checkpointStatus}>
-                                                {passedCheckpoints.includes('D3') ? 'Hoàn thành' : 'Chờ'}
+                                                {(() => {
+                                                    const obs = getObsForCheckpoint(3);
+                                                    if (obs) {
+                                                        const dg = getDanhGiaLabel(obs.danhGia);
+                                                        return <span style={{ color: dg.color, fontWeight: 600 }}>{dg.text}</span>;
+                                                    }
+                                                    return passedCheckpoints.includes('D3') ? 'Hoàn thành' : 'Chờ';
+                                                })()}
                                             </div>
                                         </div>
 
@@ -452,49 +728,88 @@ export default function BangGiamSat({ userId }: Props) {
                                             </div>
                                             <div style={styles.checkpointLabel}>D+7</div>
                                             <div style={styles.checkpointStatus}>
-                                                {passedCheckpoints.includes('D7') ? 'Hoàn thành' : 'Chờ'}
+                                                {(() => {
+                                                    const obs = getObsForCheckpoint(7);
+                                                    if (obs) {
+                                                        const dg = getDanhGiaLabel(obs.danhGia);
+                                                        return <span style={{ color: dg.color, fontWeight: 600 }}>{dg.text}</span>;
+                                                    }
+                                                    return passedCheckpoints.includes('D7') ? 'Hoàn thành' : 'Chờ';
+                                                })()}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Metrics Comparison */}
+                                {/* Observations with Trend Data */}
                                 <div style={styles.metricsSection}>
-                                    <p style={styles.timelineTitle}>So Sánh Metrics</p>
-                                    <div style={styles.metricsGrid}>
-                                        {/* CPP */}
-                                        <div style={styles.metricCard}>
-                                            <div style={styles.metricLabel}>CPP</div>
-                                            <div style={styles.metricValue}>
-                                                {formatCurrency(proposal.metrics_TruocKhi?.cpp || 0)}
-                                            </div>
-                                            <div style={styles.metricChange(false)}>
-                                                Trước khi thực thi
-                                            </div>
-                                        </div>
+                                    {observations.length > 0 ? (
+                                        <>
+                                            <p style={styles.timelineTitle}>
+                                                Kết Quả Giám Sát ({observations.length} checkpoint)
+                                            </p>
+                                            {observations.map(obs => renderObservationCard(obs))}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* Fallback: Metrics trước thực thi (khi chưa có observation) */}
+                                            <p style={styles.timelineTitle}>Metrics Trước Thực Thi</p>
+                                            <div style={styles.metricsGrid}>
+                                                <div style={styles.metricCard}>
+                                                    <div style={styles.metricLabel}>CPP</div>
+                                                    <div style={styles.metricValue}>
+                                                        {formatCurrency(proposal.metrics_TruocKhi?.cpp || 0)}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Baseline
+                                                    </div>
+                                                </div>
 
-                                        {/* ROAS */}
-                                        <div style={styles.metricCard}>
-                                            <div style={styles.metricLabel}>ROAS</div>
-                                            <div style={styles.metricValue}>
-                                                {(proposal.metrics_TruocKhi?.roas || 0).toFixed(2)}x
-                                            </div>
-                                            <div style={styles.metricChange(false)}>
-                                                Trước khi thực thi
-                                            </div>
-                                        </div>
+                                                <div style={styles.metricCard}>
+                                                    <div style={styles.metricLabel}>ROAS</div>
+                                                    <div style={styles.metricValue}>
+                                                        {(proposal.metrics_TruocKhi?.roas || 0).toFixed(2)}x
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Baseline
+                                                    </div>
+                                                </div>
 
-                                        {/* Chi tiêu */}
-                                        <div style={styles.metricCard}>
-                                            <div style={styles.metricLabel}>Chi tiêu</div>
-                                            <div style={styles.metricValue}>
-                                                {formatCurrency(proposal.metrics_TruocKhi?.chiTieu || 0)}
+                                                <div style={styles.metricCard}>
+                                                    <div style={styles.metricLabel}>Chi tiêu</div>
+                                                    <div style={styles.metricValue}>
+                                                        {formatCurrency(proposal.metrics_TruocKhi?.chiTieu || 0)}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                        Baseline
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div style={styles.metricChange(false)}>
-                                                Trước khi thực thi
+
+                                            {/* Daily Trend trước thực thi từ DeXuat */}
+                                            {proposal.dailyTrend_TruocKhi && proposal.dailyTrend_TruocKhi.length > 0 && (
+                                                <div style={{ marginTop: '16px' }}>
+                                                    {renderDailyTrendTable(
+                                                        `Trend 7 ngày trước thực thi`,
+                                                        proposal.dailyTrend_TruocKhi,
+                                                        colors.textMuted
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div style={{
+                                                marginTop: '12px',
+                                                padding: '12px',
+                                                background: `${colors.warning}10`,
+                                                border: `1px solid ${colors.warning}30`,
+                                                borderRadius: '6px',
+                                                fontSize: '0.8125rem',
+                                                color: colors.textMuted,
+                                            }}>
+                                                Đang chờ checkpoint đầu tiên (D+1). Dữ liệu so sánh sẽ xuất hiện khi có observation.
                                             </div>
-                                        </div>
-                                    </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         );

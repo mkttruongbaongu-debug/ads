@@ -143,12 +143,14 @@ export async function taoDeXuat(
         console.log(`[TAO_DE_XUAT] 🔍 Bắt đầu tạo đề xuất cho campaign: ${input.tenCampaign}`);
 
         // ===================================================================
-        // STEP 0: DEDUP GUARD — Chặn nếu campaign đã có đề xuất đang active
-        // Quy tắc: Mỗi campaign chỉ được có TỐI ĐA 1 đề xuất đang hoạt động
-        // Active = CHO_DUYET | DA_DUYET | DANG_GIAM_SAT
-        // Cho phép tạo mới khi: HOAN_THANH | BI_TU_CHOI | không có đề xuất
+        // STEP 0: DEDUP GUARD + COOLDOWN 7 NGÀY
+        // Quy tắc:
+        //   1. Mỗi campaign chỉ 1 đề xuất active (CHO_DUYET | DA_DUYET | DANG_GIAM_SAT)
+        //   2. Sau đề xuất gần nhất, PHẢI CHỜ 7 NGÀY mới được tạo mới
+        //      → Tập trung thực thi trước, rồi mới tinh chỉnh tiếp
         // ===================================================================
         const ACTIVE_STATUSES = ['CHO_DUYET', 'DA_DUYET', 'DANG_GIAM_SAT'];
+        const COOLDOWN_DAYS = 7;
 
         const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
         const apiSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || 'tho-ads-ai-2026';
@@ -165,6 +167,7 @@ export async function taoDeXuat(
                 const checkData = await checkRes.json();
 
                 if (checkData.success && checkData.data) {
+                    // --- CHECK 1: Đề xuất đang active → block ---
                     const activeProposal = checkData.data.find(
                         (p: any) => ACTIVE_STATUSES.includes(p.trangThai)
                     );
@@ -184,11 +187,44 @@ export async function taoDeXuat(
                             error: `Campaign này đã có đề xuất ${statusLabel}. Mỗi campaign chỉ được có 1 đề xuất hoạt động tại một thời điểm. Vui lòng xử lý đề xuất hiện tại trước khi phân tích lại.`,
                         };
                     }
+
+                    // --- CHECK 2: Cooldown 7 ngày sau đề xuất gần nhất → block ---
+                    if (checkData.data.length > 0) {
+                        const sorted = [...checkData.data].sort(
+                            (a: any, b: any) => new Date(b.thoiGian_Tao).getTime() - new Date(a.thoiGian_Tao).getTime()
+                        );
+                        const newest = sorted[0];
+                        const daysSince = (Date.now() - new Date(newest.thoiGian_Tao).getTime()) / (1000 * 60 * 60 * 24);
+
+                        if (daysSince < COOLDOWN_DAYS) {
+                            const daysLeft = Math.ceil(COOLDOWN_DAYS - daysSince);
+                            const createdDate = new Date(newest.thoiGian_Tao).toLocaleDateString('vi-VN');
+                            const statusLabels2: Record<string, string> = {
+                                'CHO_DUYET': 'chờ duyệt',
+                                'DA_DUYET': 'đã duyệt',
+                                'DANG_GIAM_SAT': 'đang giám sát',
+                                'HOAN_THANH': 'hoàn thành',
+                                'BI_TU_CHOI': 'bị từ chối',
+                            };
+                            const stt = statusLabels2[newest.trangThai] || newest.trangThai;
+
+                            console.log(`[TAO_DE_XUAT] ⏳ COOLDOWN: Campaign "${input.tenCampaign}" — đề xuất gần nhất ${createdDate} (${stt}), còn ${daysLeft} ngày`);
+
+                            return {
+                                success: false,
+                                error: `Tạm ngưng đề xuất mới. Hãy tập trung thực thi đề xuất hiện tại trước.\nĐề xuất gần nhất: ${createdDate} (${stt})\nCòn ${daysLeft} ngày nữa mới được phân tích lại (cooldown ${COOLDOWN_DAYS} ngày).`,
+                            };
+                        }
+                    }
                 }
-                console.log(`[TAO_DE_XUAT] ✅ DEDUP OK: Campaign chưa có đề xuất active`);
+                console.log(`[TAO_DE_XUAT] ✅ DEDUP + COOLDOWN OK: Campaign sẵn sàng tạo đề xuất mới`);
             } catch (dedupErr) {
-                // Non-critical: nếu check fail thì vẫn cho tạo (graceful degradation)
-                console.warn('[TAO_DE_XUAT] ⚠️ Dedup check failed, proceeding anyway:', dedupErr);
+                // STRICT: Nếu check fail → KHÔNG cho tạo (tránh bypass dedup)
+                console.error('[TAO_DE_XUAT] ❌ Dedup/Cooldown check failed, BLOCKING:', dedupErr);
+                return {
+                    success: false,
+                    error: 'Không thể kiểm tra đề xuất hiện có. Vui lòng thử lại sau.',
+                };
             }
         }
 

@@ -68,6 +68,7 @@ interface Ad {
         cpp: number;
         ctr: number;
     }>;
+    _debug?: Record<string, any>;
 }
 
 interface Props {
@@ -800,6 +801,10 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     // Auto-prompt modal state
     const [showProposalPrompt, setShowProposalPrompt] = useState(false);
 
+    // Carousel: track which image is "active" per ad id
+    const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({});
+    const [showImageDebug, setShowImageDebug] = useState(false);
+
     // FAST: Fetch trend data for charts — separate from AI to render instantly
     const fetchTrend = async () => {
         setIsLoadingTrend(true);
@@ -1390,6 +1395,117 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                     {/* Overview Tab */}
                     {activeTab === 'overview' && (
                         <>
+                            {/* COPY DEBUG — Overview */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                                <button
+                                    onClick={() => {
+                                        const rec = campaign.actionRecommendation;
+                                        const aiBands = rec?.debugData?.processing?.bands;
+                                        const tags = rec?.metricTags || [];
+
+                                        // Compute bands locally for debug
+                                        const computeBandDebug = (key: 'cpp' | 'ctr' | 'roas') => {
+                                            const band = aiBands?.[key];
+                                            if (band?.ma) return band;
+                                            const vals = dailyTrend
+                                                .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
+                                                .filter((v: number) => v > 0);
+                                            if (vals.length < 3) return null;
+                                            const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
+                                            const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                            const sigma = Math.sqrt(variance);
+                                            const windowVals = vals.slice(-7);
+                                            const windowAvg = windowVals.length > 0
+                                                ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
+                                                : ma;
+                                            const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
+                                            return { ma, sigma, windowAvg, zScore };
+                                        };
+
+                                        const getStatusLabel = (zScore: number | undefined, isInverse: boolean) => {
+                                            if (zScore === undefined) return '—';
+                                            const ez = isInverse ? -zScore : zScore;
+                                            if (ez <= -2.0) return 'NGUY HIỂM';
+                                            if (ez <= -1.0) return 'YẾU';
+                                            if (ez <= -0.5) return 'CẦN THEO DÕI';
+                                            if (ez < 0.5) return 'ỔN ĐỊNH';
+                                            if (ez < 1.0) return 'TỐT';
+                                            return 'XUẤT SẮC';
+                                        };
+
+                                        const ctrB = computeBandDebug('ctr');
+                                        const cppB = computeBandDebug('cpp');
+                                        const roasB = computeBandDebug('roas');
+
+                                        const ageDays = campaign.created_time
+                                            ? Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / 86400000)
+                                            : null;
+
+                                        const lines = [
+                                            `===== TỔNG QUAN DEBUG — ${campaign.name} =====`,
+                                            `ID: ${campaign.id}`,
+                                            `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
+                                            ageDays !== null ? `Tuổi: ${ageDays} ngày` : '',
+                                            campaign.daily_budget ? `Ngân sách/ngày: ${formatMoney(campaign.daily_budget)}` : '',
+                                            campaign.daily_budget_estimated ? `Ngân sách ước tính/ngày: ${formatMoney(campaign.daily_budget_estimated)}` : '',
+                                            ``,
+                                            `--- METRICS TỔNG ---`,
+                                            `Chi tiêu: ${formatMoney(campaign.totals.spend)}`,
+                                            `Đơn: ${campaign.totals.purchases}`,
+                                            `Doanh thu: ${formatMoney(campaign.totals.revenue)}`,
+                                            `CPP: ${formatMoney(campaign.totals.cpp)}`,
+                                            `ROAS: ${campaign.totals.roas.toFixed(2)}x`,
+                                            `CTR: ${campaign.totals.ctr.toFixed(2)}%`,
+                                            ``,
+                                            `--- TRẠNG THÁI ---`,
+                                            `Giai đoạn: ${rec?.debugData?.processing?.lifeCycleStage || 'N/A'}`,
+                                            `Health Score: ${rec?.healthScore ?? 'N/A'}`,
+                                            `Khuyến nghị: ${rec?.action || 'N/A'}`,
+                                            ``,
+                                            `--- PHÂN TÍCH CHỈ SỐ (7D vs TB lịch sử) ---`,
+                                            ctrB ? `CTR: ${(ctrB.windowAvg || 0).toFixed(2)}% | MA: ${(ctrB.ma || 0).toFixed(2)}% | Z: ${(ctrB.zScore || 0).toFixed(2)} | ${getStatusLabel(ctrB.zScore, false)}` : 'CTR: Không đủ data',
+                                            cppB ? `CPP: ${formatMoney(cppB.windowAvg || 0)} | MA: ${formatMoney(cppB.ma || 0)} | Z: ${(cppB.zScore || 0).toFixed(2)} | ${getStatusLabel(cppB.zScore, true)}` : 'CPP: Không đủ data',
+                                            roasB ? `ROAS: ${(roasB.windowAvg || 0).toFixed(2)}x | MA: ${(roasB.ma || 0).toFixed(2)}x | Z: ${(roasB.zScore || 0).toFixed(2)} | ${getStatusLabel(roasB.zScore, false)}` : 'ROAS: Không đủ data',
+                                        ];
+
+                                        // Issues
+                                        if (campaign.issues.length > 0) {
+                                            lines.push('', '--- ISSUES ---');
+                                            campaign.issues.forEach(i => {
+                                                lines.push(`[${i.severity.toUpperCase()}] ${i.message} — ${i.detail} → ${i.action}`);
+                                            });
+                                        }
+
+                                        // Metric tags
+                                        if (tags.length > 0) {
+                                            lines.push('', '--- METRIC TAGS ---');
+                                            tags.forEach((t: any) => {
+                                                lines.push(`${t.metric}: ${t.tag} (Z=${t.zScore?.toFixed(2) || 'N/A'})`);
+                                            });
+                                        }
+
+                                        // Daily trend
+                                        if (dailyTrend.length > 0) {
+                                            lines.push('', '--- DAILY TREND ---');
+                                            lines.push('Date | Spend | Orders | CPP | CTR | ROAS');
+                                            dailyTrend.forEach((d: any) => {
+                                                lines.push(`${d.date} | ${formatMoney(d.spend)} | ${d.purchases} | ${formatMoney(d.cpp)} | ${d.ctr.toFixed(2)}% | ${d.roas?.toFixed(2) || 'N/A'}x`);
+                                            });
+                                        }
+
+                                        navigator.clipboard.writeText(lines.filter(l => l !== undefined).join('\n'));
+                                    }}
+                                    style={{
+                                        background: 'transparent', border: `1px solid ${colors.border}`,
+                                        color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
+                                        padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                        fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                    }}
+                                >
+                                    COPY DEBUG
+                                </button>
+                            </div>
+
                             {/* ═══ TICKER BAR ═══ */}
                             <div style={{
                                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
@@ -2096,44 +2212,60 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </span>
                                 </h3>
                                 {ads.length > 0 && (
-                                    <button
-                                        onClick={() => {
-                                            const totalSpend = campaign.totals.spend;
-                                            const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
-                                            const debugLines = ads.map((ad, i) => {
-                                                const ev = getContentScore(ad, totalSpend, avgCpp);
-                                                return [
-                                                    `--- Content ${i + 1}: ${ad.name} ---`,
-                                                    `ID: ${ad.id} | Status: ${ad.status}`,
-                                                    `Điểm: ${ev.score === -1 ? 'Ít data' : ev.score + '/10'} | FB chi: ${ev.spendShare.toFixed(1)}%`,
-                                                    `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
-                                                    `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
-                                                    `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
-                                                    `Chi tiết: ${ev.tip}`,
-                                                    `Daily data points: ${ad.dailyMetrics?.length || 0}`,
-                                                ].join('\n');
-                                            });
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                const totalSpend = campaign.totals.spend;
+                                                const avgCpp = campaign.totals.purchases > 0 ? totalSpend / campaign.totals.purchases : 0;
+                                                const debugLines = ads.map((ad, i) => {
+                                                    const ev = getContentScore(ad, totalSpend, avgCpp);
+                                                    return [
+                                                        `--- Content ${i + 1}: ${ad.name} ---`,
+                                                        `ID: ${ad.id} | Status: ${ad.status}`,
+                                                        `Điểm: ${ev.score === -1 ? 'Ít data' : ev.score + '/10'} | FB chi: ${ev.spendShare.toFixed(1)}%`,
+                                                        `Chi: ${formatMoney(ad.totals.spend)} | Thu: ${formatMoney(ad.totals.revenue)} | Đơn: ${ad.totals.purchases}`,
+                                                        `CPP: ${formatMoney(ad.totals.cpp)} | CTR: ${ad.totals.ctr.toFixed(2)}%`,
+                                                        `ROAS: ${ad.totals.revenue > 0 && ad.totals.spend > 0 ? (ad.totals.revenue / ad.totals.spend).toFixed(2) + 'x' : 'N/A'}`,
+                                                        `Chi tiết: ${ev.tip}`,
+                                                        `Daily data points: ${ad.dailyMetrics?.length || 0}`,
+                                                    ].join('\n');
+                                                });
 
-                                            const summary = [
-                                                `===== CONTENT DEBUG - ${campaign.name} =====`,
-                                                `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
-                                                `Tổng content: ${ads.length}`,
-                                                `Tổng chi tiêu campaign: ${formatMoney(totalSpend)}`,
-                                                ``,
-                                                ...debugLines,
-                                            ].join('\n\n');
+                                                const summary = [
+                                                    `===== CONTENT DEBUG - ${campaign.name} =====`,
+                                                    `Ngày: ${dateRange.startDate} → ${dateRange.endDate}`,
+                                                    `Tổng content: ${ads.length}`,
+                                                    `Tổng chi tiêu campaign: ${formatMoney(totalSpend)}`,
+                                                    ``,
+                                                    ...debugLines,
+                                                ].join('\n\n');
 
-                                            navigator.clipboard.writeText(summary);
-                                        }}
-                                        style={{
-                                            background: 'transparent', border: `1px solid ${colors.border}`,
-                                            color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
-                                            padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
-                                            fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
-                                        }}
-                                    >
-                                        COPY DEBUG
-                                    </button>
+                                                navigator.clipboard.writeText(summary);
+                                            }}
+                                            style={{
+                                                background: 'transparent', border: `1px solid ${colors.border}`,
+                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
+                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                            }}
+                                        >
+                                            COPY DEBUG
+                                        </button>
+                                        <button
+                                            onClick={() => setShowImageDebug(prev => !prev)}
+                                            style={{
+                                                background: showImageDebug ? '#0ECB81' : 'transparent',
+                                                border: `1px solid ${showImageDebug ? '#0ECB81' : colors.border}`,
+                                                color: showImageDebug ? '#000' : colors.textMuted,
+                                                fontSize: '0.625rem', fontWeight: 700,
+                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                                marginLeft: '4px',
+                                            }}
+                                        >
+                                            IMG DEBUG {showImageDebug ? 'ON' : 'OFF'}
+                                        </button>
+                                    </>
                                 )}
                             </div>
 
@@ -2173,35 +2305,76 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         overflow: 'hidden',
                                     }}>
                                         {/* Top: Image + Info side by side */}
-                                        <div style={{ display: 'flex', gap: '0' }}>
+                                        <div style={{ display: 'flex', gap: '0', position: 'relative' }}>
                                             {/* Image - larger */}
-                                            {/* Carousel: show all images */}
+                                            {/* Carousel: main image + thumbnail strip */}
                                             {ad.thumbnails && ad.thumbnails.length > 1 ? (
                                                 <div style={{
-                                                    width: '160px',
-                                                    height: '160px',
+                                                    width: '200px',
                                                     flexShrink: 0,
                                                     display: 'flex',
-                                                    overflowX: 'auto',
-                                                    scrollSnapType: 'x mandatory',
-                                                    scrollbarWidth: 'none',
-                                                    position: 'relative',
+                                                    flexDirection: 'column',
                                                 }}>
-                                                    {ad.thumbnails.map((img, i) => (
+                                                    {/* Main image with counter badge */}
+                                                    <div style={{ position: 'relative' }}>
                                                         <img
-                                                            key={i}
-                                                            src={img}
-                                                            alt={`${ad.name} - ${i + 1}`}
+                                                            src={ad.thumbnails[carouselIndex[ad.id] || 0]}
+                                                            alt={`${ad.name} - main`}
                                                             style={{
-                                                                width: '160px',
+                                                                width: '200px',
                                                                 height: '160px',
                                                                 objectFit: 'cover',
-                                                                flexShrink: 0,
-                                                                scrollSnapAlign: 'start',
                                                                 display: 'block',
+                                                                borderBottom: `1px solid ${colors.border}`,
                                                             }}
                                                         />
-                                                    ))}
+                                                        {/* Image counter badge */}
+                                                        <span style={{
+                                                            position: 'absolute',
+                                                            top: '6px',
+                                                            right: '6px',
+                                                            background: 'rgba(0,0,0,0.7)',
+                                                            color: '#fff',
+                                                            fontSize: '0.5625rem',
+                                                            fontWeight: 700,
+                                                            padding: '2px 6px',
+                                                            borderRadius: '3px',
+                                                            fontFamily: '"JetBrains Mono", monospace',
+                                                        }}>
+                                                            {(carouselIndex[ad.id] || 0) + 1}/{ad.thumbnails.length}
+                                                        </span>
+                                                    </div>
+                                                    {/* Thumbnail strip */}
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        gap: '3px',
+                                                        padding: '4px',
+                                                        overflowX: 'auto',
+                                                        scrollbarWidth: 'thin',
+                                                        background: colors.bg,
+                                                    }}>
+                                                        {ad.thumbnails.map((img, i) => (
+                                                            <img
+                                                                key={i}
+                                                                src={img}
+                                                                alt={`${ad.name} - ${i + 1}`}
+                                                                onClick={() => setCarouselIndex(prev => ({ ...prev, [ad.id]: i }))}
+                                                                style={{
+                                                                    width: '44px',
+                                                                    height: '44px',
+                                                                    objectFit: 'cover',
+                                                                    flexShrink: 0,
+                                                                    borderRadius: '3px',
+                                                                    cursor: 'pointer',
+                                                                    border: (carouselIndex[ad.id] || 0) === i
+                                                                        ? `2px solid ${colors.primary}`
+                                                                        : `2px solid transparent`,
+                                                                    opacity: (carouselIndex[ad.id] || 0) === i ? 1 : 0.6,
+                                                                    transition: 'opacity 0.15s, border-color 0.15s',
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             ) : ad.thumbnail ? (
                                                 <img
@@ -2225,6 +2398,29 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     flexShrink: 0,
                                                 }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textMuted }}>NO IMG</span>
+                                                </div>
+                                            )}
+
+                                            {/* Debug panel for image URLs */}
+                                            {showImageDebug && ad._debug && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    bottom: 0,
+                                                    background: 'rgba(0,0,0,0.92)',
+                                                    zIndex: 10,
+                                                    padding: '8px',
+                                                    overflow: 'auto',
+                                                    fontSize: '0.5625rem',
+                                                    fontFamily: '"JetBrains Mono", monospace',
+                                                    color: '#0ECB81',
+                                                    lineHeight: 1.4,
+                                                }}>
+                                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                                        {JSON.stringify(ad._debug, null, 1)}
+                                                    </pre>
                                                 </div>
                                             )}
 

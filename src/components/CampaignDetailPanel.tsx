@@ -2212,7 +2212,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     </span>
                                 </h3>
                                 {ads.length > 0 && (
-                                    <>
+                                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                                         <button
                                             onClick={() => {
                                                 const totalSpend = campaign.totals.spend;
@@ -2244,12 +2244,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             }}
                                             style={{
                                                 background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
-                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                color: colors.textMuted, fontSize: '0.5625rem', fontWeight: 700,
+                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
                                                 fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                                whiteSpace: 'nowrap' as const,
                                             }}
                                         >
-                                            COPY DEBUG
+                                            DEBUG
                                         </button>
                                         <button
                                             onClick={() => setShowImageDebug(prev => !prev)}
@@ -2257,15 +2258,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 background: showImageDebug ? '#0ECB81' : 'transparent',
                                                 border: `1px solid ${showImageDebug ? '#0ECB81' : colors.border}`,
                                                 color: showImageDebug ? '#000' : colors.textMuted,
-                                                fontSize: '0.625rem', fontWeight: 700,
-                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
+                                                fontSize: '0.5625rem', fontWeight: 700,
+                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
                                                 fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
-                                                marginLeft: '4px',
+                                                whiteSpace: 'nowrap' as const,
                                             }}
                                         >
-                                            IMG DEBUG {showImageDebug ? 'ON' : 'OFF'}
+                                            IMG {showImageDebug ? '✓' : '✗'}
                                         </button>
-                                    </>
+                                    </div>
                                 )}
                             </div>
 

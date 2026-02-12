@@ -65,7 +65,7 @@ const THRESHOLDS = {
     BURN_MONEY_SPEND: 500000,     // 500K không có đơn = đốt tiền
     CPP_INCREASE_DAYS: 3,         // 3 ngày CPP tăng liên tục
     CPP_INCREASE_PERCENT: 20,     // CPP tăng 20% = cảnh báo
-    MIN_ROAS: 1,                  // ROAS < 1 = lỗ
+    MIN_ROAS: 1,                  // ROAS < 1 = chi ads > doanh thu
     HIGH_FREQUENCY: 3,            // Frequency > 3 = audience burn
     CPM_SPIKE_PERCENT: 30,        // CPM tăng 30% = spike
     GOOD_CTR: 1.5,                // CTR > 1.5% là tốt
@@ -74,7 +74,7 @@ const THRESHOLDS = {
     SPEND_SPIKE_PERCENT: 200,     // Spend gấp 2 = spike
 
     // NEW: Profit-based thresholds (v2)
-    ROAS_LOSS: 2,                 // ROAS < 2 = chắc chắn lỗ (cost SP ~50%)
+    ROAS_LOSS: 2,                 // ROAS < 2 = không đủ bù vốn + chi phí (cost SP ~50%)
     ROAS_EXCELLENT: 4,            // ROAS >= 4 = xuất sắc, có thể scale
     ROAS_GOOD: 2.5,               // ROAS >= 2.5 = tốt
     VARIANCE_THRESHOLD: 20,       // ±20% = ngưỡng biến động bất thường
@@ -276,14 +276,14 @@ export function detectIssues(campaign: CampaignData): Issue[] {
         });
     }
 
-    // 1b. Có đơn nhưng lỗ (ROAS < 1)
+    // 1b. Có đơn nhưng chi ads > doanh thu (ROAS < 1)
     if (totals.purchases > 0 && totals.roas < THRESHOLDS.MIN_ROAS) {
-        const loss = totals.spend - totals.revenue;
+        const adLoss = totals.spend - totals.revenue;
         issues.push({
             type: 'losing_money',
             severity: 'critical',
-            message: 'Có đơn nhưng đang lỗ',
-            detail: `ROAS ${totals.roas.toFixed(2)}x, lỗ ${formatMoney(loss)}`,
+            message: 'Có đơn nhưng chi ads vượt doanh thu',
+            detail: `ROAS ${totals.roas.toFixed(2)}x, chi ads vượt thu ${formatMoney(adLoss)} (chưa tính vốn hàng, nhân sự)`,
             action: 'Giảm budget 50% hoặc tắt',
         });
     }
@@ -579,7 +579,7 @@ export function getRecommendedAction(
             action: 'STOP',
             reason: isBurningMoney
                 ? `Chi ${formatMoney(totals.spend)} không ra đơn`
-                : `ROAS ${totals.roas.toFixed(2)}x < 2 = Lỗ`,
+                : `ROAS ${totals.roas.toFixed(2)}x < 2 = Không đủ bù vốn + chi phí`,
             emoji: '🔴',
             color: '#F6465D',
             trendInfo: trend.summary,

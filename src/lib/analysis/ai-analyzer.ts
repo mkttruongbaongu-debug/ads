@@ -196,7 +196,7 @@ QUAN TRỌNG — BẠN PHẢI TỰ TÍNH BENCHMARK:
 QUY TẮC AN TOÀN
 ═══════════════════════════════════════════
 
-1. ROAS < 1 = ĐANG LỖ → verdict KHÔNG được là SCALE
+1. ROAS < 1 = CHI ADS VƯỢT DOANH THU → verdict KHÔNG được là SCALE
 2. Window ROAS (7 ngày gần nhất) mới phản ánh thực tế — ROAS tổng có thể misleading
 3. dataBasis.days PHẢI = TỔNG SỐ NGÀY data được cung cấp (đếm dailyTrend). KHÔNG tự ý cắt bớt.
 
@@ -430,17 +430,17 @@ function applyGuardrails(
         console.log(`[GUARDRAIL_v3] 📊 Trends: ${trendDetail}`);
     }
 
-    // RULE 1 (AN TOÀN): ROAS < 1 = ĐANG LỖ → KHÔNG được SCALE
+    // RULE 1 (AN TOÀN): ROAS < 1 = CHI ADS > DOANH THU → KHÔNG được SCALE
     action = result.verdict?.action;
     if (roas < 1 && action === 'SCALE') {
-        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 (lỗ) → không cho SCALE`;
+        overrideReason = `ROAS ${roas.toFixed(2)}x < 1 (chi ads > thu) → không cho SCALE`;
         console.warn(`[GUARDRAIL_v3] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
-            headline: `ROAS ${roas.toFixed(1)}x — Campaign đang lỗ`,
+            headline: `ROAS ${roas.toFixed(1)}x — Chi ads vượt doanh thu`,
             condition: result.verdict?.condition,
         };
-        result.reasoning = `[GUARDRAIL] ROAS < 1 = lỗ, không thể SCALE. ` + result.reasoning;
+        result.reasoning = `[GUARDRAIL] ROAS < 1 = chi ads vượt doanh thu, không thể SCALE. ` + result.reasoning;
     }
 
     // RULE 2 (AN TOÀN): ROAS < 1 + AI nói MAINTAIN → nâng lên REDUCE
@@ -450,10 +450,10 @@ function applyGuardrails(
         console.warn(`[GUARDRAIL_v3] ⚠️ ${overrideReason}`);
         result.verdict = {
             action: 'REDUCE',
-            headline: `ROAS ${roas.toFixed(1)}x — Campaign đang lỗ, cần giảm chi tiêu`,
+            headline: `ROAS ${roas.toFixed(1)}x — Chi ads vượt doanh thu, cần giảm chi tiêu`,
             condition: result.verdict?.condition,
         };
-        result.reasoning = `[GUARDRAIL] ROAS < 1 = đang lỗ tiền, không thể duy trì. ` + result.reasoning;
+        result.reasoning = `[GUARDRAIL] ROAS < 1 = chi ads vượt thu, không thể duy trì. ` + result.reasoning;
     }
 
     // --- Track guardrail result ---

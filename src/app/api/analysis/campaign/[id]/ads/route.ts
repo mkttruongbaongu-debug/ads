@@ -688,7 +688,7 @@ export async function GET(
             try {
                 const videoIds = Array.from(videoMap.keys()).join(',');
                 const vidRes = await fetch(
-                    `${FB_API_BASE}/?ids=${videoIds}&fields=picture,format&access_token=${accessToken}`
+                    `${FB_API_BASE}/?ids=${videoIds}&fields=picture,format,source&access_token=${accessToken}`
                 );
                 const vidData = await vidRes.json();
 
@@ -708,9 +708,13 @@ export async function GET(
                     if (bestPic) {
                         for (const idx of adIndexes) {
                             ads[idx].thumbnail = bestPic; // ALWAYS override for video
+                            if (vidInfo.source) {
+                                ads[idx].videoUrl = vidInfo.source;
+                            }
                             if (ads[idx]._debug) {
                                 ads[idx]._debug.step3 = 'video';
                                 ads[idx]._debug.step3_url = bestPic;
+                                ads[idx]._debug.step3_video = vidInfo.source ? 'yes' : 'no_source';
                             }
                         }
                         upgraded++;

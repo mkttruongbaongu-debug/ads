@@ -50,6 +50,7 @@ interface Ad {
     status: string;
     thumbnail: string | null;
     thumbnails?: string[];
+    videoUrl?: string | null;
     message?: string | null;
     link?: string | null;
     postUrl?: string | null;
@@ -2446,6 +2447,50 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             />
                                                         ))}
                                                     </div>
+                                                </div>
+                                            ) : ad.videoUrl ? (
+                                                <div style={{
+                                                    width: '160px',
+                                                    height: '160px',
+                                                    flexShrink: 0,
+                                                    position: 'relative',
+                                                    overflow: 'hidden',
+                                                }}>
+                                                    <video
+                                                        src={ad.videoUrl}
+                                                        poster={ad.thumbnail || undefined}
+                                                        autoPlay
+                                                        muted
+                                                        loop
+                                                        playsInline
+                                                        style={{
+                                                            width: '160px',
+                                                            height: '160px',
+                                                            objectFit: 'cover',
+                                                            display: 'block',
+                                                        }}
+                                                    />
+                                                    {/* Video indicator */}
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        bottom: '6px',
+                                                        left: '6px',
+                                                        background: 'rgba(0,0,0,0.6)',
+                                                        color: '#fff',
+                                                        fontSize: '0.5rem',
+                                                        fontWeight: 600,
+                                                        padding: '1px 5px',
+                                                        borderRadius: '3px',
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                    }}>
+                                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M8 5v14l11-7z" />
+                                                        </svg>
+                                                        VIDEO
+                                                    </span>
                                                 </div>
                                             ) : ad.thumbnail ? (
                                                 <img

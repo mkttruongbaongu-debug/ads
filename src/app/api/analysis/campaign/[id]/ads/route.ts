@@ -401,85 +401,52 @@ export async function GET(
         }
 
         // ===================================================================
-        // STEP 2.5: Individual post fetch with Page Token for ads STILL low-res
-        // If STEP 2 batch failed for some ads, retry individually with Page Token
+        // STEP 2.5: Request HD thumbnails via Creative API with thumbnail_width
+        // /{creative-id}?fields=thumbnail_url&thumbnail_width=1080
+        // This is the official Marketing API approach - no special permissions needed
         // ===================================================================
-        const lowResAdsForStep25: Array<{ idx: number; storyId: string; pageId: string }> = [];
+        const lowResAdsForStep25: Array<{ idx: number; creativeId: string }> = [];
         ads.forEach((ad: any, idx: number) => {
             if (videoAdIndexes.has(idx)) return;
             const thumb = ad.thumbnail || '';
             if (thumb.includes('p64x64') || thumb.includes('dst-emg0') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
-                const rawAd = (adsData.data || [])[idx];
-                const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
-                if (storyId) {
-                    const pageId = storyId.split('_')[0];
-                    lowResAdsForStep25.push({ idx, storyId, pageId });
+                const creativeId = ad.creativeId;
+                if (creativeId) {
+                    lowResAdsForStep25.push({ idx, creativeId });
                 }
             }
         });
 
         if (lowResAdsForStep25.length > 0) {
-            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, retrying with Page Token`);
+            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying Creative API with thumbnail_width=1080`);
             let upgraded25 = 0;
             await Promise.allSettled(
-                lowResAdsForStep25.map(async ({ idx, storyId, pageId }) => {
-                    const token = pageTokenMap.get(pageId) || accessToken;
-                    const tokenType = pageTokenMap.has(pageId) ? 'page' : 'user';
+                lowResAdsForStep25.map(async ({ idx, creativeId }) => {
                     try {
                         const res = await fetch(
-                            `${FB_API_BASE}/${storyId}?fields=full_picture,source,picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${token}`
+                            `${FB_API_BASE}/${creativeId}?fields=thumbnail_url&thumbnail_width=1080&thumbnail_height=1080&access_token=${accessToken}`
                         );
                         const data = await res.json();
 
                         if (data.error) {
                             if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'POST_ERROR';
+                                ads[idx]._debug.step25 = 'CREATIVE_ERROR';
                                 ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 80)}`;
-                                ads[idx]._debug.step25_token = tokenType;
                             }
                             return;
                         }
 
-                        // Try subattachments (multiple images)
-                        const subs = data.attachments?.data?.[0]?.subattachments?.data || [];
-                        if (subs.length > 1) {
-                            const allImages = subs
-                                .map((s: any) => s?.media?.image?.src ? extractHighResUrl(s.media.image.src) : null)
-                                .filter((u: string | null): u is string => u !== null);
-                            if (allImages.length > 0) {
-                                ads[idx].thumbnails = allImages;
-                                ads[idx].thumbnail = allImages[0];
-                                if (ads[idx]._debug) {
-                                    ads[idx]._debug.step25 = 'multi';
-                                    ads[idx]._debug.step25_count = allImages.length;
-                                    ads[idx]._debug.step25_token = tokenType;
-                                }
-                                upgraded25++;
-                                return;
+                        const hdUrl = data.thumbnail_url;
+                        if (hdUrl && !hdUrl.includes('p64x64')) {
+                            ads[idx].thumbnail = hdUrl;
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step25 = 'creative_hd';
+                                ads[idx]._debug.step25_url = hdUrl;
                             }
-                        }
-
-                        // Single image: attachment > full_picture > source > picture
-                        const attachment = data.attachments?.data?.[0];
-                        const bestUrl = attachment?.media?.image?.src
-                            || data.full_picture
-                            || data.source
-                            || data.picture;
-                        if (bestUrl) {
-                            const upgraded = extractHighResUrl(bestUrl);
-                            if (!upgraded.includes('p64x64')) {
-                                ads[idx].thumbnail = upgraded;
-                                if (ads[idx]._debug) {
-                                    ads[idx]._debug.step25 = 'single';
-                                    ads[idx]._debug.step25_url = upgraded;
-                                    ads[idx]._debug.step25_token = tokenType;
-                                }
-                                upgraded25++;
-                            }
+                            upgraded25++;
                         } else if (ads[idx]._debug) {
-                            ads[idx]._debug.step25 = 'NO_DATA';
-                            ads[idx]._debug.step25_token = tokenType;
-                            ads[idx]._debug.step25_keys = Object.keys(data);
+                            ads[idx]._debug.step25 = hdUrl ? 'STILL_LOW_RES' : 'NO_URL';
+                            ads[idx]._debug.step25_url = hdUrl || null;
                         }
                     } catch (err: any) {
                         if (ads[idx]._debug) {
@@ -489,7 +456,7 @@ export async function GET(
                     }
                 })
             );
-            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Page Token`);
+            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Creative API thumbnail_width`);
         }
 
         // ===================================================================

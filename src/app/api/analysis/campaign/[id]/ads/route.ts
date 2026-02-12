@@ -401,6 +401,117 @@ export async function GET(
         }
 
         // ===================================================================
+        // STEP 2b: Retry failed multi-photo posts
+        // For ads where STEP 2 returned NOT_FOUND (user token can't read page posts),
+        // try: 1) Get page token via /{page-id}?fields=access_token
+        //      2) Retry individual post fetch with page token
+        // ===================================================================
+        const failedStoryAds: Array<{ idx: number; storyId: string; pageId: string }> = [];
+        ads.forEach((ad: any, idx: number) => {
+            if (videoAdIndexes.has(idx)) return;
+            if (ad.thumbnails && ad.thumbnails.length > 1) return; // Already have multi-images
+            if (ad._debug?.step2 === 'NOT_FOUND' || ad._debug?.step2 === 'POST_ERROR') {
+                const rawAd = (adsData.data || [])[idx];
+                const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
+                if (storyId) {
+                    const pageId = storyId.split('_')[0];
+                    failedStoryAds.push({ idx, storyId, pageId });
+                }
+            }
+        });
+
+        if (failedStoryAds.length > 0) {
+            console.log(`[API:ADS] 🔍 STEP 2b: ${failedStoryAds.length} posts failed, retrying with page tokens`);
+
+            // Collect unique pageIds that need tokens
+            const pagesNeedToken = new Set(failedStoryAds.map(a => a.pageId));
+            const newPageTokens = new Map<string, string>();
+
+            // Try to get page token for each page via direct query
+            await Promise.allSettled(
+                Array.from(pagesNeedToken).map(async (pageId) => {
+                    if (pageTokenMap.has(pageId)) {
+                        newPageTokens.set(pageId, pageTokenMap.get(pageId)!);
+                        return;
+                    }
+                    try {
+                        const res = await fetch(
+                            `${FB_API_BASE}/${pageId}?fields=access_token&access_token=${accessToken}`
+                        );
+                        const data = await res.json();
+                        if (data.access_token) {
+                            newPageTokens.set(pageId, data.access_token);
+                            console.log(`[API:ADS] 🔑 STEP 2b: Got page token for ${pageId}`);
+                        }
+                    } catch { }
+                })
+            );
+
+            // Retry fetching posts individually with page tokens
+            let multiFound = 0;
+            await Promise.allSettled(
+                failedStoryAds.map(async ({ idx, storyId, pageId }) => {
+                    const token = newPageTokens.get(pageId) || accessToken;
+                    const tokenType = newPageTokens.has(pageId) ? 'page_direct' : 'user_retry';
+                    try {
+                        const res = await fetch(
+                            `${FB_API_BASE}/${storyId}?fields=full_picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${token}`
+                        );
+                        const data = await res.json();
+                        if (data.error) {
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step2b = 'ERROR';
+                                ads[idx]._debug.step2b_token = tokenType;
+                                ads[idx]._debug.step2b_error = `${data.error.code}: ${data.error.message?.substring(0, 80)}`;
+                            }
+                            return;
+                        }
+
+                        const attachment = data.attachments?.data?.[0];
+                        const subs = attachment?.subattachments?.data || [];
+
+                        if (subs.length > 1) {
+                            const allImages: string[] = [];
+                            for (const sub of subs) {
+                                if (sub?.media?.image?.src) {
+                                    allImages.push(extractHighResUrl(sub.media.image.src));
+                                }
+                            }
+                            if (allImages.length > 0) {
+                                ads[idx].thumbnails = allImages;
+                                ads[idx].thumbnail = allImages[0];
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step2b = 'multi';
+                                    ads[idx]._debug.step2b_count = allImages.length;
+                                    ads[idx]._debug.step2b_token = tokenType;
+                                }
+                                multiFound++;
+                            }
+                        } else {
+                            const rawImage = attachment?.media?.image?.src || data.full_picture;
+                            if (rawImage) {
+                                ads[idx].thumbnail = extractHighResUrl(rawImage);
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step2b = 'single';
+                                    ads[idx]._debug.step2b_token = tokenType;
+                                }
+                            } else if (ads[idx]._debug) {
+                                ads[idx]._debug.step2b = 'NO_IMAGE';
+                                ads[idx]._debug.step2b_token = tokenType;
+                            }
+                        }
+                    } catch (err: any) {
+                        if (ads[idx]._debug) {
+                            ads[idx]._debug.step2b = 'FETCH_ERROR';
+                            ads[idx]._debug.step2b_error = err?.message?.substring(0, 80);
+                        }
+                    }
+                })
+            );
+            console.log(`[API:ADS] 🖼️ STEP 2b: ${multiFound} multi-image posts found`);
+        }
+
+        // ===================================================================
         // STEP 2.5: HD thumbnails + multi-image via Creative API
         // 1) Fetch creative with object_story_spec → find child_attachments
         // 2) If image_hashes found → AdImage API for full URLs (Marketing API, no page perms needed)

@@ -1496,14 +1496,16 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         navigator.clipboard.writeText(lines.filter(l => l !== undefined).join('\n'));
                                     }}
                                     style={{
-                                        background: 'transparent', border: `1px solid ${colors.border}`,
-                                        color: colors.textMuted, fontSize: '0.75rem',
-                                        padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                        lineHeight: 1,
+                                        background: 'transparent', border: 'none',
+                                        color: colors.textSubtle, cursor: 'pointer',
+                                        padding: '4px', borderRadius: '3px', opacity: 0.35,
+                                        display: 'flex', alignItems: 'center',
                                     }}
-                                    title="Copy overview debug to clipboard"
+                                    title="Copy overview debug"
+                                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.35'; e.currentTarget.style.background = 'transparent'; }}
                                 >
-                                    📋
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
                                 </button>
                             </div>
 
@@ -1923,13 +1925,16 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
                                     }}
                                     style={{
-                                        padding: '2px 6px', fontSize: '0.75rem',
-                                        background: 'transparent', border: `1px solid ${colors.border}`,
-                                        borderRadius: '3px', color: colors.textSubtle, cursor: 'pointer',
-                                        lineHeight: 1,
+                                        background: 'transparent', border: 'none',
+                                        color: colors.textSubtle, cursor: 'pointer',
+                                        padding: '4px', borderRadius: '3px', opacity: 0.35,
+                                        display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle',
+                                        marginLeft: '6px',
                                     }}
-                                    title="Copy AI debug data to clipboard"
-                                >📋</button>
+                                    title="Copy AI debug"
+                                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.35'; e.currentTarget.style.background = 'transparent'; }}
+                                ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg></button>
                             </h3>
 
                             {!aiAnalysis && !isLoadingAI && !aiError && (
@@ -2165,13 +2170,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 navigator.clipboard.writeText(summary);
                                             }}
                                             style={{
-                                                background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.75rem',
-                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                                lineHeight: 1,
+                                                background: 'transparent', border: 'none',
+                                                color: colors.textSubtle, cursor: 'pointer',
+                                                padding: '4px', borderRadius: '3px', opacity: 0.35,
+                                                display: 'inline-flex', alignItems: 'center',
                                             }}
-                                            title="Copy content debug to clipboard"
-                                        >📋</button>
+                                            title="Copy content debug"
+                                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.opacity = '0.35'; e.currentTarget.style.background = 'transparent'; }}
+                                        ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg></button>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
                                         {ads.slice(0, 10).map((ad, i) => {
@@ -2245,28 +2252,32 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 navigator.clipboard.writeText(summary);
                                             }}
                                             style={{
-                                                background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.75rem',
-                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                                lineHeight: 1,
+                                                background: 'transparent', border: 'none',
+                                                color: colors.textSubtle, cursor: 'pointer',
+                                                padding: '4px', borderRadius: '3px', opacity: 0.35,
+                                                display: 'flex', alignItems: 'center',
                                             }}
-                                            title="Copy content debug to clipboard"
+                                            title="Copy content debug"
+                                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.opacity = '0.35'; e.currentTarget.style.background = 'transparent'; }}
                                         >
-                                            📋
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
                                         </button>
                                         <button
                                             onClick={() => setShowImageDebug(prev => !prev)}
                                             style={{
-                                                background: showImageDebug ? '#0ECB81' : 'transparent',
-                                                border: `1px solid ${showImageDebug ? '#0ECB81' : colors.border}`,
-                                                color: showImageDebug ? '#000' : colors.textMuted,
-                                                fontSize: '0.75rem',
-                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                                lineHeight: 1,
+                                                background: 'transparent', border: 'none',
+                                                color: showImageDebug ? '#0ECB81' : colors.textSubtle,
+                                                cursor: 'pointer',
+                                                padding: '4px', borderRadius: '3px',
+                                                opacity: showImageDebug ? 0.9 : 0.35,
+                                                display: 'flex', alignItems: 'center',
                                             }}
                                             title="Toggle image debug"
+                                            onMouseEnter={e => { if (!showImageDebug) { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } }}
+                                            onMouseLeave={e => { if (!showImageDebug) { e.currentTarget.style.opacity = '0.35'; e.currentTarget.style.background = 'transparent'; } }}
                                         >
-                                            🖼
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
                                         </button>
                                     </div>
                                 )}

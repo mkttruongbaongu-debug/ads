@@ -432,7 +432,7 @@ export async function GET(
                 lowResOrNoCarousel.map(async ({ idx, creativeId }) => {
                     try {
                         const res = await fetch(
-                            `${FB_API_BASE}/${creativeId}?fields=thumbnail_url,object_story_spec&thumbnail_width=1080&access_token=${accessToken}`
+                            `${FB_API_BASE}/${creativeId}?fields=thumbnail_url,object_story_spec&thumbnail_width=1080&thumbnail_height=1080&access_token=${accessToken}`
                         );
                         const data = await res.json();
 

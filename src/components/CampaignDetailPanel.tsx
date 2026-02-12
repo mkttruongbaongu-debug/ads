@@ -1497,12 +1497,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                     }}
                                     style={{
                                         background: 'transparent', border: `1px solid ${colors.border}`,
-                                        color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
-                                        padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
-                                        fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                        color: colors.textMuted, fontSize: '0.75rem',
+                                        padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
+                                        lineHeight: 1,
                                     }}
+                                    title="Copy overview debug to clipboard"
                                 >
-                                    COPY DEBUG
+                                    📋
                                 </button>
                             </div>
 
@@ -1922,13 +1923,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
                                     }}
                                     style={{
-                                        padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
+                                        padding: '2px 6px', fontSize: '0.75rem',
                                         background: 'transparent', border: `1px solid ${colors.border}`,
-                                        borderRadius: '4px', color: colors.textSubtle, cursor: 'pointer',
-                                        fontFamily: '"JetBrains Mono", monospace',
+                                        borderRadius: '3px', color: colors.textSubtle, cursor: 'pointer',
+                                        lineHeight: 1,
                                     }}
-                                    title="Copy full debug data to clipboard"
-                                >COPY DEBUG</button>
+                                    title="Copy AI debug data to clipboard"
+                                >📋</button>
                             </h3>
 
                             {!aiAnalysis && !isLoadingAI && !aiError && (
@@ -2165,11 +2166,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             }}
                                             style={{
                                                 background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.625rem', fontWeight: 700,
-                                                padding: '3px 8px', borderRadius: '3px', cursor: 'pointer',
-                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+                                                color: colors.textMuted, fontSize: '0.75rem',
+                                                padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
+                                                lineHeight: 1,
                                             }}
-                                        >COPY DEBUG</button>
+                                            title="Copy content debug to clipboard"
+                                        >📋</button>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
                                         {ads.slice(0, 10).map((ad, i) => {
@@ -2244,13 +2246,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             }}
                                             style={{
                                                 background: 'transparent', border: `1px solid ${colors.border}`,
-                                                color: colors.textMuted, fontSize: '0.5625rem', fontWeight: 700,
+                                                color: colors.textMuted, fontSize: '0.75rem',
                                                 padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
-                                                whiteSpace: 'nowrap' as const,
+                                                lineHeight: 1,
                                             }}
+                                            title="Copy content debug to clipboard"
                                         >
-                                            DEBUG
+                                            📋
                                         </button>
                                         <button
                                             onClick={() => setShowImageDebug(prev => !prev)}
@@ -2258,13 +2260,13 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 background: showImageDebug ? '#0ECB81' : 'transparent',
                                                 border: `1px solid ${showImageDebug ? '#0ECB81' : colors.border}`,
                                                 color: showImageDebug ? '#000' : colors.textMuted,
-                                                fontSize: '0.5625rem', fontWeight: 700,
+                                                fontSize: '0.75rem',
                                                 padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                                                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
-                                                whiteSpace: 'nowrap' as const,
+                                                lineHeight: 1,
                                             }}
+                                            title="Toggle image debug"
                                         >
-                                            IMG {showImageDebug ? '✓' : '✗'}
+                                            🖼
                                         </button>
                                     </div>
                                 )}

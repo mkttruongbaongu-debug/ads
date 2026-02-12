@@ -71,6 +71,26 @@ export async function GET(
             console.warn('[API:ADS] ⚠️ Could not fetch account_id:', err);
         }
 
+        // Fetch Page Access Tokens — needed to read page posts (bypasses pages_read_engagement Advanced Access)
+        // Page Tokens have inherent permission to read their own posts
+        const pageTokenMap = new Map<string, string>();
+        try {
+            const pagesRes = await fetch(
+                `${FB_API_BASE}/me/accounts?fields=id,access_token&limit=100&access_token=${accessToken}`
+            );
+            const pagesData = await pagesRes.json();
+            if (pagesData.data) {
+                for (const page of pagesData.data) {
+                    if (page.id && page.access_token) {
+                        pageTokenMap.set(page.id, page.access_token);
+                    }
+                }
+            }
+            console.log(`[API:ADS] 🔑 Page tokens: ${pageTokenMap.size} pages`);
+        } catch (err) {
+            console.warn('[API:ADS] ⚠️ Could not fetch page tokens:', err);
+        }
+
         // Fetch ads with daily insights and creative info
         // video_id needed to batch-fetch hi-res video thumbnails
         // image_hash needed for AdImage API fallback (STEP 5)
@@ -294,176 +314,172 @@ export async function GET(
         });
 
         if (storyIdMap.size > 0) {
-            try {
-                const storyIds = Array.from(storyIdMap.keys()).join(',');
-                const postRes = await fetch(
-                    `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${accessToken}`
-                );
-                const postData = await postRes.json();
+            // Group storyIds by pageId so we use the correct Page Token for each
+            const pageGroups = new Map<string, { storyId: string; adIndexes: number[] }[]>();
+            for (const [storyId, adIndexes] of storyIdMap) {
+                const pageId = storyId.split('_')[0];
+                if (!pageGroups.has(pageId)) pageGroups.set(pageId, []);
+                pageGroups.get(pageId)!.push({ storyId, adIndexes });
+            }
 
-                for (const [storyId, adIndexes] of storyIdMap) {
-                    const postInfo = postData[storyId];
-                    if (!postInfo) continue;
+            for (const [pageId, stories] of pageGroups) {
+                // Use Page Token if available, fallback to user token
+                const token = pageTokenMap.get(pageId) || accessToken;
+                const tokenType = pageTokenMap.has(pageId) ? 'page' : 'user';
+                try {
+                    const storyIds = stories.map(s => s.storyId).join(',');
+                    const postRes = await fetch(
+                        `${FB_API_BASE}/?ids=${storyIds}&fields=full_picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${token}`
+                    );
+                    const postData = await postRes.json();
 
-                    const attachment = postInfo.attachments?.data?.[0];
-                    const subs = attachment?.subattachments?.data || [];
-
-                    // Carousel: collect ALL subattachment images (highest quality source)
-                    if (subs.length > 1) {
-                        const allImages: string[] = [];
-                        for (const sub of subs) {
-                            if (sub?.media?.image?.src) {
-                                // Extract original URL from safe_image.php proxy for full resolution
-                                allImages.push(extractHighResUrl(sub.media.image.src));
-                            }
-                        }
-                        if (allImages.length > 0) {
+                    for (const { storyId, adIndexes } of stories) {
+                        const postInfo = postData[storyId];
+                        if (!postInfo || postInfo.error) {
                             for (const idx of adIndexes) {
-                                ads[idx].thumbnails = allImages;
-                                ads[idx].thumbnail = allImages[0];
                                 if (ads[idx]._debug) {
-                                    ads[idx]._debug.step2 = 'carousel';
-                                    ads[idx]._debug.step2_count = allImages.length;
-                                    ads[idx]._debug.step2_urls = allImages;
+                                    ads[idx]._debug.step2 = postInfo?.error ? 'POST_ERROR' : 'NOT_FOUND';
+                                    ads[idx]._debug.step2_token = tokenType;
+                                    if (postInfo?.error) ads[idx]._debug.step2_error = `${postInfo.error.code}: ${postInfo.error.message?.substring(0, 80)}`;
                                 }
                             }
+                            continue;
                         }
-                    } else {
-                        // Single image: use attachment or full_picture
-                        const rawImage = attachment?.media?.image?.src || postInfo.full_picture;
-                        const bestImage = rawImage ? extractHighResUrl(rawImage) : null;
-                        if (bestImage) {
-                            for (const idx of adIndexes) {
-                                ads[idx].thumbnail = bestImage;
-                                if (ads[idx]._debug) {
-                                    ads[idx]._debug.step2 = 'single';
-                                    ads[idx]._debug.step2_url = bestImage;
-                                    ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
-                                    ads[idx]._debug.step2_attachment_src = attachment?.media?.image?.src || null;
+
+                        const attachment = postInfo.attachments?.data?.[0];
+                        const subs = attachment?.subattachments?.data || [];
+
+                        // Multiple images: collect ALL subattachment images
+                        if (subs.length > 1) {
+                            const allImages: string[] = [];
+                            for (const sub of subs) {
+                                if (sub?.media?.image?.src) {
+                                    allImages.push(extractHighResUrl(sub.media.image.src));
+                                }
+                            }
+                            if (allImages.length > 0) {
+                                for (const idx of adIndexes) {
+                                    ads[idx].thumbnails = allImages;
+                                    ads[idx].thumbnail = allImages[0];
+                                    if (ads[idx]._debug) {
+                                        ads[idx]._debug.step2 = 'multi';
+                                        ads[idx]._debug.step2_count = allImages.length;
+                                        ads[idx]._debug.step2_token = tokenType;
+                                    }
                                 }
                             }
                         } else {
-                            // Debug: STEP 2 found post but no usable image
-                            for (const idx of adIndexes) {
-                                if (ads[idx]._debug) {
-                                    ads[idx]._debug.step2 = 'NO_IMAGE';
-                                    ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
-                                    ads[idx]._debug.step2_attachment_src = attachment?.media?.image?.src || null;
-                                    ads[idx]._debug.step2_has_attachment = !!attachment;
-                                    ads[idx]._debug.step2_sub_count = subs.length;
-                                    ads[idx]._debug.step2_post_keys = Object.keys(postInfo);
+                            // Single image: use attachment or full_picture
+                            const rawImage = attachment?.media?.image?.src || postInfo.full_picture;
+                            const bestImage = rawImage ? extractHighResUrl(rawImage) : null;
+                            if (bestImage) {
+                                for (const idx of adIndexes) {
+                                    ads[idx].thumbnail = bestImage;
+                                    if (ads[idx]._debug) {
+                                        ads[idx]._debug.step2 = 'single';
+                                        ads[idx]._debug.step2_url = bestImage;
+                                        ads[idx]._debug.step2_token = tokenType;
+                                    }
+                                }
+                            } else {
+                                for (const idx of adIndexes) {
+                                    if (ads[idx]._debug) {
+                                        ads[idx]._debug.step2 = 'NO_IMAGE';
+                                        ads[idx]._debug.step2_token = tokenType;
+                                        ads[idx]._debug.step2_full_picture = postInfo.full_picture || null;
+                                        ads[idx]._debug.step2_post_keys = Object.keys(postInfo);
+                                    }
                                 }
                             }
                         }
                     }
+                    console.log(`[API:ADS] 🖼️ STEP 2: Page ${pageId} (${tokenType} token) — ${stories.length} posts`);
+                } catch (err) {
+                    console.warn(`[API:ADS] ⚠️ STEP 2 failed for page ${pageId}:`, err);
                 }
-                console.log(`[API:ADS] 🖼️ STEP 2: Fetched ${storyIdMap.size} post images`);
-            } catch (err) {
-                console.warn('[API:ADS] ⚠️ STEP 2 failed:', err);
             }
         }
 
         // ===================================================================
-        // STEP 2.5: Ad Preview API for ads STILL with p64x64 URLs
-        // Uses /{adId}/previews — only needs ads_read permission (no pages_read_engagement)
-        // Parses HTML preview to extract full-res image URLs
+        // STEP 2.5: Individual post fetch with Page Token for ads STILL low-res
+        // If STEP 2 batch failed for some ads, retry individually with Page Token
         // ===================================================================
-        const lowResAdsForStep25: Array<{ idx: number; adId: string }> = [];
+        const lowResAdsForStep25: Array<{ idx: number; storyId: string; pageId: string }> = [];
         ads.forEach((ad: any, idx: number) => {
             if (videoAdIndexes.has(idx)) return;
             const thumb = ad.thumbnail || '';
             if (thumb.includes('p64x64') || thumb.includes('dst-emg0') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
-                lowResAdsForStep25.push({ idx, adId: ad.id });
+                const rawAd = (adsData.data || [])[idx];
+                const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
+                if (storyId) {
+                    const pageId = storyId.split('_')[0];
+                    lowResAdsForStep25.push({ idx, storyId, pageId });
+                }
             }
         });
 
         if (lowResAdsForStep25.length > 0) {
-            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying Ad Preview API`);
+            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, retrying with Page Token`);
             let upgraded25 = 0;
-            const results = await Promise.allSettled(
-                lowResAdsForStep25.map(async ({ idx, adId }) => {
+            await Promise.allSettled(
+                lowResAdsForStep25.map(async ({ idx, storyId, pageId }) => {
+                    const token = pageTokenMap.get(pageId) || accessToken;
+                    const tokenType = pageTokenMap.has(pageId) ? 'page' : 'user';
                     try {
                         const res = await fetch(
-                            `${FB_API_BASE}/${adId}/previews?ad_format=DESKTOP_FEED_STANDARD&access_token=${accessToken}`
+                            `${FB_API_BASE}/${storyId}?fields=full_picture,source,picture,attachments{media{image{src,height,width}},subattachments{media{image{src,height,width}}}}&access_token=${token}`
                         );
                         const data = await res.json();
 
                         if (data.error) {
                             if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'PREVIEW_ERROR';
-                                ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 100)}`;
+                                ads[idx]._debug.step25 = 'POST_ERROR';
+                                ads[idx]._debug.step25_error = `${data.error.code}: ${data.error.message?.substring(0, 80)}`;
+                                ads[idx]._debug.step25_token = tokenType;
                             }
                             return;
                         }
 
-                        let html = data.data?.[0]?.body || '';
-                        if (!html) {
-                            if (ads[idx]._debug) ads[idx]._debug.step25 = 'NO_HTML';
-                            return;
-                        }
-
-                        // Preview API returns iframe wrapper — extract iframe src and fetch real HTML
-                        const iframeSrcMatch = html.match(/src="(https?:[^"]+)"/);
-                        if (iframeSrcMatch && html.includes('<iframe')) {
-                            const iframeUrl = iframeSrcMatch[1].replace(/&amp;/g, '&');
-                            try {
-                                const iframeRes = await fetch(iframeUrl, {
-                                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-                                });
-                                html = await iframeRes.text();
-                            } catch {
+                        // Try subattachments (multiple images)
+                        const subs = data.attachments?.data?.[0]?.subattachments?.data || [];
+                        if (subs.length > 1) {
+                            const allImages = subs
+                                .map((s: any) => s?.media?.image?.src ? extractHighResUrl(s.media.image.src) : null)
+                                .filter((u: string | null): u is string => u !== null);
+                            if (allImages.length > 0) {
+                                ads[idx].thumbnails = allImages;
+                                ads[idx].thumbnail = allImages[0];
                                 if (ads[idx]._debug) {
-                                    ads[idx]._debug.step25 = 'IFRAME_FETCH_FAILED';
-                                    ads[idx]._debug.step25_iframe_url = iframeUrl.substring(0, 120);
+                                    ads[idx]._debug.step25 = 'multi';
+                                    ads[idx]._debug.step25_count = allImages.length;
+                                    ads[idx]._debug.step25_token = tokenType;
                                 }
+                                upgraded25++;
                                 return;
                             }
                         }
 
-                        // Extract all image src URLs from the fetched HTML
-                        const allUrls: string[] = [];
-                        const srcPattern = /src="(https?:[^"]+)"/gi;
-                        let m: RegExpExecArray | null;
-                        while ((m = srcPattern.exec(html)) !== null) {
-                            const url = m[1].replace(/&amp;/g, '&');
-                            if ((url.includes('scontent') || url.includes('fbcdn.net')) &&
-                                /\.(jpg|jpeg|png|webp)/i.test(url) &&
-                                !url.includes('emoji') && !url.includes('rsrc.php') &&
-                                !url.includes('/icons/') && !url.includes('logo') &&
-                                !url.includes('p64x64') && !url.includes('s64x64')) {
-                                allUrls.push(url);
+                        // Single image: attachment > full_picture > source > picture
+                        const attachment = data.attachments?.data?.[0];
+                        const bestUrl = attachment?.media?.image?.src
+                            || data.full_picture
+                            || data.source
+                            || data.picture;
+                        if (bestUrl) {
+                            const upgraded = extractHighResUrl(bestUrl);
+                            if (!upgraded.includes('p64x64')) {
+                                ads[idx].thumbnail = upgraded;
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step25 = 'single';
+                                    ads[idx]._debug.step25_url = upgraded;
+                                    ads[idx]._debug.step25_token = tokenType;
+                                }
+                                upgraded25++;
                             }
-                        }
-
-                        // Deduplicate
-                        const uniqueUrls = [...new Set(allUrls)];
-
-                        if (uniqueUrls.length > 1) {
-                            ads[idx].thumbnails = uniqueUrls;
-                            ads[idx].thumbnail = uniqueUrls[0];
-                            if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'preview_multi';
-                                ads[idx]._debug.step25_count = uniqueUrls.length;
-                            }
-                            upgraded25++;
-                        } else if (uniqueUrls.length === 1) {
-                            ads[idx].thumbnail = uniqueUrls[0];
-                            if (ads[idx]._debug) {
-                                ads[idx]._debug.step25 = 'preview_single';
-                                ads[idx]._debug.step25_url = uniqueUrls[0];
-                            }
-                            upgraded25++;
                         } else if (ads[idx]._debug) {
-                            ads[idx]._debug.step25 = 'NO_URLS_IN_HTML';
-                            ads[idx]._debug.step25_html_length = html.length;
-                            // Sample found src URLs for debugging
-                            const sampleSrcs: string[] = [];
-                            const debugPattern = /src="(https?:[^"]+)"/gi;
-                            let dm: RegExpExecArray | null;
-                            while ((dm = debugPattern.exec(html)) !== null && sampleSrcs.length < 3) {
-                                sampleSrcs.push(dm[1].substring(0, 100));
-                            }
-                            ads[idx]._debug.step25_sample_srcs = sampleSrcs;
+                            ads[idx]._debug.step25 = 'NO_DATA';
+                            ads[idx]._debug.step25_token = tokenType;
+                            ads[idx]._debug.step25_keys = Object.keys(data);
                         }
                     } catch (err: any) {
                         if (ads[idx]._debug) {
@@ -473,7 +489,7 @@ export async function GET(
                     }
                 })
             );
-            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Ad Preview API`);
+            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Page Token`);
         }
 
         // ===================================================================

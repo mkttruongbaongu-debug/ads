@@ -78,6 +78,7 @@ export async function GET(
                 date: day.date_start,
                 spend,
                 purchases: purchaseCount,
+                revenue: revenueAmount,
                 cpp: purchaseCount > 0 ? spend / purchaseCount : 0,
                 ctr: parseFloat(day.ctr || '0'),
                 roas: spend > 0 ? revenueAmount / spend : 0,

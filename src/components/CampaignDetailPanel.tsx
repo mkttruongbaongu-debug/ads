@@ -1433,7 +1433,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 const slice = dailyTrend.slice(i - WINDOW + 1, i + 1);
                                                 const tSpend = slice.reduce((s: number, d: any) => s + (d.spend || 0), 0);
                                                 const tPurch = slice.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
-                                                const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || 0), 0);
+                                                const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || (d.spend || 0) * (d.roas || 0)), 0);
                                                 if (key === 'cpp' && tPurch > 0) {
                                                     rollingVals.push(tSpend / tPurch);
                                                 } else if (key === 'roas' && tSpend > 0 && tRev > 0) {
@@ -1730,7 +1730,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         const slice = dailyTrend.slice(i - WINDOW + 1, i + 1);
                                         const tSpend = slice.reduce((s: number, d: any) => s + (d.spend || 0), 0);
                                         const tPurch = slice.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
-                                        const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || 0), 0);
+                                        const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || (d.spend || 0) * (d.roas || 0)), 0);
                                         if (key === 'cpp' && tPurch > 0) {
                                             rollingVals.push(tSpend / tPurch);
                                         } else if (key === 'roas' && tSpend > 0 && tRev > 0) {

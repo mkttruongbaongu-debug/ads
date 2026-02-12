@@ -2379,67 +2379,69 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             {/* Carousel: main image + thumbnail strip */}
                                             {ad.thumbnails && ad.thumbnails.length > 1 ? (
                                                 <div style={{
-                                                    width: '200px',
+                                                    width: '160px',
+                                                    height: '160px',
                                                     flexShrink: 0,
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                }}>
-                                                    {/* Main image with counter badge */}
-                                                    <div style={{ position: 'relative' }}>
-                                                        <img
-                                                            src={ad.thumbnails[carouselIndex[ad.id] || 0]}
-                                                            alt={`${ad.name} - main`}
-                                                            style={{
-                                                                width: '200px',
-                                                                height: '160px',
-                                                                objectFit: 'cover',
-                                                                display: 'block',
-                                                                borderBottom: `1px solid ${colors.border}`,
-                                                            }}
-                                                        />
-                                                        {/* Image counter badge */}
-                                                        <span style={{
-                                                            position: 'absolute',
-                                                            top: '6px',
-                                                            right: '6px',
-                                                            background: 'rgba(0,0,0,0.7)',
-                                                            color: '#fff',
-                                                            fontSize: '0.5625rem',
-                                                            fontWeight: 700,
-                                                            padding: '2px 6px',
-                                                            borderRadius: '3px',
-                                                            fontFamily: '"JetBrains Mono", monospace',
-                                                        }}>
-                                                            {(carouselIndex[ad.id] || 0) + 1}/{ad.thumbnails.length}
-                                                        </span>
-                                                    </div>
-                                                    {/* Thumbnail strip */}
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        gap: '3px',
-                                                        padding: '4px',
-                                                        overflowX: 'auto',
-                                                        scrollbarWidth: 'thin',
-                                                        background: colors.bg,
+                                                    position: 'relative',
+                                                    cursor: 'pointer',
+                                                }}
+                                                    onClick={() => setCarouselIndex(prev => ({
+                                                        ...prev,
+                                                        [ad.id]: ((prev[ad.id] || 0) + 1) % ad.thumbnails!.length,
+                                                    }))}
+                                                >
+                                                    {/* Main image */}
+                                                    <img
+                                                        src={ad.thumbnails[carouselIndex[ad.id] || 0]}
+                                                        alt={`${ad.name} - ${(carouselIndex[ad.id] || 0) + 1}`}
+                                                        style={{
+                                                            width: '160px',
+                                                            height: '160px',
+                                                            objectFit: 'cover',
+                                                            display: 'block',
+                                                        }}
+                                                    />
+                                                    {/* Counter badge */}
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: '6px',
+                                                        left: '6px',
+                                                        background: 'rgba(0,0,0,0.65)',
+                                                        color: '#fff',
+                                                        fontSize: '0.5625rem',
+                                                        fontWeight: 600,
+                                                        padding: '1px 5px',
+                                                        borderRadius: '3px',
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                        letterSpacing: '0.02em',
                                                     }}>
-                                                        {ad.thumbnails.map((img, i) => (
-                                                            <img
+                                                        {(carouselIndex[ad.id] || 0) + 1}/{ad.thumbnails.length}
+                                                    </span>
+                                                    {/* Bottom dot indicators */}
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        bottom: '6px',
+                                                        left: '50%',
+                                                        transform: 'translateX(-50%)',
+                                                        display: 'flex',
+                                                        gap: '4px',
+                                                    }}>
+                                                        {ad.thumbnails.map((_, i) => (
+                                                            <span
                                                                 key={i}
-                                                                src={img}
-                                                                alt={`${ad.name} - ${i + 1}`}
-                                                                onClick={() => setCarouselIndex(prev => ({ ...prev, [ad.id]: i }))}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setCarouselIndex(prev => ({ ...prev, [ad.id]: i }));
+                                                                }}
                                                                 style={{
-                                                                    width: '44px',
-                                                                    height: '44px',
-                                                                    objectFit: 'cover',
-                                                                    flexShrink: 0,
+                                                                    width: (carouselIndex[ad.id] || 0) === i ? '12px' : '5px',
+                                                                    height: '5px',
                                                                     borderRadius: '3px',
+                                                                    background: (carouselIndex[ad.id] || 0) === i
+                                                                        ? '#fff'
+                                                                        : 'rgba(255,255,255,0.45)',
+                                                                    transition: 'all 0.2s ease',
                                                                     cursor: 'pointer',
-                                                                    border: (carouselIndex[ad.id] || 0) === i
-                                                                        ? `2px solid ${colors.primary}`
-                                                                        : `2px solid transparent`,
-                                                                    opacity: (carouselIndex[ad.id] || 0) === i ? 1 : 0.6,
-                                                                    transition: 'opacity 0.15s, border-color 0.15s',
                                                                 }}
                                                             />
                                                         ))}

@@ -151,13 +151,14 @@ export function splitHistoryAndWindow(
 
 /**
  * Tính band (MA + σ) cho 1 metric từ dữ liệu lịch sử
+ * historyValues và windowValues đã được xử lý (lọc > 0 hoặc rolling aggregates)
  */
 function calculateSingleBand(
     historyValues: number[],
     windowValues: number[],
     isInverse: boolean  // true cho CPP (cao = xấu), false cho CTR/ROAS (cao = tốt)
 ): MetricBand | null {
-    // Lọc ra các giá trị > 0 (bỏ ngày không có data)
+    // Lọc ra các giá trị > 0 (bỏ entries không có data)
     const validHistory = historyValues.filter(v => v > 0);
     const validWindow = windowValues.filter(v => v > 0);
 
@@ -180,11 +181,68 @@ function calculateSingleBand(
     const windowAvg = validWindow.reduce((s, v) => s + v, 0) / validWindow.length;
 
     // Z-Score
-    // Cho CPP: z > 0 = xấu (CPP tăng so với TB), z < 0 = tốt (CPP giảm)
-    // Cho CTR/ROAS: z > 0 = tốt (tăng so với TB), z < 0 = xấu (giảm)
     const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
 
     return { ma, sigma, floor, ceiling, windowAvg, zScore };
+}
+
+/**
+ * Tính rolling aggregate ratios cho CPP/ROAS từ daily metrics.
+ * 
+ * Thay vì averaging daily CPP (vô nghĩa khi đơn rải rác: ngày 0 đơn → CPP=0),
+ * dùng rolling 7-day window: CPP = sum(spend) / sum(purchases)
+ * 
+ * VD: 87 ngày, 8 đơn → ~80 rolling windows, mỗi window tổng hợp 7 ngày
+ * → data points có ý nghĩa thống kê hơn
+ */
+function calculateRollingAggregates(
+    metrics: DailyMetric[],
+    type: 'cpp' | 'roas',
+    windowSize: number = 7
+): number[] {
+    const results: number[] = [];
+    if (metrics.length < windowSize) return results;
+
+    for (let i = windowSize - 1; i < metrics.length; i++) {
+        const window = metrics.slice(i - windowSize + 1, i + 1);
+        const totalSpend = window.reduce((s, m) => s + m.spend, 0);
+        const totalPurchases = window.reduce((s, m) => s + m.purchases, 0);
+        const totalRevenue = window.reduce((s, m) => s + (m.revenue || 0), 0);
+
+        if (type === 'cpp') {
+            // Chỉ tạo data point khi có ít nhất 1 đơn trong window
+            if (totalPurchases > 0) {
+                results.push(totalSpend / totalPurchases);
+            }
+        } else {
+            // ROAS: chỉ khi có cả spend và revenue
+            if (totalSpend > 0 && totalRevenue > 0) {
+                results.push(totalRevenue / totalSpend);
+            }
+        }
+    }
+    return results;
+}
+
+/**
+ * Tính aggregate ratio cho current window (7 ngày gần nhất).
+ * CPP = tổng_spend / tổng_purchases
+ * ROAS = tổng_revenue / tổng_spend  
+ */
+function calculateWindowAggregate(
+    windowMetrics: DailyMetric[],
+    type: 'cpp' | 'roas'
+): number | null {
+    if (windowMetrics.length === 0) return null;
+    const totalSpend = windowMetrics.reduce((s, m) => s + m.spend, 0);
+    const totalPurchases = windowMetrics.reduce((s, m) => s + m.purchases, 0);
+    const totalRevenue = windowMetrics.reduce((s, m) => s + (m.revenue || 0), 0);
+
+    if (type === 'cpp') {
+        return totalPurchases > 0 ? totalSpend / totalPurchases : null;
+    } else {
+        return totalSpend > 0 && totalRevenue > 0 ? totalRevenue / totalSpend : null;
+    }
 }
 
 /**
@@ -339,21 +397,28 @@ export function generateMetricTags(
     }
 
     // Tính bands cho từng metric
+    // CTR: dùng daily values (CTR có ý nghĩa per-day vì không phụ thuộc purchases)
     const ctrBand = calculateSingleBand(
         history.map(m => m.ctr),
         windowData.map(m => m.ctr),
         false // CTR cao = tốt
     );
 
+    // CPP/ROAS: dùng ROLLING AGGREGATE (ratio-of-sums) thay vì average-of-ratios
+    // → Tránh bị ảo khi đơn rải rác (VD: 8 đơn / 87 ngày)
+    const historyCppValues = calculateRollingAggregates(history, 'cpp');
+    const windowCppValue = calculateWindowAggregate(windowData, 'cpp');
     const cppBand = calculateSingleBand(
-        history.map(m => m.cpp),
-        windowData.map(m => m.cpp),
+        historyCppValues,
+        windowCppValue !== null ? [windowCppValue] : [],
         true  // CPP cao = xấu
     );
 
+    const historyRoasValues = calculateRollingAggregates(history, 'roas');
+    const windowRoasValue = calculateWindowAggregate(windowData, 'roas');
     const roasBand = calculateSingleBand(
-        history.map(m => m.roas),
-        windowData.map(m => m.roas),
+        historyRoasValues,
+        windowRoasValue !== null ? [windowRoasValue] : [],
         false // ROAS cao = tốt
     );
 

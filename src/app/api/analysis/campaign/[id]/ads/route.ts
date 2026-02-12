@@ -401,30 +401,38 @@ export async function GET(
         }
 
         // ===================================================================
-        // STEP 2.5: Request HD thumbnails via Creative API with thumbnail_width
-        // /{creative-id}?fields=thumbnail_url&thumbnail_width=1080
-        // This is the official Marketing API approach - no special permissions needed
+        // STEP 2.5: HD thumbnails + multi-image via Creative API
+        // 1) Fetch creative with object_story_spec → find child_attachments
+        // 2) If image_hashes found → AdImage API for full URLs (Marketing API, no page perms needed)
+        // 3) Fallback: thumbnail_url with thumbnail_width=1080 for single images
         // ===================================================================
-        const lowResAdsForStep25: Array<{ idx: number; creativeId: string }> = [];
+        const lowResOrNoCarousel: Array<{ idx: number; creativeId: string }> = [];
         ads.forEach((ad: any, idx: number) => {
             if (videoAdIndexes.has(idx)) return;
             const thumb = ad.thumbnail || '';
-            if (thumb.includes('p64x64') || thumb.includes('dst-emg0') || thumb.includes('_s.') || !thumb || thumb.length < 50) {
+            const needsHD = thumb.includes('p64x64') || thumb.includes('dst-emg0') || thumb.includes('_s.') || !thumb || thumb.length < 50;
+            const noCarousel = !ad.thumbnails || ad.thumbnails.length <= 1;
+            if (needsHD || noCarousel) {
                 const creativeId = ad.creativeId;
                 if (creativeId) {
-                    lowResAdsForStep25.push({ idx, creativeId });
+                    lowResOrNoCarousel.push({ idx, creativeId });
                 }
             }
         });
 
-        if (lowResAdsForStep25.length > 0) {
-            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResAdsForStep25.length} ads still low-res, trying Creative API with thumbnail_width=1080`);
+        if (lowResOrNoCarousel.length > 0) {
+            console.log(`[API:ADS] 🔍 STEP 2.5: ${lowResOrNoCarousel.length} ads — fetching HD + multi-image via Creative API`);
             let upgraded25 = 0;
+            let carouselFound = 0;
+
+            // Collect image_hashes to batch-fetch via AdImage API
+            const hashToAdIndexes = new Map<string, number[]>();
+
             await Promise.allSettled(
-                lowResAdsForStep25.map(async ({ idx, creativeId }) => {
+                lowResOrNoCarousel.map(async ({ idx, creativeId }) => {
                     try {
                         const res = await fetch(
-                            `${FB_API_BASE}/${creativeId}?fields=thumbnail_url&thumbnail_width=1080&access_token=${accessToken}`
+                            `${FB_API_BASE}/${creativeId}?fields=thumbnail_url,object_story_spec&thumbnail_width=1080&access_token=${accessToken}`
                         );
                         const data = await res.json();
 
@@ -436,6 +444,48 @@ export async function GET(
                             return;
                         }
 
+                        // Check for carousel / multi-image in object_story_spec
+                        const spec = data.object_story_spec;
+                        const childAttachments = spec?.link_data?.child_attachments || [];
+
+                        if (childAttachments.length > 1) {
+                            // Carousel: collect image_hashes and pictures
+                            const pictures: string[] = [];
+                            const hashes: string[] = [];
+                            for (const child of childAttachments) {
+                                if (child.picture) pictures.push(child.picture);
+                                if (child.image_hash) {
+                                    hashes.push(child.image_hash);
+                                    if (!hashToAdIndexes.has(child.image_hash)) hashToAdIndexes.set(child.image_hash, []);
+                                    hashToAdIndexes.get(child.image_hash)!.push(idx);
+                                }
+                            }
+
+                            if (pictures.length > 1) {
+                                ads[idx].thumbnails = pictures.map(p => extractHighResUrl(p));
+                                ads[idx].thumbnail = ads[idx].thumbnails[0];
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step25 = 'carousel_spec';
+                                    ads[idx]._debug.step25_count = pictures.length;
+                                    ads[idx]._debug.step25_hashes = hashes.length;
+                                }
+                                carouselFound++;
+                                upgraded25++;
+                                return; // Done — got carousel images
+                            }
+
+                            // Has hashes but no pictures — will batch-fetch via AdImage API below
+                            if (hashes.length > 1) {
+                                ads[idx]._debug_pending_hashes = hashes;
+                                if (ads[idx]._debug) {
+                                    ads[idx]._debug.step25 = 'carousel_hashes_pending';
+                                    ads[idx]._debug.step25_hash_count = hashes.length;
+                                }
+                                return;
+                            }
+                        }
+
+                        // Single image: use HD thumbnail
                         const hdUrl = data.thumbnail_url;
                         if (hdUrl && !hdUrl.includes('p64x64')) {
                             ads[idx].thumbnail = hdUrl;
@@ -456,7 +506,54 @@ export async function GET(
                     }
                 })
             );
-            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25}/${lowResAdsForStep25.length} upgraded via Creative API thumbnail_width`);
+
+            // Batch fetch image_hashes via AdImage API (if any pending)
+            if (hashToAdIndexes.size > 0 && adAccountId) {
+                let hashUrlMap: Map<string, string> | undefined;
+                try {
+                    const allHashes = Array.from(hashToAdIndexes.keys());
+                    const hashParam = JSON.stringify(allHashes);
+                    const imgRes = await fetch(
+                        `${FB_API_BASE}/${adAccountId}/adimages?hashes=${encodeURIComponent(hashParam)}&fields=hash,url_128,url&access_token=${accessToken}`
+                    );
+                    const imgData = await imgRes.json();
+
+                    if (imgData.data) {
+                        // Build hash → url map
+                        hashUrlMap = new Map<string, string>();
+                        for (const img of imgData.data) {
+                            if (img.hash && (img.url || img.url_128)) {
+                                hashUrlMap.set(img.hash, img.url || img.url_128);
+                            }
+                        }
+
+                        // Apply to ads with pending hashes
+                        for (const ad of ads as any[]) {
+                            if (ad._debug_pending_hashes && hashUrlMap) {
+                                const urls = ad._debug_pending_hashes
+                                    .map((h: string) => hashUrlMap!.get(h))
+                                    .filter((u: string | undefined): u is string => !!u);
+                                if (urls.length > 1) {
+                                    ad.thumbnails = urls;
+                                    ad.thumbnail = urls[0];
+                                    if (ad._debug) {
+                                        ad._debug.step25 = 'carousel_adimage';
+                                        ad._debug.step25_count = urls.length;
+                                    }
+                                    carouselFound++;
+                                    upgraded25++;
+                                }
+                                delete ad._debug_pending_hashes;
+                            }
+                        }
+                    }
+                    console.log(`[API:ADS] 🖼️ STEP 2.5 AdImage: ${hashUrlMap?.size ?? 0} hashes resolved`);
+                } catch (err) {
+                    console.warn(`[API:ADS] ⚠️ STEP 2.5 AdImage API failed:`, err);
+                }
+            }
+
+            console.log(`[API:ADS] 🖼️ STEP 2.5: ${upgraded25} upgraded, ${carouselFound} carousels found`);
         }
 
         // ===================================================================

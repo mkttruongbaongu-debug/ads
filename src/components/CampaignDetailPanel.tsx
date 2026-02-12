@@ -1404,22 +1404,51 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         const tags = rec?.metricTags || [];
 
                                         // Compute bands locally for debug
+                                        // CPP/ROAS: rolling aggregate (ratio-of-sums) | CTR: daily values
                                         const computeBandDebug = (key: 'cpp' | 'ctr' | 'roas') => {
                                             const band = aiBands?.[key];
                                             if (band?.ma) return band;
-                                            const vals = dailyTrend
-                                                .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
-                                                .filter((v: number) => v > 0);
-                                            if (vals.length < 3) return null;
-                                            const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
-                                            const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+
+                                            if (key === 'ctr') {
+                                                // CTR: daily values OK (có ý nghĩa per-day)
+                                                const vals = dailyTrend
+                                                    .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
+                                                    .filter((v: number) => v > 0);
+                                                if (vals.length < 3) return null;
+                                                const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
+                                                const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                                const sigma = Math.sqrt(variance);
+                                                const windowVals = vals.slice(-7);
+                                                const windowAvg = windowVals.length > 0
+                                                    ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
+                                                    : ma;
+                                                const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
+                                                return { ma, sigma, windowAvg, zScore };
+                                            }
+
+                                            // CPP/ROAS: rolling 7-day aggregate (ratio-of-sums)
+                                            const WINDOW = 7;
+                                            const rollingVals: number[] = [];
+                                            for (let i = WINDOW - 1; i < dailyTrend.length; i++) {
+                                                const slice = dailyTrend.slice(i - WINDOW + 1, i + 1);
+                                                const tSpend = slice.reduce((s: number, d: any) => s + (d.spend || 0), 0);
+                                                const tPurch = slice.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
+                                                const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || 0), 0);
+                                                if (key === 'cpp' && tPurch > 0) {
+                                                    rollingVals.push(tSpend / tPurch);
+                                                } else if (key === 'roas' && tSpend > 0 && tRev > 0) {
+                                                    rollingVals.push(tRev / tSpend);
+                                                }
+                                            }
+                                            if (rollingVals.length < 3) return null;
+
+                                            const ma = rollingVals.reduce((s, v) => s + v, 0) / rollingVals.length;
+                                            const variance = rollingVals.reduce((s, v) => s + (v - ma) ** 2, 0) / rollingVals.length;
                                             const sigma = Math.sqrt(variance);
-                                            const windowVals = vals.slice(-7);
-                                            const windowAvg = windowVals.length > 0
-                                                ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
-                                                : ma;
+                                            // Window = last rolling value (most recent 7-day window)
+                                            const windowAvg = rollingVals[rollingVals.length - 1];
                                             const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
-                                            return { ma, sigma, windowAvg, zScore };
+                                            return { ma, sigma, windowAvg, zScore, _rollingCount: rollingVals.length };
                                         };
 
                                         const getStatusLabel = (zScore: number | undefined, isInverse: boolean) => {
@@ -1675,19 +1704,45 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 const tags = rec?.metricTags || [];
 
                                 // Fallback: compute bands locally from dailyTrend when AI hasn't run yet
+                                // CPP/ROAS: rolling aggregate (ratio-of-sums) | CTR: daily values
                                 const computeLocalBandFull = (key: 'cpp' | 'ctr' | 'roas') => {
-                                    const vals = dailyTrend
-                                        .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
-                                        .filter((v: number) => v > 0);
-                                    if (vals.length < 3) return null;
-                                    const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
-                                    const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                    if (key === 'ctr') {
+                                        // CTR: daily values OK (meaningful per-day)
+                                        const vals = dailyTrend
+                                            .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
+                                            .filter((v: number) => v > 0);
+                                        if (vals.length < 3) return null;
+                                        const ma = vals.reduce((s: number, v: number) => s + v, 0) / vals.length;
+                                        const variance = vals.reduce((s: number, v: number) => s + (v - ma) ** 2, 0) / vals.length;
+                                        const sigma = Math.sqrt(variance);
+                                        const windowVals = vals.slice(-7);
+                                        const windowAvg = windowVals.length > 0
+                                            ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
+                                            : ma;
+                                        const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
+                                        return { ma, sigma, windowAvg, zScore };
+                                    }
+
+                                    // CPP/ROAS: rolling 7-day aggregate (ratio-of-sums)
+                                    const WINDOW = 7;
+                                    const rollingVals: number[] = [];
+                                    for (let i = WINDOW - 1; i < dailyTrend.length; i++) {
+                                        const slice = dailyTrend.slice(i - WINDOW + 1, i + 1);
+                                        const tSpend = slice.reduce((s: number, d: any) => s + (d.spend || 0), 0);
+                                        const tPurch = slice.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
+                                        const tRev = slice.reduce((s: number, d: any) => s + (d.revenue || 0), 0);
+                                        if (key === 'cpp' && tPurch > 0) {
+                                            rollingVals.push(tSpend / tPurch);
+                                        } else if (key === 'roas' && tSpend > 0 && tRev > 0) {
+                                            rollingVals.push(tRev / tSpend);
+                                        }
+                                    }
+                                    if (rollingVals.length < 3) return null;
+
+                                    const ma = rollingVals.reduce((s, v) => s + v, 0) / rollingVals.length;
+                                    const variance = rollingVals.reduce((s, v) => s + (v - ma) ** 2, 0) / rollingVals.length;
                                     const sigma = Math.sqrt(variance);
-                                    // Window avg = last 7 days
-                                    const windowVals = vals.slice(-7);
-                                    const windowAvg = windowVals.length > 0
-                                        ? windowVals.reduce((s: number, v: number) => s + v, 0) / windowVals.length
-                                        : ma;
+                                    const windowAvg = rollingVals[rollingVals.length - 1];
                                     const zScore = sigma > 0 ? (windowAvg - ma) / sigma : 0;
                                     return { ma, sigma, windowAvg, zScore };
                                 };

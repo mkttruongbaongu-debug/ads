@@ -1127,16 +1127,20 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
             };
         }
 
-        // --- CPP z-score ---
+        // --- CPP z-score (WEIGHTED MA: ratio-of-sums) ---
+        const histSpend = historyDays.reduce((s, d) => s + d.spend, 0);
+        const histPurch = historyDays.reduce((s, d) => s + d.purchases, 0);
         const histCPP = historyDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
-        const winCPP = windowDays.map(d => d.purchases > 0 ? d.spend / d.purchases : 0).filter(v => v > 0);
 
         let cppZRaw = 0, cppMA = 0, cppWindowAvg = 0;
-        if (histCPP.length >= 3 && winCPP.length > 0) {
-            cppMA = histCPP.reduce((s, v) => s + v, 0) / histCPP.length;
+        if (histPurch > 0 && histCPP.length >= 3) {
+            cppMA = histSpend / histPurch; // Weighted MA
             const cppVariance = histCPP.reduce((s, v) => s + Math.pow(v - cppMA, 2), 0) / histCPP.length;
             const cppSigma = Math.sqrt(cppVariance);
-            cppWindowAvg = winCPP.reduce((s, v) => s + v, 0) / winCPP.length;
+            // Window avg: also weighted
+            const winSpend = windowDays.reduce((s, d) => s + d.spend, 0);
+            const winPurch = windowDays.reduce((s, d) => s + d.purchases, 0);
+            cppWindowAvg = winPurch > 0 ? winSpend / winPurch : cppMA;
             cppZRaw = cppSigma > 0 ? (cppWindowAvg - cppMA) / cppSigma : 0;
         }
         // CAP z-score ±3σ — tránh giá trị cực đoan phá hoại điểm
@@ -1633,8 +1637,39 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
 
                                 // Fallback: compute ma/sigma locally when AI bands not yet available
+                                // CPP/ROAS: weighted MA (ratio-of-sums) | CTR/Spend: simple MA
                                 const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas' | 'spend') => {
                                     if (bands?.[key]?.ma) return bands[key];
+
+                                    if (key === 'cpp' || key === 'roas') {
+                                        // Weighted MA: sum(spend)/sum(purchases) for CPP, sum(revenue)/sum(spend) for ROAS
+                                        const totalSpend = dailyTrend.reduce((s: number, d: any) => s + (d.spend || 0), 0);
+                                        const totalPurchases = dailyTrend.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
+                                        const totalRevenue = dailyTrend.reduce((s: number, d: any) => s + (d.revenue || (d.spend || 0) * (d.roas || 0)), 0);
+
+                                        let ma: number | undefined;
+                                        if (key === 'cpp' && totalPurchases > 0) {
+                                            ma = totalSpend / totalPurchases;
+                                        } else if (key === 'roas' && totalSpend > 0 && totalRevenue > 0) {
+                                            ma = totalRevenue / totalSpend;
+                                        }
+                                        if (ma === undefined) return { ma: undefined, sigma: undefined };
+
+                                        // Sigma: based on daily weighted values (only days with purchases/spend)
+                                        const dailyVals = dailyTrend
+                                            .map((d: any) => {
+                                                if (key === 'cpp') return d.purchases > 0 ? d.spend / d.purchases : null;
+                                                return d.spend > 0 ? (d.revenue || d.spend * (d.roas || 0)) / d.spend : null;
+                                            })
+                                            .filter((v: number | null): v is number => v !== null && v > 0);
+                                        const variance = dailyVals.length > 0
+                                            ? dailyVals.reduce((s: number, v: number) => s + (v - ma!) ** 2, 0) / dailyVals.length
+                                            : 0;
+                                        const sigma = Math.sqrt(variance);
+                                        return { ma, sigma };
+                                    }
+
+                                    // CTR/Spend: simple MA (per-day values are meaningful)
                                     const vals = dailyTrend
                                         .map((d: any) => typeof d[key] === 'number' ? d[key] as number : 0)
                                         .filter((v: number) => v > 0);

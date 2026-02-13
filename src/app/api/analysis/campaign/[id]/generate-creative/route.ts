@@ -295,17 +295,26 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 
             log(`[IMG] Calling OpenRouter (attempt ${attempt}, ref=${useRef ? 'YES' : 'NO'})...`);
 
-            const response = await client.chat.completions.create({
-                model: 'google/gemini-3-pro-image-preview',
-                messages: [
-                    {
-                        role: 'user',
-                        content: contentParts,
-                    },
-                ],
-                // @ts-ignore - OpenRouter specific: modalities for image generation
-                modalities: ['image', 'text'],
-            } as any);
+            // 60-second timeout to prevent hanging
+            const TIMEOUT_MS = 60_000;
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error(`OpenRouter timeout after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS)
+            );
+
+            const response = await Promise.race([
+                client.chat.completions.create({
+                    model: 'google/gemini-3-pro-image-preview',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: contentParts,
+                        },
+                    ],
+                    // @ts-ignore - OpenRouter specific: modalities for image generation
+                    modalities: ['image', 'text'],
+                } as any),
+                timeoutPromise,
+            ]);
 
             // ─── DEBUG: Log raw response structure ───
             const message = response.choices?.[0]?.message;

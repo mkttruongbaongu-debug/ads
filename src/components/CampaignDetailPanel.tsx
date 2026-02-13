@@ -2528,14 +2528,41 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         }
                                                     }}
                                                 >
-                                                    {videoLoadState[ad.id] === 'loading' || videoLoadState[ad.id] === 'loaded' ? (
+                                                    {videoLoadState[ad.id] === 'error' ? (
+                                                        /* Error fallback: thumbnail + FB link */
+                                                        <div style={{ width: '160px', height: '160px', position: 'relative' }}>
+                                                            <img
+                                                                src={ad.thumbnail || ''}
+                                                                alt={ad.name}
+                                                                style={{ width: '160px', height: '160px', objectFit: 'cover', display: 'block' }}
+                                                            />
+                                                            {ad.postUrl && (
+                                                                <a
+                                                                    href={ad.postUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        bottom: '6px',
+                                                                        left: '50%',
+                                                                        transform: 'translateX(-50%)',
+                                                                        fontSize: '0.5rem', fontWeight: 600, color: '#fff',
+                                                                        background: 'rgba(0,0,0,0.7)', padding: '3px 8px',
+                                                                        borderRadius: '3px', textDecoration: 'none',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}
+                                                                >XEM TRÊN FB ↗</a>
+                                                            )}
+                                                        </div>
+                                                    ) : videoLoadState[ad.id] === 'loading' || videoLoadState[ad.id] === 'loaded' ? (
                                                         <video
                                                             src={ad.videoUrl!}
                                                             poster={ad.thumbnail || undefined}
                                                             muted
                                                             loop
                                                             playsInline
-                                                            preload="auto"
+                                                            preload="metadata"
                                                             style={{
                                                                 width: '160px',
                                                                 height: '160px',
@@ -2545,7 +2572,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             onError={() => {
                                                                 setVideoLoadState(prev => ({ ...prev, [ad.id]: 'error' }));
                                                             }}
-                                                            onLoadedData={(e) => {
+                                                            onLoadedMetadata={(e) => {
                                                                 setVideoLoadState(prev => ({ ...prev, [ad.id]: 'loaded' }));
                                                                 e.currentTarget.play().catch(() => { });
                                                             }}
@@ -2571,38 +2598,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             }}>ĐANG TẢI...</span>
                                                         </div>
                                                     )}
-                                                    {/* Fallback image when video fails */}
-                                                    <div data-fallback="true" style={{ display: 'none', width: '160px', height: '160px', position: 'relative' }}>
-                                                        <img
-                                                            src={ad.thumbnail || ''}
-                                                            alt={ad.name}
-                                                            style={{ width: '160px', height: '160px', objectFit: 'cover', display: 'block' }}
-                                                        />
-                                                        {ad.postUrl && (
-                                                            <a
-                                                                href={ad.postUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    bottom: '6px',
-                                                                    left: '50%',
-                                                                    transform: 'translateX(-50%)',
-                                                                    background: 'rgba(0,0,0,0.7)',
-                                                                    color: '#fff',
-                                                                    fontSize: '0.5rem',
-                                                                    fontWeight: 600,
-                                                                    padding: '2px 8px',
-                                                                    borderRadius: '3px',
-                                                                    textDecoration: 'none',
-                                                                    whiteSpace: 'nowrap' as const,
-                                                                }}
-                                                            >
-                                                                Xem trên FB
-                                                            </a>
-                                                        )}
-                                                    </div>
                                                     {/* Video indicator */}
                                                     <span style={{
                                                         position: 'absolute',
@@ -2793,7 +2788,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Auto-Prompt Modal */}
             {

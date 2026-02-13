@@ -263,7 +263,7 @@ export async function POST(
         const { id: campaignId } = await params;
         const body = await request.json();
 
-        const { creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
+        const { genMode, creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
 
         if (!creativeBrief) {
             return NextResponse.json(
@@ -342,22 +342,39 @@ export async function POST(
 
         const referenceUrls: string[] = topAdImageUrls || [];
         const generatedImages: string[] = [];
+        const mode = genMode || 'inspired';
 
-        // Force imageCount to match reference images count (1:1 cloning)
-        const effectiveImageCount = referenceUrls.length > 0 ? referenceUrls.length : captionResult.imageCount;
+        // Determine effective image count and reference strategy based on mode
+        let effectiveImageCount: number;
+        if (mode === 'clone' && referenceUrls.length > 0) {
+            // Clone: force imageCount to match reference images (1:1)
+            effectiveImageCount = referenceUrls.length;
+        } else {
+            // Inspired/Fresh: use AI's suggested count
+            effectiveImageCount = captionResult.imageCount;
+        }
+
         const effectivePrompts = captionResult.imagePrompts.slice(0, effectiveImageCount);
-        // Pad prompts if fewer than reference images
+        // Pad prompts if fewer than needed
         while (effectivePrompts.length < effectiveImageCount) {
             effectivePrompts.push(captionResult.imagePrompts[captionResult.imagePrompts.length - 1] || captionResult.imagePrompts[0]);
         }
 
-        console.log(`[GENERATE_CREATIVE] 🖼️ Generating ${effectiveImageCount} image(s) (${referenceUrls.length} reference images)...`);
+        console.log(`[GENERATE_CREATIVE] 🖼️ Mode: ${mode.toUpperCase()}, generating ${effectiveImageCount} image(s) (${referenceUrls.length} references)...`);
 
-        // Generate images in parallel — each referencing its corresponding original
+        // Generate images based on mode
         const imagePromises = effectivePrompts
             .map(async (prompt, idx) => {
-                const refImage = referenceUrls[idx] || null; // 1:1 mapping
-                console.log(`[GENERATE_CREATIVE] 🖼️ Generating image ${idx + 1}/${effectiveImageCount} (ref: ${refImage ? 'YES' : 'NO'})...`);
+                let refImage: string | null = null;
+                if (mode === 'clone') {
+                    // 1:1 mapping: each image gets its corresponding reference
+                    refImage = referenceUrls[idx] || null;
+                } else if (mode === 'inspired') {
+                    // Send the first available reference for general inspiration
+                    refImage = referenceUrls[idx % referenceUrls.length] || null;
+                }
+                // fresh: refImage stays null
+                console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? 'YES' : 'NO'}`);
                 const image = await generateImage(client, prompt, refImage, effectiveImageCount);
                 return { idx, image };
             });

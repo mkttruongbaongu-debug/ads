@@ -141,6 +141,10 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [adSetLoading, setAdSetLoading] = useState(false);
     const [adSetError, setAdSetError] = useState('');
 
+    // Generation mode
+    const [genMode, setGenMode] = useState<'clone' | 'inspired' | 'fresh'>('inspired');
+    const [selectedRefAdIdx, setSelectedRefAdIdx] = useState(0); // Index of ad to use as reference
+
     // Debug
     const [showDebug, setShowDebug] = useState(false);
 
@@ -262,11 +266,21 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         setGeneratedImages([]);
 
         try {
-            // Lấy full ảnh từ top winner ad (ad đầu tiên có purchases > 0)
-            const topWinnerAd = ads.find(a => a.metrics.purchases > 0);
-            const topAdImageUrls = topWinnerAd?.image_urls?.length
-                ? topWinnerAd.image_urls
-                : [topWinnerAd?.image_url].filter(Boolean) as string[];
+            // Build reference URLs based on generation mode
+            let topAdImageUrls: string[] = [];
+            if (genMode === 'clone') {
+                // 1:1 clone: full ảnh từ ad được chọn
+                const topAdsWithPurchases = ads.filter(a => a.metrics.purchases > 0);
+                const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
+                topAdImageUrls = refAd?.image_urls?.length
+                    ? refAd.image_urls
+                    : [refAd?.image_url].filter(Boolean) as string[];
+            } else if (genMode === 'inspired') {
+                // Mix từ top 3 ads
+                const top3 = ads.filter(a => a.metrics.purchases > 0).slice(0, 3);
+                topAdImageUrls = top3.flatMap(a => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[];
+            }
+            // fresh: topAdImageUrls stays empty
 
             const res = await fetch(
                 `/api/analysis/campaign/${campaignId}/generate-creative`,
@@ -274,6 +288,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        genMode,
                         creativeBrief: intel.creativeBrief,
                         winningPatterns: intel.winningPatterns,
                         topAds: intel.topAds,
@@ -885,8 +900,94 @@ Tổng ads: ${ads.length}`}
                                         </div>
                                     )}
 
-                                    {/* ═══ TẠO CREATIVE BUTTON ═══ */}
+                                    {/* ═══ GENERATION MODE ═══ */}
                                     <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${colors.border}` }}>
+                                        <span style={{ fontSize: '0.5625rem', color: colors.textMuted, fontWeight: 700, letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>
+                                            CHẾ ĐỘ TẠO ẢNH
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                                            {([
+                                                { id: 'clone' as const, label: 'NHÂN BẢN', desc: 'Clone 1:1 từ ad mẫu', icon: '📋' },
+                                                { id: 'inspired' as const, label: 'CẢM HỨNG', desc: 'Mix từ top 3 ads', icon: '✨' },
+                                                { id: 'fresh' as const, label: 'MỚI HOÀN TOÀN', desc: 'Chỉ dùng brief', icon: '🆕' },
+                                            ]).map(mode => (
+                                                <button
+                                                    key={mode.id}
+                                                    onClick={() => setGenMode(mode.id)}
+                                                    style={{
+                                                        flex: 1, padding: '8px 6px',
+                                                        background: genMode === mode.id ? `${colors.primary}15` : colors.bg,
+                                                        border: `1px solid ${genMode === mode.id ? colors.primary : colors.border}`,
+                                                        borderRadius: '6px', cursor: 'pointer',
+                                                        textAlign: 'center' as const,
+                                                        transition: 'all 0.15s',
+                                                    }}
+                                                >
+                                                    <div style={{ fontSize: '0.875rem', marginBottom: '2px' }}>{mode.icon}</div>
+                                                    <div style={{
+                                                        fontSize: '0.5625rem', fontWeight: 700,
+                                                        color: genMode === mode.id ? colors.primary : colors.text,
+                                                        letterSpacing: '0.05em',
+                                                    }}>{mode.label}</div>
+                                                    <div style={{ fontSize: '0.5rem', color: colors.textMuted, marginTop: '1px' }}>
+                                                        {mode.desc}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Ad selector — only for clone mode */}
+                                        {genMode === 'clone' && ads.filter(a => a.metrics.purchases > 0).length > 1 && (
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <span style={{ fontSize: '0.5625rem', color: colors.textMuted, fontWeight: 700, letterSpacing: '0.05em' }}>
+                                                    CHỌN AD LÀM MẪU
+                                                </span>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', overflowX: 'auto' as const, paddingBottom: '4px' }}>
+                                                    {ads.filter(a => a.metrics.purchases > 0).slice(0, 5).map((ad, i) => (
+                                                        <button
+                                                            key={ad.ad_id}
+                                                            onClick={() => setSelectedRefAdIdx(i)}
+                                                            style={{
+                                                                minWidth: '80px', padding: '6px',
+                                                                background: selectedRefAdIdx === i ? `${colors.accent}15` : colors.bg,
+                                                                border: `1px solid ${selectedRefAdIdx === i ? colors.accent : colors.border}`,
+                                                                borderRadius: '6px', cursor: 'pointer',
+                                                                textAlign: 'center' as const,
+                                                            }}
+                                                        >
+                                                            {ad.image_url && (
+                                                                <img
+                                                                    src={ad.image_url}
+                                                                    alt=""
+                                                                    style={{ width: '48px', height: '48px', objectFit: 'cover' as const, borderRadius: '3px', marginBottom: '3px' }}
+                                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                />
+                                                            )}
+                                                            <div style={{
+                                                                fontSize: '0.5rem', fontWeight: 600,
+                                                                color: selectedRefAdIdx === i ? colors.accent : colors.textMuted,
+                                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+                                                                maxWidth: '72px',
+                                                            }}>
+                                                                {ad.ad_name.slice(0, 15)}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.5rem', color: colors.accent }}>
+                                                                ROAS {ad.metrics.roas.toFixed(1)}x
+                                                            </div>
+                                                            {ad.image_urls && ad.image_urls.length > 1 && (
+                                                                <div style={{ fontSize: '0.4375rem', color: colors.textMuted }}>
+                                                                    {ad.image_urls.length} ảnh
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* ═══ TẠO CREATIVE BUTTON ═══ */}
+                                    <div style={{ marginTop: '8px' }}>
                                         <button
                                             onClick={generateCreative}
                                             disabled={isGenerating}

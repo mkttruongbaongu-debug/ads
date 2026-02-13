@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getValidAccessToken } from '@/lib/facebook/token';
+import { calculateROAS } from '@/lib/facebook/metrics';
 
 const FB_API_VERSION = 'v21.0';
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
@@ -81,7 +82,7 @@ export async function GET(
                 revenue: revenueAmount,
                 cpp: purchaseCount > 0 ? spend / purchaseCount : 0,
                 ctr: parseFloat(day.ctr || '0'),
-                roas: spend > 0 ? revenueAmount / spend : 0,
+                roas: calculateROAS({ revenue: revenueAmount, spend }),
             };
         });
 

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDynamicFacebookClient } from '@/lib/facebook/client';
-import { IMPORTANT_ACTION_TYPES, calculateDerivedMetrics } from '@/lib/facebook/metrics';
+import { IMPORTANT_ACTION_TYPES, calculateDerivedMetrics, calculateROAS } from '@/lib/facebook/metrics';
 
 // Helper to find action value by types
 function findAction(
@@ -127,9 +127,12 @@ export async function GET(request: NextRequest) {
             const videoP100 = insight.video_p100_watched_actions?.[0]?.value
                 ? parseInt(insight.video_p100_watched_actions[0].value) : 0;
 
-            // ROAS
-            const roas = insight.purchase_roas?.[0]?.value
-                ? parseFloat(insight.purchase_roas[0].value) : 0;
+            // ROAS — unified calculation
+            const roas = calculateROAS({
+                purchaseRoas: insight.purchase_roas?.[0]?.value ? parseFloat(insight.purchase_roas[0].value) : undefined,
+                revenue: purchaseValue,
+                spend,
+            });
 
             // ========================================
             // DERIVED METRICS - Calculated
@@ -201,7 +204,7 @@ export async function GET(request: NextRequest) {
                 aov: derived.aov,
                 cac: derived.cac,
                 cvr: derived.cvr,
-                roas: roas || derived.roas,
+                roas,
                 gross_profit: derived.gross_profit,
                 profit_margin: derived.profit_margin,
 

@@ -181,6 +181,29 @@ export interface DerivedMetrics {
 // ============================================================================
 // HELPER FUNCTIONS FOR DERIVED METRICS
 // ============================================================================
+// ============================================================================
+// ROAS CALCULATION — SINGLE SOURCE OF TRUTH
+// Priority: purchase_roas (Facebook official) > revenue / spend (manual fallback)
+// ============================================================================
+/**
+ * Thống nhất cách tính ROAS cho toàn bộ hệ thống.
+ * - purchase_roas: Facebook trả sẵn, đã xử lý attribution chuẩn (ưu tiên #1)
+ * - revenue / spend: tính thủ công từ action_values (fallback)
+ */
+export function calculateROAS(params: {
+    purchaseRoas?: number;   // Facebook purchase_roas[0].value
+    revenue?: number;        // action_values purchase
+    spend?: number;          // total spend
+}): number {
+    // Priority 1: Facebook official ROAS
+    if (params.purchaseRoas && params.purchaseRoas > 0) return params.purchaseRoas;
+    // Priority 2: Manual calculation
+    if (params.spend && params.spend > 0 && params.revenue && params.revenue > 0) {
+        return params.revenue / params.spend;
+    }
+    return 0;
+}
+
 export function calculateDerivedMetrics(raw: {
     spend: number;
     impressions: number;
@@ -198,6 +221,7 @@ export function calculateDerivedMetrics(raw: {
     video_p100: number;
     ctr: number;
     link_ctr: number;
+    purchaseRoas?: number;  // Facebook purchase_roas[0].value (optional)
 }): DerivedMetrics {
     const safeDiv = (a: number, b: number) => b > 0 ? a / b : 0;
 
@@ -206,7 +230,7 @@ export function calculateDerivedMetrics(raw: {
         aov: safeDiv(raw.revenue, raw.purchases),
         cac: safeDiv(raw.spend, raw.purchases),
         cvr: safeDiv(raw.purchases, raw.clicks) * 100,
-        roas: safeDiv(raw.revenue, raw.spend),
+        roas: calculateROAS({ purchaseRoas: raw.purchaseRoas, revenue: raw.revenue, spend: raw.spend }),
         mer: safeDiv(raw.revenue, raw.spend),
 
         // Profit Analysis

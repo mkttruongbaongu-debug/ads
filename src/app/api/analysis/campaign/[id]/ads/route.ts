@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getValidAccessToken } from '@/lib/facebook/token';
+import { calculateROAS } from '@/lib/facebook/metrics';
 
 const FB_API_VERSION = 'v21.0';
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
@@ -99,7 +100,7 @@ export async function GET(
             `fields=id,name,status,effective_object_story_id,effective_image_url,` +
             `creative{id,thumbnail_url,image_url,image_hash,video_id,body,object_story_spec,effective_object_story_id},` +
             `insights.time_range({'since':'${startDate}','until':'${endDate}'}).time_increment(1){` +
-            `date_start,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm` +
+            `date_start,spend,impressions,clicks,actions,action_values,purchase_roas,ctr,cpc,cpm` +
             `}&limit=100&access_token=${accessToken}`
         );
 
@@ -141,6 +142,7 @@ export async function GET(
                     clicks: string;
                     actions?: Array<{ action_type: string; value: string }>;
                     action_values?: Array<{ action_type: string; value: string }>;
+                    purchase_roas?: Array<{ action_type: string; value: string }>;
                     ctr: string;
                     cpc: string;
                     cpm: string;
@@ -265,7 +267,7 @@ export async function GET(
                 totals: {
                     ...totals,
                     cpp: totals.purchases > 0 ? totals.spend / totals.purchases : 0,
-                    roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
+                    roas: calculateROAS({ revenue: totals.revenue, spend: totals.spend }),
                     ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
                 },
                 dailyMetrics: insightsData.map(day => {

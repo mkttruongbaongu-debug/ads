@@ -65,6 +65,10 @@ interface AnalysisData {
         critical: number;
         warning: number;
         good: number;
+        stopCount: number;
+        adjustCount: number;
+        watchCount: number;
+        scaleCount: number;
         totalSpend: number;
         totalRevenue: number;
     };
@@ -747,10 +751,10 @@ export default function DashboardPage() {
                                 onClick={() => setActiveView('creative')}
                                 style={{
                                     padding: '8px 16px',
-                                    background: activeView === 'creative' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
-                                    border: `1px solid ${activeView === 'creative' ? '#8B5CF6' : colors.border}`,
+                                    background: activeView === 'creative' ? 'rgba(240, 185, 11, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'creative' ? colors.primary : colors.border}`,
                                     borderRadius: '6px',
-                                    color: activeView === 'creative' ? '#8B5CF6' : colors.text,
+                                    color: activeView === 'creative' ? colors.primary : colors.text,
                                     fontSize: '0.875rem',
                                     fontWeight: 600,
                                     cursor: 'pointer',
@@ -759,8 +763,8 @@ export default function DashboardPage() {
                                 title="Mở Creative Studio - Tạo content mới cho chiến dịch bất kỳ"
                                 onMouseEnter={(e) => {
                                     if (activeView !== 'creative') {
-                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
-                                        e.currentTarget.style.borderColor = '#8B5CF6';
+                                        e.currentTarget.style.background = 'rgba(240, 185, 11, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.primary;
                                     }
                                 }}
                                 onMouseLeave={(e) => {
@@ -1049,8 +1053,8 @@ export default function DashboardPage() {
                                                 borderLeft: `4px solid ${c.actionRecommendation?.color || colors.textMuted}`,
                                             }}
                                             onMouseEnter={(e) => {
-                                                e.currentTarget.style.borderColor = '#8B5CF6';
-                                                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
+                                                e.currentTarget.style.borderColor = colors.primary;
+                                                e.currentTarget.style.background = 'rgba(240, 185, 11, 0.08)';
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.borderColor = colors.border;
@@ -1074,7 +1078,7 @@ export default function DashboardPage() {
                                             <div style={{
                                                 marginTop: '10px',
                                                 fontSize: '0.75rem', fontWeight: 700,
-                                                color: '#8B5CF6',
+                                                color: colors.primary,
                                             }}>
                                                 MỞ CREATIVE STUDIO →
                                             </div>
@@ -1479,7 +1483,7 @@ export default function DashboardPage() {
                                             {/* Secondary Row: Performance + Campaign Counts */}
                                             <div style={{
                                                 display: 'grid',
-                                                gridTemplateColumns: 'repeat(5, 1fr)',
+                                                gridTemplateColumns: 'repeat(6, 1fr)',
                                                 gap: '12px',
                                             }}>
                                                 {/* CVR */}
@@ -1512,7 +1516,7 @@ export default function DashboardPage() {
                                                     </p>
                                                 </div>
 
-                                                {/* Critical Count */}
+                                                {/* DỪNG Count */}
                                                 <div style={{
                                                     background: 'rgba(248,113,113,0.08)',
                                                     borderRadius: '8px',
@@ -1520,14 +1524,29 @@ export default function DashboardPage() {
                                                     border: `1px solid rgba(248,113,113,0.3)`,
                                                 }}>
                                                     <p style={{ fontSize: '0.65rem', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                        Cần xử lý
+                                                        Dừng
                                                     </p>
                                                     <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f87171', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                        {data.summary.critical}
+                                                        {data.summary.stopCount}
                                                     </p>
                                                 </div>
 
-                                                {/* Warning Count */}
+                                                {/* ĐIỀU CHỈNH Count */}
+                                                <div style={{
+                                                    background: 'rgba(255,140,0,0.08)',
+                                                    borderRadius: '8px',
+                                                    padding: '14px 18px',
+                                                    border: `1px solid rgba(255,140,0,0.3)`,
+                                                }}>
+                                                    <p style={{ fontSize: '0.65rem', color: '#FFB347', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                                                        Điều chỉnh
+                                                    </p>
+                                                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#FF8C00', margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
+                                                        {data.summary.adjustCount}
+                                                    </p>
+                                                </div>
+
+                                                {/* THEO DÕI Count */}
                                                 <div style={{
                                                     background: `rgba(240,185,11,0.08)`,
                                                     borderRadius: '8px',
@@ -1538,11 +1557,11 @@ export default function DashboardPage() {
                                                         Theo dõi
                                                     </p>
                                                     <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.warning, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                        {data.summary.warning}
+                                                        {data.summary.watchCount}
                                                     </p>
                                                 </div>
 
-                                                {/* Good Count */}
+                                                {/* TỐT / SCALE Count */}
                                                 <div style={{
                                                     background: 'rgba(14,203,129,0.08)',
                                                     borderRadius: '8px',
@@ -1550,10 +1569,10 @@ export default function DashboardPage() {
                                                     border: `1px solid rgba(14,203,129,0.3)`,
                                                 }}>
                                                     <p style={{ fontSize: '0.65rem', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
-                                                        Đang tốt
+                                                        Tốt / Scale
                                                     </p>
                                                     <p style={{ fontSize: '1.1rem', fontWeight: 600, color: colors.success, margin: 0, fontFamily: '"JetBrains Mono", monospace' }}>
-                                                        {data.summary.good}
+                                                        {data.summary.scaleCount}
                                                     </p>
                                                 </div>
                                             </div>

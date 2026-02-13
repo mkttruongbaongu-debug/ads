@@ -688,6 +688,11 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
         critical: number;
         warning: number;
         good: number;
+        // 4-action counts (matches per-campaign badges)
+        stopCount: number;
+        adjustCount: number;
+        watchCount: number;
+        scaleCount: number;
         totalSpend: number;
         totalRevenue: number;
     };
@@ -710,6 +715,14 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
         c.actionRecommendation.action === 'SCALE'
     );
 
+    // 4-action counts for summary cards
+    const stopCount = results.filter(c => c.actionRecommendation.action === 'STOP').length;
+    const adjustCount = results.filter(c => c.actionRecommendation.action === 'ADJUST').length;
+    const watchCount = results.filter(c => c.actionRecommendation.action === 'WATCH').length;
+    const scaleCount = results.filter(c =>
+        c.actionRecommendation.action === 'GOOD' || c.actionRecommendation.action === 'SCALE'
+    ).length;
+
     return {
         critical,
         warning,
@@ -719,6 +732,10 @@ export function analyzeCampaigns(campaigns: CampaignData[]): {
             critical: critical.length,
             warning: warning.length,
             good: good.length,
+            stopCount,
+            adjustCount,
+            watchCount,
+            scaleCount,
             totalSpend: campaigns.reduce((sum, c) => sum + c.totals.spend, 0),
             totalRevenue: campaigns.reduce((sum, c) => sum + c.totals.revenue, 0),
         },

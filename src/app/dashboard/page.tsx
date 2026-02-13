@@ -1037,53 +1037,82 @@ export default function DashboardPage() {
                             }
 
                             return (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
-                                    {allCampaigns.map(c => (
-                                        <button
-                                            key={c.id}
-                                            onClick={() => setCreativeStudioCampaign({ id: c.id, name: c.name })}
-                                            style={{
-                                                padding: '16px 20px',
-                                                background: colors.bgCard,
-                                                border: `1px solid ${colors.border}`,
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                textAlign: 'left',
-                                                transition: 'all 0.2s',
-                                                borderLeft: `4px solid ${c.actionRecommendation?.color || colors.textMuted}`,
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.borderColor = colors.primary;
-                                                e.currentTarget.style.background = 'rgba(240, 185, 11, 0.08)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.borderColor = colors.border;
-                                                e.currentTarget.style.background = colors.bgCard;
-                                            }}
-                                        >
-                                            <div style={{
-                                                fontSize: '0.9375rem', fontWeight: 600, color: colors.text,
-                                                marginBottom: '8px', lineHeight: 1.3,
-                                            }}>
-                                                {c.name}
-                                            </div>
-                                            <div style={{
-                                                display: 'flex', gap: '16px',
-                                                fontSize: '0.75rem', color: colors.textMuted,
-                                            }}>
-                                                <span>Spend: {formatMoney(c.totals.spend)}</span>
-                                                <span>CPP: {formatMoney(c.totals.cpp)}</span>
-                                                <span>ROAS: {c.totals.roas.toFixed(1)}x</span>
-                                            </div>
-                                            <div style={{
-                                                marginTop: '10px',
-                                                fontSize: '0.75rem', fontWeight: 700,
-                                                color: colors.primary,
-                                            }}>
-                                                MỞ CREATIVE STUDIO →
-                                            </div>
-                                        </button>
-                                    ))}
+                                <div style={{
+                                    border: `1px solid ${colors.border}`,
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                }}>
+                                    {/* Table Header */}
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '40px 1fr 120px 120px 80px',
+                                        padding: '10px 16px',
+                                        background: colors.bgAlt,
+                                        borderBottom: `1px solid ${colors.border}`,
+                                        fontSize: '0.625rem',
+                                        fontWeight: 700,
+                                        color: colors.textMuted,
+                                        letterSpacing: '0.08em',
+                                        textTransform: 'uppercase' as const,
+                                    }}>
+                                        <span>#</span>
+                                        <span>CHIẾN DỊCH</span>
+                                        <span style={{ textAlign: 'right' }}>SPEND</span>
+                                        <span style={{ textAlign: 'right' }}>CPP</span>
+                                        <span style={{ textAlign: 'right' }}>ROAS</span>
+                                    </div>
+
+                                    {/* Table Rows */}
+                                    {allCampaigns
+                                        .sort((a, b) => b.totals.roas - a.totals.roas)
+                                        .map((c, i) => {
+                                            const roas = c.totals.roas;
+                                            const roasColor = roas >= 8 ? colors.success : roas >= 4 ? colors.warning : '#f87171';
+                                            return (
+                                                <div
+                                                    key={c.id}
+                                                    onClick={() => setCreativeStudioCampaign({ id: c.id, name: c.name })}
+                                                    style={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: '40px 1fr 120px 120px 80px',
+                                                        padding: '12px 16px',
+                                                        borderBottom: i < allCampaigns.length - 1 ? `1px solid ${colors.border}` : 'none',
+                                                        cursor: 'pointer',
+                                                        transition: 'background 0.15s',
+                                                        alignItems: 'center',
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(240, 185, 11, 0.05)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    <span style={{
+                                                        fontSize: '0.75rem', color: colors.textMuted,
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                    }}>{i + 1}</span>
+                                                    <span style={{
+                                                        fontSize: '0.8125rem', fontWeight: 600, color: colors.text,
+                                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+                                                        paddingRight: '16px',
+                                                    }}>{c.name}</span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem', color: colors.textMuted, textAlign: 'right',
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                    }}>{formatMoney(c.totals.spend)}</span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem', color: colors.textMuted, textAlign: 'right',
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                    }}>{formatMoney(c.totals.cpp)}</span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem', fontWeight: 700, textAlign: 'right',
+                                                        color: roasColor,
+                                                        fontFamily: '"JetBrains Mono", monospace',
+                                                    }}>{roas.toFixed(1)}x</span>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             );
                         })()}

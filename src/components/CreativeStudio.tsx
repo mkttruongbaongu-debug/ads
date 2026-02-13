@@ -279,16 +279,24 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
 
         try {
             // Build reference URLs based on generation mode
+            // IMPORTANT: Only use IMAGE/CAROUSEL ads — VIDEO ads have .mp4 URLs that can't be used as reference images
+            const isImageAd = (a: AdItem) => a.content_type === 'IMAGE' || a.content_type === 'CAROUSEL';
+            const filterImageUrls = (urls: string[]) => urls.filter(u => !u.includes('.mp4'));
+
             let topAdImageUrls: string[] = [];
             if (genMode === 'clone') {
-                const topAdsWithPurchases = ads.filter((a: AdItem) => a.metrics.purchases > 0);
+                const topAdsWithPurchases = ads.filter((a: AdItem) => a.metrics.purchases > 0 && isImageAd(a));
                 const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
-                topAdImageUrls = refAd?.image_urls?.length
-                    ? refAd.image_urls
-                    : [refAd?.image_url].filter(Boolean) as string[];
+                topAdImageUrls = filterImageUrls(
+                    refAd?.image_urls?.length
+                        ? refAd.image_urls
+                        : [refAd?.image_url].filter(Boolean) as string[]
+                );
             } else if (genMode === 'inspired') {
-                const top3 = ads.filter((a: AdItem) => a.metrics.purchases > 0).slice(0, 3);
-                topAdImageUrls = top3.flatMap((a: AdItem) => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[];
+                const top3 = ads.filter((a: AdItem) => a.metrics.purchases > 0 && isImageAd(a)).slice(0, 3);
+                topAdImageUrls = filterImageUrls(
+                    top3.flatMap((a: AdItem) => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[]
+                );
             }
 
             let winnerCaption = '';

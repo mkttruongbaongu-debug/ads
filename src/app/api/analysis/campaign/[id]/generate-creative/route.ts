@@ -376,6 +376,8 @@ export async function POST(
     const mode = genMode || 'inspired';
 
     console.log(`[GENERATE_CREATIVE] 🎨 Campaign ${campaignId} — STREAMING pipeline, mode=${mode}`);
+    console.log(`[GENERATE_CREATIVE] 📎 Reference URLs count: ${referenceUrls.length}`);
+    referenceUrls.forEach((url, i) => console.log(`[GENERATE_CREATIVE] 📎 ref[${i}]: ${url.substring(0, 120)}...`));
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -464,6 +466,8 @@ export async function POST(
                 }
 
                 send({ type: 'step', message: `Đang tạo ${effectiveImageCount} ảnh...` });
+                console.log(`[GENERATE_CREATIVE] 📋 Image plan: ${effectiveImageCount} images, ${effectivePrompts.length} prompts, ${referenceUrls.length} refs`);
+                effectivePrompts.forEach((p, i) => console.log(`[GENERATE_CREATIVE] 📋 prompt[${i}]: ${p.substring(0, 80)}...`));
 
                 for (let idx = 0; idx < effectiveImageCount; idx++) {
                     const prompt = effectivePrompts[idx];
@@ -475,7 +479,10 @@ export async function POST(
                     }
 
                     send({ type: 'step', message: `Đang vẽ ảnh ${idx + 1}/${effectiveImageCount}...` });
-                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? 'YES' : 'NO'}`);
+                    // Stream debug info to client console
+                    send({ type: 'debug', message: `Image ${idx + 1}: prompt=${prompt.substring(0, 60)}... | ref=${refImage ? refImage.substring(0, 80) + '...' : 'NONE'}` });
+                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? refImage.substring(0, 100) : 'NONE'}`);
+                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1} prompt: ${prompt.substring(0, 100)}...`);
 
                     const image = await generateImage(client, prompt, refImage, effectiveImageCount);
 

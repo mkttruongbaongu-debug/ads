@@ -376,6 +376,12 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                 winnerCaption = refAd?.caption || '';
             }
 
+            console.log('[CREATIVE_STUDIO] Sending request:', {
+                genMode,
+                topAdImageUrls: topAdImageUrls.map((u: string) => u.substring(0, 80) + '...'),
+                winnerCaptionLen: winnerCaption.length,
+            });
+
             const res = await fetch(
                 `/api/analysis/campaign/${campaignId}/generate-creative`,
                 {
@@ -427,6 +433,12 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                         if (event.type === 'step') {
                             setGenerateStep(event.message || '');
                         } else if (event.type === 'caption') {
+                            console.log('[CREATIVE_STUDIO] Caption received:', {
+                                captionLen: event.data.caption?.length,
+                                imageCount: event.data.imageCount,
+                                promptCount: event.data.imagePrompts?.length,
+                                refUrls: event.data.referenceImageUrls,
+                            });
                             setGeneratedCaption(event.data.caption || '');
                             setGeneratedKeyMessage(event.data.keyMessage || '');
                             setGeneratedImagePrompts(event.data.imagePrompts || []);
@@ -438,11 +450,15 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                 switchedToOutput = true;
                             }
                         } else if (event.type === 'image') {
+                            console.log(`[CREATIVE_STUDIO] Image ${event.index + 1}/${event.total}:`, event.data ? `OK (${event.data.substring(0, 50)}...)` : 'FAILED (null)');
                             if (event.data) {
                                 collectedImages.push(event.data);
                                 setGeneratedImages([...collectedImages]);
                             }
+                        } else if (event.type === 'debug') {
+                            console.log('[CREATIVE_STUDIO] 🔍 DEBUG:', event.message);
                         } else if (event.type === 'error') {
+                            console.error('[CREATIVE_STUDIO] ❌ Error:', event.error);
                             setGenerateError(event.error || 'Lỗi không xác định');
                         }
                     } catch {

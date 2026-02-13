@@ -2490,21 +2490,79 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     flexShrink: 0,
                                                     position: 'relative',
                                                     overflow: 'hidden',
-                                                }}>
+                                                    cursor: 'pointer',
+                                                }}
+                                                    onClick={(e) => {
+                                                        const video = (e.currentTarget as HTMLDivElement).querySelector('video');
+                                                        if (video) {
+                                                            if (video.paused) {
+                                                                video.play().catch(() => { });
+                                                            } else {
+                                                                video.pause();
+                                                            }
+                                                        }
+                                                    }}
+                                                >
                                                     <video
                                                         src={ad.videoUrl}
                                                         poster={ad.thumbnail || undefined}
-                                                        autoPlay
                                                         muted
                                                         loop
                                                         playsInline
+                                                        preload="metadata"
+                                                        crossOrigin="anonymous"
                                                         style={{
                                                             width: '160px',
                                                             height: '160px',
                                                             objectFit: 'cover',
                                                             display: 'block',
                                                         }}
+                                                        onError={(e) => {
+                                                            // Video failed to load — hide video, show poster fallback
+                                                            const video = e.currentTarget;
+                                                            video.style.display = 'none';
+                                                            const fallback = video.nextElementSibling as HTMLElement;
+                                                            if (fallback && fallback.dataset.fallback) {
+                                                                fallback.style.display = 'block';
+                                                            }
+                                                        }}
+                                                        onLoadedData={(e) => {
+                                                            // Auto-play when data is loaded
+                                                            e.currentTarget.play().catch(() => { });
+                                                        }}
                                                     />
+                                                    {/* Fallback image when video fails */}
+                                                    <div data-fallback="true" style={{ display: 'none', width: '160px', height: '160px', position: 'relative' }}>
+                                                        <img
+                                                            src={ad.thumbnail || ''}
+                                                            alt={ad.name}
+                                                            style={{ width: '160px', height: '160px', objectFit: 'cover', display: 'block' }}
+                                                        />
+                                                        {ad.postUrl && (
+                                                            <a
+                                                                href={ad.postUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    bottom: '6px',
+                                                                    left: '50%',
+                                                                    transform: 'translateX(-50%)',
+                                                                    background: 'rgba(0,0,0,0.7)',
+                                                                    color: '#fff',
+                                                                    fontSize: '0.5rem',
+                                                                    fontWeight: 600,
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '3px',
+                                                                    textDecoration: 'none',
+                                                                    whiteSpace: 'nowrap' as const,
+                                                                }}
+                                                            >
+                                                                Xem trên FB
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                     {/* Video indicator */}
                                                     <span style={{
                                                         position: 'absolute',
@@ -2520,6 +2578,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         gap: '3px',
+                                                        pointerEvents: 'none',
                                                     }}>
                                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
                                                             <path d="M8 5v14l11-7z" />

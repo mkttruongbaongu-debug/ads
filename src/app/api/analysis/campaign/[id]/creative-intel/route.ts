@@ -28,7 +28,7 @@ export async function GET(
         const searchParams = request.nextUrl.searchParams;
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
-        const productFocus = searchParams.get('product') || undefined;
+        const adIdsParam = searchParams.get('adIds') || undefined;
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -186,20 +186,23 @@ export async function GET(
             }
         }
 
-        console.log(`[CREATIVE_INTEL_API] 📊 ${ads.length} ads fetched`);
+        // Filter by selected ad IDs if provided
+        let adsToAnalyze = ads;
+        if (adIdsParam) {
+            const selectedIds = new Set(adIdsParam.split(',').map(id => id.trim()));
+            adsToAnalyze = ads.filter(a => selectedIds.has(a.ad_id));
+            console.log(`[CREATIVE_INTEL_API] 🎯 Filtered to ${adsToAnalyze.length}/${ads.length} selected ads`);
+        }
 
-        if (ads.length < 2) {
+        if (adsToAnalyze.length < 2) {
             return NextResponse.json({
                 success: false,
-                error: 'Campaign cần ít nhất 2 ads để phân tích creative intelligence',
+                error: 'Cần chọn ít nhất 2 ads để phân tích creative intelligence',
             }, { status: 400 });
         }
 
         // Step 3: Run AI analysis
-        if (productFocus) {
-            console.log(`[CREATIVE_INTEL_API] 🎯 Product focus: "${productFocus}"`);
-        }
-        const result = await analyzeCreativeIntelligence(ads, productFocus);
+        const result = await analyzeCreativeIntelligence(adsToAnalyze);
 
         return NextResponse.json({
             success: true,

@@ -145,86 +145,13 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [genMode, setGenMode] = useState<'clone' | 'inspired' | 'fresh'>('inspired');
     const [selectedRefAdIdx, setSelectedRefAdIdx] = useState(0); // Index of ad to use as reference
 
-    // Product filter
-    const [detectedProducts, setDetectedProducts] = useState<string[]>([]);
-    const [selectedProduct, setSelectedProduct] = useState<string>(''); // '' = all
+    // Ad selection for analysis
+    const [selectedAdIds, setSelectedAdIds] = useState<Set<string>>(new Set());
 
     // Debug
     const [showDebug, setShowDebug] = useState(false);
 
-    // ===== PRODUCT DETECTION =====
-    // Detect products by finding distinctive multi-word phrases in captions
-    const detectProducts = useCallback((adList: AdItem[]): string[] => {
-        if (adList.length < 3) return [];
 
-        // Build 2-4 word n-gram frequency from captions
-        const phraseAdMap = new Map<string, Set<number>>();
-
-        adList.forEach((ad, idx) => {
-            const text = (ad.ad_name + ' ' + (ad.caption || '')).toLowerCase()
-                .normalize('NFC')
-                .replace(/[,.!?;:(){}\[\]"'—–\-\/\\@#$%^&*…\n\r]/g, ' ');
-            const words = text.split(/\s+/).filter(w => w.length > 1);
-
-            for (let len = 2; len <= 4; len++) {
-                for (let j = 0; j <= words.length - len; j++) {
-                    const phrase = words.slice(j, j + len).join(' ');
-                    if (phrase.length < 5) continue; // skip very short
-                    if (!phraseAdMap.has(phrase)) phraseAdMap.set(phrase, new Set());
-                    phraseAdMap.get(phrase)!.add(idx);
-                }
-            }
-        });
-
-        // Find discriminative phrases: in 20-70% of ads (not too common, not too rare)
-        const minAds = Math.max(2, Math.floor(adList.length * 0.15));
-        const maxAds = Math.floor(adList.length * 0.75);
-
-        const candidates = Array.from(phraseAdMap.entries())
-            .filter(([phrase, adSet]) => {
-                const count = adSet.size;
-                if (count < minAds || count > maxAds) return false;
-                // Filter out common Vietnamese stop-phrases
-                const stopWords = ['của', 'và', 'cho', 'với', 'này', 'cái', 'một', 'nhà', 'thì', 'mà', 'là', 'có'];
-                const phraseWords = phrase.split(' ');
-                if (phraseWords.every(w => stopWords.includes(w) || w.length <= 2)) return false;
-                return true;
-            })
-            .sort((a, b) => {
-                // Prefer longer phrases (more specific)
-                const lenDiff = b[0].split(' ').length - a[0].split(' ').length;
-                if (lenDiff !== 0) return lenDiff;
-                // Then by frequency
-                return b[1].size - a[1].size;
-            });
-
-        // Greedy clustering: pick top phrases that cover non-overlapping ad sets
-        const usedAds = new Set<number>();
-        const products: string[] = [];
-
-        for (const [phrase, adSet] of candidates) {
-            // Skip if most ads in this phrase are already covered
-            const newAds = Array.from(adSet).filter(i => !usedAds.has(i));
-            if (newAds.length < minAds) continue;
-
-            // Capitalize first letter of each word
-            const name = phrase.replace(/\b\w/g, c => c.toUpperCase());
-            products.push(name);
-            adSet.forEach(i => usedAds.add(i));
-
-            if (products.length >= 5) break; // max 5 products
-        }
-
-        return products;
-    }, []);
-
-    // Compute filtered ads based on selected product
-    const filteredAds = selectedProduct
-        ? ads.filter(a => {
-            const text = (a.ad_name + ' ' + (a.caption || '')).toLowerCase();
-            return text.includes(selectedProduct.toLowerCase());
-        })
-        : ads;
 
     // ===== FETCH ADS DATA =====
     const fetchAds = useCallback(async () => {
@@ -273,9 +200,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         setLoadingIntel(true);
         setIntelError('');
         try {
-            const productParam = selectedProduct ? `&product=${encodeURIComponent(selectedProduct)}` : '';
+            const adIdsParam = selectedAdIds.size > 0 ? `&adIds=${Array.from(selectedAdIds).join(',')}` : '';
             const res = await fetch(
-                `/api/analysis/campaign/${campaignId}/creative-intel?startDate=${startDate}&endDate=${endDate}${productParam}`
+                `/api/analysis/campaign/${campaignId}/creative-intel?startDate=${startDate}&endDate=${endDate}${adIdsParam}`
             );
             const json = await res.json();
             if (json.success && json.data) {
@@ -289,19 +216,14 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         } finally {
             setLoadingIntel(false);
         }
-    }, [campaignId, startDate, endDate, selectedProduct]);
+    }, [campaignId, startDate, endDate, selectedAdIds]);
 
     // Auto-fetch ads on mount + detect products when ads change
     useEffect(() => {
         fetchAds();
     }, [fetchAds]);
 
-    useEffect(() => {
-        if (ads.length > 0) {
-            const products = detectProducts(ads);
-            setDetectedProducts(products);
-        }
-    }, [ads, detectProducts]);
+
 
     // ===== FETCH AD SETS =====
     const fetchAdSets = useCallback(async () => {
@@ -359,19 +281,19 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
             // Build reference URLs based on generation mode
             let topAdImageUrls: string[] = [];
             if (genMode === 'clone') {
-                const topAdsWithPurchases = filteredAds.filter(a => a.metrics.purchases > 0);
+                const topAdsWithPurchases = ads.filter((a: AdItem) => a.metrics.purchases > 0);
                 const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
                 topAdImageUrls = refAd?.image_urls?.length
                     ? refAd.image_urls
                     : [refAd?.image_url].filter(Boolean) as string[];
             } else if (genMode === 'inspired') {
-                const top3 = filteredAds.filter(a => a.metrics.purchases > 0).slice(0, 3);
-                topAdImageUrls = top3.flatMap(a => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[];
+                const top3 = ads.filter((a: AdItem) => a.metrics.purchases > 0).slice(0, 3);
+                topAdImageUrls = top3.flatMap((a: AdItem) => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[];
             }
 
             let winnerCaption = '';
             if (genMode === 'clone') {
-                const topAdsWithPurchases = filteredAds.filter(a => a.metrics.purchases > 0);
+                const topAdsWithPurchases = ads.filter((a: AdItem) => a.metrics.purchases > 0);
                 const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
                 winnerCaption = refAd?.caption || '';
             }
@@ -473,74 +395,101 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
             setIsGenerating(false);
             setGenerateStep('');
         }
-    }, [intel, filteredAds, campaignId, campaignName, genMode, selectedRefAdIdx]);
+    }, [intel, ads, campaignId, campaignName, genMode, selectedRefAdIdx]);
 
     // ===== RENDER HELPERS =====
 
-    const renderAdCard = (ad: AdItem, rank: number, isTop: boolean) => (
-        <div key={ad.ad_id} style={{
-            display: 'flex', gap: '12px', padding: '12px',
-            background: colors.bg, borderRadius: '6px',
-            border: `1px solid ${isTop ? `${colors.accent}30` : `${colors.error}20`}`,
-            marginBottom: '8px',
-        }}>
-            {/* Thumbnail */}
-            {ad.image_url && (
+    const renderAdCard = (ad: AdItem, rank: number, isTop: boolean) => {
+        const isSelected = selectedAdIds.has(ad.ad_id);
+        return (
+            <div key={ad.ad_id} style={{
+                display: 'flex', gap: '12px', padding: '12px',
+                background: isSelected ? `${colors.primary}08` : colors.bg,
+                borderRadius: '6px',
+                border: `1px solid ${isSelected ? colors.primary + '60' : isTop ? `${colors.accent}30` : `${colors.error}20`}`,
+                marginBottom: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+            }}
+                onClick={() => {
+                    setSelectedAdIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(ad.ad_id)) next.delete(ad.ad_id);
+                        else next.add(ad.ad_id);
+                        return next;
+                    });
+                }}
+            >
+                {/* Checkbox */}
                 <div style={{
-                    width: '64px', height: '64px', borderRadius: '4px', overflow: 'hidden',
-                    flexShrink: 0, background: colors.bgAlt,
+                    width: '20px', height: '20px', borderRadius: '3px',
+                    border: `2px solid ${isSelected ? colors.primary : colors.border}`,
+                    background: isSelected ? colors.primary : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, marginTop: '2px',
+                    transition: 'all 0.15s',
                 }}>
-                    <img
-                        src={ad.image_url}
-                        alt={ad.ad_name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                </div>
-            )}
-
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                    <p style={{
-                        margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: colors.text,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        maxWidth: '200px',
-                    }}>
-                        #{rank} {ad.ad_name}
-                    </p>
-                    <span style={{
-                        fontSize: '0.625rem', padding: '2px 5px', borderRadius: '3px',
-                        background: `${isTop ? colors.accent : colors.error}15`,
-                        color: isTop ? colors.accent : colors.error,
-                        fontWeight: 700, flexShrink: 0,
-                    }}>
-                        {ad.content_type}
-                    </span>
+                    {isSelected && <span style={{ color: '#000', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
                 </div>
 
-                {/* Metrics row */}
-                <div style={{ display: 'flex', gap: '12px', fontSize: '0.6875rem', color: colors.textMuted }}>
-                    <span>ROAS <b style={{ color: ad.metrics.roas >= 5 ? colors.accent : ad.metrics.roas >= 2 ? colors.text : colors.error }}>
-                        {ad.metrics.roas.toFixed(1)}x
-                    </b></span>
-                    <span>CPP <b style={{ color: colors.text }}>{formatMoney(ad.metrics.cpp)}đ</b></span>
-                    <span>CTR <b style={{ color: colors.text }}>{ad.metrics.ctr.toFixed(1)}%</b></span>
-                    <span>{ad.metrics.purchases} đơn</span>
-                </div>
-
-                {/* Caption preview */}
-                {ad.caption && (
-                    <p style={{
-                        margin: '4px 0 0', fontSize: '0.6875rem', color: colors.textSubtle,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                {/* Thumbnail */}
+                {ad.image_url && (
+                    <div style={{
+                        width: '56px', height: '56px', borderRadius: '4px', overflow: 'hidden',
+                        flexShrink: 0, background: colors.bgAlt,
                     }}>
-                        "{ad.caption.slice(0, 80)}..."
-                    </p>
+                        <img
+                            src={ad.image_url}
+                            alt={ad.ad_name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                    </div>
                 )}
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <p style={{
+                            margin: 0, fontSize: '0.78rem', fontWeight: 600, color: colors.text,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            maxWidth: '180px',
+                        }}>
+                            #{rank} {ad.ad_name}
+                        </p>
+                        <span style={{
+                            fontSize: '0.625rem', padding: '2px 5px', borderRadius: '3px',
+                            background: `${isTop ? colors.accent : colors.error}15`,
+                            color: isTop ? colors.accent : colors.error,
+                            fontWeight: 700, flexShrink: 0,
+                        }}>
+                            {ad.content_type}
+                        </span>
+                    </div>
+
+                    {/* Metrics row */}
+                    <div style={{ display: 'flex', gap: '10px', fontSize: '0.67rem', color: colors.textMuted }}>
+                        <span>ROAS <b style={{ color: ad.metrics.roas >= 5 ? colors.accent : ad.metrics.roas >= 2 ? colors.text : colors.error }}>
+                            {ad.metrics.roas.toFixed(1)}x
+                        </b></span>
+                        <span>CPP <b style={{ color: colors.text }}>{formatMoney(ad.metrics.cpp)}đ</b></span>
+                        <span>CTR <b style={{ color: colors.text }}>{ad.metrics.ctr.toFixed(1)}%</b></span>
+                        <span>{ad.metrics.purchases} đơn</span>
+                    </div>
+
+                    {/* Caption preview */}
+                    {ad.caption && (
+                        <p style={{
+                            margin: '3px 0 0', fontSize: '0.65rem', color: colors.textSubtle,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                            "{ad.caption.slice(0, 80)}..."
+                        </p>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderPattern = (p: WinningPattern, idx: number, isWin: boolean) => (
         <div key={idx} style={{
@@ -667,69 +616,38 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
 
                             {!loadingAds && ads.length > 0 && (
                                 <>
-                                    {/* Product Filter */}
-                                    {detectedProducts.length > 0 && (
-                                        <div style={{ marginBottom: '16px', paddingBottom: '12px', borderBottom: `1px solid ${colors.border}` }}>
-                                            <span style={{
-                                                fontSize: '0.5625rem', fontWeight: 700, color: colors.textMuted,
-                                                letterSpacing: '0.1em', display: 'block', marginBottom: '8px',
-                                            }}>
-                                                LỌC THEO SẢN PHẨM
-                                            </span>
-                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                                                <button
-                                                    onClick={() => { setSelectedProduct(''); setSelectedRefAdIdx(0); }}
-                                                    style={{
-                                                        padding: '5px 10px', fontSize: '0.6875rem', fontWeight: 600,
-                                                        background: !selectedProduct ? `${colors.primary}20` : 'transparent',
-                                                        border: `1px solid ${!selectedProduct ? colors.primary : colors.border}`,
-                                                        borderRadius: '4px', cursor: 'pointer',
-                                                        color: !selectedProduct ? colors.primary : colors.textMuted,
-                                                    }}
-                                                >
-                                                    TẤT CẢ ({ads.length})
-                                                </button>
-                                                {detectedProducts.map(product => {
-                                                    const count = ads.filter(a => (a.ad_name + ' ' + (a.caption || '')).toLowerCase().includes(product.toLowerCase())).length;
-                                                    const isActive = selectedProduct.toLowerCase() === product.toLowerCase();
-                                                    return (
-                                                        <button
-                                                            key={product}
-                                                            onClick={() => { setSelectedProduct(isActive ? '' : product); setSelectedRefAdIdx(0); }}
-                                                            style={{
-                                                                padding: '5px 10px', fontSize: '0.6875rem', fontWeight: 600,
-                                                                background: isActive ? `${colors.accent}20` : 'transparent',
-                                                                border: `1px solid ${isActive ? colors.accent : colors.border}`,
-                                                                borderRadius: '4px', cursor: 'pointer',
-                                                                color: isActive ? colors.accent : colors.textMuted,
-                                                            }}
-                                                        >
-                                                            {product} ({count})
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            {/* Manual input */}
-                                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Hoặc nhập tên sản phẩm..."
-                                                    value={detectedProducts.some(p => p.toLowerCase() === selectedProduct.toLowerCase()) ? '' : selectedProduct}
-                                                    onChange={(e) => { setSelectedProduct(e.target.value); setSelectedRefAdIdx(0); }}
-                                                    style={{
-                                                        flex: 1, padding: '5px 8px', fontSize: '0.6875rem',
-                                                        background: colors.bg, border: `1px solid ${colors.border}`,
-                                                        borderRadius: '4px', color: colors.text, outline: 'none',
-                                                    }}
-                                                />
-                                                {selectedProduct && (
-                                                    <span style={{ fontSize: '0.625rem', color: colors.textMuted }}>
-                                                        {filteredAds.length} ads
-                                                    </span>
-                                                )}
-                                            </div>
+                                    {/* Selection controls */}
+                                    <div style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                        marginBottom: '12px', paddingBottom: '10px',
+                                        borderBottom: `1px solid ${colors.border}`,
+                                    }}>
+                                        <span style={{ fontSize: '0.6875rem', color: colors.textMuted }}>
+                                            {selectedAdIds.size > 0 ? (
+                                                <><b style={{ color: colors.primary }}>{selectedAdIds.size}</b> content đã chọn</>
+                                            ) : (
+                                                'Tick chọn content cần phân tích'
+                                            )}
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button
+                                                onClick={() => setSelectedAdIds(new Set(ads.map(a => a.ad_id)))}
+                                                style={{
+                                                    padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
+                                                    background: 'transparent', border: `1px solid ${colors.border}`,
+                                                    borderRadius: '3px', cursor: 'pointer', color: colors.textMuted,
+                                                }}
+                                            >Chọn tất cả</button>
+                                            <button
+                                                onClick={() => setSelectedAdIds(new Set())}
+                                                style={{
+                                                    padding: '3px 8px', fontSize: '0.625rem', fontWeight: 600,
+                                                    background: 'transparent', border: `1px solid ${colors.border}`,
+                                                    borderRadius: '3px', cursor: 'pointer', color: colors.textMuted,
+                                                }}
+                                            >Bỏ chọn</button>
                                         </div>
-                                    )}
+                                    </div>
 
                                     {/* Top ads */}
                                     <div style={{ marginBottom: '20px' }}>
@@ -737,9 +655,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                             fontSize: '0.6875rem', fontWeight: 700, color: colors.accent,
                                             letterSpacing: '0.1em', margin: '0 0 10px',
                                         }}>
-                                            ▲ TOP PERFORMER ({Math.min(5, filteredAds.filter(a => a.metrics.purchases > 0).length)})
+                                            ▲ TOP PERFORMER ({Math.min(5, ads.filter(a => a.metrics.purchases > 0).length)})
                                         </h3>
-                                        {filteredAds
+                                        {ads
                                             .filter(a => a.metrics.purchases > 0)
                                             .slice(0, 5)
                                             .map((ad, i) => renderAdCard(ad, i + 1, true))
@@ -754,7 +672,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                         }}>
                                             ▼ UNDER PERFORMER
                                         </h3>
-                                        {filteredAds
+                                        {ads
                                             .filter(a => a.metrics.spend > 50000)
                                             .slice(-3)
                                             .reverse()
@@ -765,18 +683,18 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                     {/* Analyze button */}
                                     <button
                                         onClick={fetchIntel}
-                                        disabled={loadingIntel}
+                                        disabled={loadingIntel || selectedAdIds.size < 2}
                                         style={{
                                             width: '100%', padding: '12px', marginTop: '8px',
-                                            background: loadingIntel ? colors.bgAlt : colors.primary,
+                                            background: loadingIntel ? colors.bgAlt : selectedAdIds.size < 2 ? colors.bgAlt : colors.primary,
                                             border: 'none', borderRadius: '6px',
-                                            color: loadingIntel ? colors.textMuted : '#000',
+                                            color: loadingIntel || selectedAdIds.size < 2 ? colors.textMuted : '#000',
                                             fontSize: '0.8125rem', fontWeight: 700,
-                                            cursor: loadingIntel ? 'not-allowed' : 'pointer',
+                                            cursor: loadingIntel || selectedAdIds.size < 2 ? 'not-allowed' : 'pointer',
                                             letterSpacing: '0.05em',
                                         }}
                                     >
-                                        {loadingIntel ? 'ĐANG PHÂN TÍCH...' : 'PHÂN TÍCH SÂU → TẠO BRIEF'}
+                                        {loadingIntel ? 'ĐANG PHÂN TÍCH...' : selectedAdIds.size < 2 ? 'CHỌN ÍT NHẤT 2 CONTENT' : `PHÂN TÍCH SÂU ${selectedAdIds.size} CONTENT → TẠO BRIEF`}
                                     </button>
                                     {intelError && (
                                         <p style={{ color: colors.error, fontSize: '0.75rem', marginTop: '8px' }}>
@@ -1155,13 +1073,13 @@ Tổng ads: ${ads.length}`}
                                         </div>
 
                                         {/* Ad selector — only for clone mode */}
-                                        {genMode === 'clone' && filteredAds.filter(a => a.metrics.purchases > 0).length > 1 && (
+                                        {genMode === 'clone' && ads.filter((a: AdItem) => a.metrics.purchases > 0).length > 1 && (
                                             <div style={{ marginBottom: '12px' }}>
                                                 <span style={{ fontSize: '0.5625rem', color: colors.textMuted, fontWeight: 700, letterSpacing: '0.05em' }}>
-                                                    CHỌN AD LÀM MẪU{selectedProduct ? ` (${selectedProduct})` : ''}
+                                                    CHỌN AD LÀM MẪU
                                                 </span>
                                                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px', overflowX: 'auto' as const, paddingBottom: '4px' }}>
-                                                    {filteredAds.filter(a => a.metrics.purchases > 0).slice(0, 5).map((ad, i) => (
+                                                    {ads.filter((a: AdItem) => a.metrics.purchases > 0).slice(0, 5).map((ad: AdItem, i: number) => (
                                                         <button
                                                             key={ad.ad_id}
                                                             onClick={() => setSelectedRefAdIdx(i)}

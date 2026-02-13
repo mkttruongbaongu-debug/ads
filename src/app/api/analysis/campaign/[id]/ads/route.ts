@@ -727,6 +727,84 @@ export async function GET(
         }
 
         // ===================================================================
+        // STEP 3b: Retry video source with page tokens
+        // source field requires page-level permission on some videos
+        // ===================================================================
+        const noSourceVideos: Array<{ idx: number; videoId: string; pageId: string }> = [];
+        ads.forEach((ad: any, idx: number) => {
+            if (ad.videoUrl) return; // Already have source
+            if (ad._debug?.step3 !== 'video') return; // Not a video ad
+            // Find video ID for this ad
+            const rawAd = (adsData.data || [])[idx];
+            const videoId = rawAd?.creative?.video_id || rawAd?.creative?.object_story_spec?.video_data?.video_id;
+            const storyId = rawAd?.effective_object_story_id || rawAd?.creative?.effective_object_story_id;
+            if (videoId && storyId) {
+                const pageId = storyId.split('_')[0];
+                noSourceVideos.push({ idx, videoId, pageId });
+            }
+        });
+
+        if (noSourceVideos.length > 0) {
+            console.log(`[API:ADS] 🎬 STEP 3b: ${noSourceVideos.length} videos missing source, retrying with page tokens`);
+
+            // Get page tokens for unique pages
+            const pagesNeedToken = new Set(noSourceVideos.map(v => v.pageId));
+            const videoPageTokens = new Map<string, string>();
+
+            for (const pageId of pagesNeedToken) {
+                if (pageTokenMap.has(pageId)) {
+                    videoPageTokens.set(pageId, pageTokenMap.get(pageId)!);
+                } else {
+                    try {
+                        const res = await fetch(
+                            `${FB_API_BASE}/${pageId}?fields=access_token&access_token=${accessToken}`
+                        );
+                        const data = await res.json();
+                        if (data.access_token) {
+                            videoPageTokens.set(pageId, data.access_token);
+                        }
+                    } catch { }
+                }
+            }
+
+            let sourced = 0;
+            await Promise.allSettled(
+                noSourceVideos.map(async ({ idx, videoId, pageId }) => {
+                    const token = videoPageTokens.get(pageId);
+                    if (!token) {
+                        if (ads[idx]._debug) ads[idx]._debug.step3b = 'no_page_token';
+                        return;
+                    }
+                    try {
+                        const res = await fetch(
+                            `${FB_API_BASE}/${videoId}?fields=source&access_token=${token}`
+                        );
+                        const data = await res.json();
+                        if (data.source) {
+                            ads[idx].videoUrl = data.source;
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step3b = 'sourced';
+                                ads[idx]._debug.step3_video = 'yes_page_token';
+                            }
+                            sourced++;
+                        } else {
+                            if (ads[idx]._debug) {
+                                ads[idx]._debug.step3b = data.error ? 'error' : 'no_source_page';
+                                if (data.error) ads[idx]._debug.step3b_error = `${data.error.code}: ${data.error.message?.substring(0, 60)}`;
+                            }
+                        }
+                    } catch (err: any) {
+                        if (ads[idx]._debug) {
+                            ads[idx]._debug.step3b = 'fetch_error';
+                            ads[idx]._debug.step3b_error = err?.message?.substring(0, 60);
+                        }
+                    }
+                })
+            );
+            console.log(`[API:ADS] 🎬 STEP 3b: ${sourced}/${noSourceVideos.length} videos sourced via page tokens`);
+        }
+
+        // ===================================================================
         // STEP 4: Creative images — for ALL non-video ads
         // Fetch /{creative_id}?fields=effective_image_url,image_url,
         //   object_story_spec{link_data{child_attachments}}

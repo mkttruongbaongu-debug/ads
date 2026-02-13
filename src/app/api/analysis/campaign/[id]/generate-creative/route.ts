@@ -203,7 +203,7 @@ async function isUrlAccessible(url: string): Promise<boolean> {
 }
 
 async function generateImage(
-    client: OpenAI,
+    apiKey: string,
     prompt: string,
     referenceImageUrl: string | null,
     imageCount: number,
@@ -220,7 +220,7 @@ async function generateImage(
         log(`[IMG] Validating ref URL: ${validRefUrl.substring(0, 80)}...`);
         const accessible = await isUrlAccessible(validRefUrl);
         if (!accessible) {
-            log(`[IMG] ⚠️ Ref URL NOT accessible (expired/blocked) → will generate WITHOUT reference`);
+            log(`[IMG] ⚠️ Ref URL NOT accessible → generating WITHOUT reference`);
             validRefUrl = null;
         } else {
             log(`[IMG] ✅ Ref URL accessible`);
@@ -229,7 +229,7 @@ async function generateImage(
 
     // ─── Attempt generation (with retry) ───
     for (let attempt = 1; attempt <= 2; attempt++) {
-        const useRef = attempt === 1 ? validRefUrl : null; // retry without ref
+        const useRef = attempt === 1 ? validRefUrl : null;
         if (attempt === 2) {
             log(`[IMG] 🔄 RETRY attempt 2 — generating WITHOUT reference image`);
         }
@@ -295,95 +295,110 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 
             log(`[IMG] Calling OpenRouter (attempt ${attempt}, ref=${useRef ? 'YES' : 'NO'})...`);
 
-            // 60-second timeout to prevent hanging
-            const TIMEOUT_MS = 60_000;
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error(`OpenRouter timeout after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS)
-            );
+            // ─── Direct fetch() instead of OpenAI SDK to preserve raw multimodal response ───
+            const TIMEOUT_MS = 90_000;
+            const abortCtrl = new AbortController();
+            const timer = setTimeout(() => abortCtrl.abort(), TIMEOUT_MS);
 
-            const response = await Promise.race([
-                client.chat.completions.create({
+            const rawRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+                    'X-Title': 'THO ADS AI - Creative Studio',
+                },
+                body: JSON.stringify({
                     model: 'google/gemini-3-pro-image-preview',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: contentParts,
-                        },
-                    ],
-                    // @ts-ignore - OpenRouter specific: modalities for image generation
+                    messages: [{ role: 'user', content: contentParts }],
                     modalities: ['image', 'text'],
-                } as any),
-                timeoutPromise,
-            ]);
+                }),
+                signal: abortCtrl.signal,
+            });
+            clearTimeout(timer);
 
-            // ─── DEBUG: Log raw response structure ───
-            const message = response.choices?.[0]?.message;
-            log(`[IMG] Response keys: ${JSON.stringify(Object.keys(message || {}))}`);
-            if (Array.isArray(message?.content)) {
-                log(`[IMG] Content array len=${(message?.content as any[]).length}`);
-                (message!.content as any[]).forEach((part: any, i: number) => {
-                    log(`[IMG] content[${i}]: type=${part?.type || 'none'} keys=${JSON.stringify(Object.keys(part || {}))}`);
-                });
-            } else if (typeof message?.content === 'string') {
-                log(`[IMG] Content string len=${message.content.length}, preview: ${message.content.substring(0, 100)}`);
+            if (!rawRes.ok) {
+                const errText = await rawRes.text().catch(() => '');
+                log(`[IMG] ❌ OpenRouter HTTP ${rawRes.status}: ${errText.substring(0, 300)}`);
+                throw new Error(`OpenRouter HTTP ${rawRes.status}`);
             }
 
-            // ─── Extract image (multi-format) ───
+            const rawJson = await rawRes.json();
+
+            // ─── DEBUG: Dump raw response structure ───
+            const choice = rawJson?.choices?.[0];
+            const message = choice?.message;
+            log(`[IMG] Raw response: finish=${choice?.finish_reason}, content_type=${typeof message?.content}, is_array=${Array.isArray(message?.content)}`);
+
             if (Array.isArray(message?.content)) {
-                for (const part of (message!.content as any[])) {
+                log(`[IMG] Content parts: ${message.content.length}`);
+                message.content.forEach((part: any, i: number) => {
+                    const keys = Object.keys(part || {});
+                    log(`[IMG] part[${i}]: type=${part?.type || 'none'} keys=[${keys.join(',')}]${part?.inline_data ? ' HAS_INLINE_DATA' : ''}`);
+                });
+            } else if (typeof message?.content === 'string') {
+                log(`[IMG] Content string len=${message.content.length}`);
+            } else {
+                // Dump the entire message keys for debugging
+                log(`[IMG] Message keys: ${JSON.stringify(Object.keys(message || {}))}`);
+                log(`[IMG] Full choice dump: ${JSON.stringify(choice, null, 2).substring(0, 1500)}`);
+            }
+
+            // ─── Extract image from raw response ───
+            // Format 1: content array with inline_data (Gemini native via OpenRouter)
+            if (Array.isArray(message?.content)) {
+                for (const part of message.content) {
+                    // Gemini inline_data format
                     if (part?.inline_data?.data) {
                         const mime = part.inline_data.mime_type || 'image/png';
-                        log(`[IMG] ✅ Found inline_data image (${mime})`);
+                        log(`[IMG] ✅ Found inline_data (${mime}, ${Math.round(part.inline_data.data.length / 1024)}KB)`);
                         return `data:${mime};base64,${part.inline_data.data}`;
                     }
+                    // OpenRouter image_url format
                     if (part?.type === 'image_url' && part?.image_url?.url) {
-                        log(`[IMG] ✅ Found image_url in content array`);
+                        log(`[IMG] ✅ Found image_url in content`);
                         return part.image_url.url;
                     }
+                    // Generic image part
                     if (part?.type === 'image' && (part?.url || part?.image_url?.url)) {
                         log(`[IMG] ✅ Found image part`);
                         return part.url || part.image_url.url;
                     }
+                    // Data URL embedded in text
                     if (part?.type === 'text' && typeof part?.text === 'string') {
                         const m = part.text.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-                        if (m) { log(`[IMG] ✅ Found data URL in text part`); return m[0]; }
+                        if (m) { log(`[IMG] ✅ Found data URL in text`); return m[0]; }
                     }
                 }
             }
 
-            if (message && (message as any).images?.length > 0) {
-                const img = (message as any).images[0];
-                const url = img?.image_url?.url || img?.imageUrl?.url || img?.url || (typeof img === 'string' ? img : null);
+            // Format 2: content is string with embedded data URL
+            if (typeof message?.content === 'string' && message.content.length > 0) {
+                const base64Match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                if (base64Match) { log(`[IMG] ✅ Found data URL in content string`); return base64Match[0]; }
+            }
+
+            // Format 3: message.images array
+            if (message?.images?.length > 0) {
+                const img = message.images[0];
+                const url = img?.image_url?.url || img?.url || (typeof img === 'string' ? img : null);
                 if (url) { log(`[IMG] ✅ Found in .images[]`); return url; }
             }
 
-            const content = typeof message?.content === 'string' ? message.content : '';
-            if (content) {
-                const base64Match = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-                if (base64Match) { log(`[IMG] ✅ Found data URL in string`); return base64Match[0]; }
-            }
+            log(`[IMG] ⚠️ No image extracted. Raw dump: ${JSON.stringify(rawJson).substring(0, 2000)}`);
 
-            const dumpStr = JSON.stringify(response.choices?.[0], null, 2).substring(0, 2000);
-            log(`[IMG] ⚠️ No image found in response. Dump: ${dumpStr}`);
-
-            // If this was attempt 1 with ref, retry without ref
             if (attempt === 1 && validRefUrl) {
-                log(`[IMG] Will retry without reference image...`);
+                log(`[IMG] Will retry without ref...`);
                 continue;
             }
             return null;
 
         } catch (error: any) {
             const errMsg = error?.message || String(error);
-            const errStatus = error?.status || error?.statusCode || 'unknown';
-            const errCode = error?.code || 'unknown';
-            const errType = error?.type || 'unknown';
             log(`[IMG] ❌ FAILED (attempt ${attempt}): ${errMsg}`);
-            log(`[IMG] ❌ Details: status=${errStatus}, code=${errCode}, type=${errType}`);
 
-            // If attempt 1 with ref failed, retry without ref
             if (attempt === 1 && validRefUrl) {
-                log(`[IMG] Will retry without reference image...`);
+                log(`[IMG] Will retry without ref...`);
                 continue;
             }
             return null;
@@ -550,7 +565,7 @@ export async function POST(
                     console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1} prompt: ${prompt.substring(0, 100)}...`);
 
                     const sendDebug = (msg: string) => send({ type: 'debug', message: msg });
-                    const image = await generateImage(client, prompt, refImage, effectiveImageCount, sendDebug);
+                    const image = await generateImage(openrouterKey, prompt, refImage, effectiveImageCount, sendDebug);
 
                     send({
                         type: 'image',

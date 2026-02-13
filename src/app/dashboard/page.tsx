@@ -8,6 +8,7 @@ import CampaignDetailPanel from '@/components/CampaignDetailPanel';
 import HopThuDeXuat from '@/components/HopThuDeXuat';
 import BangGiamSat from '@/components/BangGiamSat';
 import BangThucThi from '@/components/BangThucThi';
+import CreativeStudio from '@/components/CreativeStudio';
 
 interface Issue {
     type: string;
@@ -356,7 +357,10 @@ export default function DashboardPage() {
     const [filterText, setFilterText] = useState('');
 
     // Tab navigation - keeps state when switching views
-    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'execution' | 'monitoring'>('campaigns');
+    const [activeView, setActiveView] = useState<'campaigns' | 'proposals' | 'execution' | 'monitoring' | 'creative'>('campaigns');
+
+    // Creative Studio standalone
+    const [creativeStudioCampaign, setCreativeStudioCampaign] = useState<{ id: string; name: string } | null>(null);
 
     // Autopilot state
     const [showAutopilot, setShowAutopilot] = useState(false);
@@ -735,6 +739,40 @@ export default function DashboardPage() {
                                 GIÁM SÁT
                             </button>
 
+                            {/* Divider */}
+                            <div style={{ width: '1px', height: '24px', background: colors.border, margin: '0 4px' }} />
+
+                            {/* CREATIVE STUDIO Tab */}
+                            <button
+                                onClick={() => setActiveView('creative')}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: activeView === 'creative' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+                                    border: `1px solid ${activeView === 'creative' ? '#8B5CF6' : colors.border}`,
+                                    borderRadius: '6px',
+                                    color: activeView === 'creative' ? '#8B5CF6' : colors.text,
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                                title="Mở Creative Studio - Tạo content mới cho chiến dịch bất kỳ"
+                                onMouseEnter={(e) => {
+                                    if (activeView !== 'creative') {
+                                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                        e.currentTarget.style.borderColor = '#8B5CF6';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeView !== 'creative') {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.borderColor = colors.border;
+                                    }
+                                }}
+                            >
+                                CREATIVE STUDIO
+                            </button>
+
 
                         </div>
                     </div>
@@ -939,6 +977,124 @@ export default function DashboardPage() {
                 {/* TAB: MONITORING - Show BangGiamSat inline */}
                 {activeView === 'monitoring' && (
                     <BangGiamSat userId={session?.user?.email || ''} />
+                )}
+
+                {/* TAB: CREATIVE STUDIO - Standalone creative generation */}
+                {activeView === 'creative' && (
+                    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+                        <div style={{
+                            marginBottom: '24px', paddingBottom: '16px',
+                            borderBottom: `1px solid ${colors.border}`,
+                        }}>
+                            <h2 style={{
+                                fontSize: '1.25rem', fontWeight: 700, color: colors.text,
+                                margin: '0 0 4px', letterSpacing: '0.5px',
+                            }}>
+                                CREATIVE STUDIO
+                            </h2>
+                            <p style={{ fontSize: '0.8125rem', color: colors.textMuted, margin: 0 }}>
+                                Chọn chiến dịch để mở Creative Studio — tạo content mới
+                            </p>
+                        </div>
+
+                        {/* Campaign Picker */}
+                        {!data || !hasSearched ? (
+                            <div style={{
+                                textAlign: 'center', padding: '60px 0',
+                                color: colors.textMuted,
+                            }}>
+                                <p style={{ fontSize: '1rem', marginBottom: '16px' }}>
+                                    Chọn tài khoản quảng cáo và bấm <strong style={{ color: colors.primary }}>TRA CỨU</strong> để load danh sách chiến dịch
+                                </p>
+                                <button
+                                    onClick={() => { setActiveView('campaigns'); handleSearch(); }}
+                                    style={{
+                                        padding: '10px 24px',
+                                        background: colors.primary,
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        color: '#000',
+                                        fontSize: '0.875rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    TRA CỨU NGAY
+                                </button>
+                            </div>
+                        ) : (() => {
+                            const allCampaigns = [...(data.critical || []), ...(data.warning || []), ...(data.good || [])];
+                            if (allCampaigns.length === 0) {
+                                return (
+                                    <div style={{ textAlign: 'center', padding: '60px 0', color: colors.textMuted }}>
+                                        Không có chiến dịch nào trong khoảng thời gian này.
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                                    {allCampaigns.map(c => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => setCreativeStudioCampaign({ id: c.id, name: c.name })}
+                                            style={{
+                                                padding: '16px 20px',
+                                                background: colors.bgCard,
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                transition: 'all 0.2s',
+                                                borderLeft: `4px solid ${c.actionRecommendation?.color || colors.textMuted}`,
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.borderColor = '#8B5CF6';
+                                                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.borderColor = colors.border;
+                                                e.currentTarget.style.background = colors.bgCard;
+                                            }}
+                                        >
+                                            <div style={{
+                                                fontSize: '0.9375rem', fontWeight: 600, color: colors.text,
+                                                marginBottom: '8px', lineHeight: 1.3,
+                                            }}>
+                                                {c.name}
+                                            </div>
+                                            <div style={{
+                                                display: 'flex', gap: '16px',
+                                                fontSize: '0.75rem', color: colors.textMuted,
+                                            }}>
+                                                <span>Spend: {formatMoney(c.totals.spend)}</span>
+                                                <span>CPP: {formatMoney(c.totals.cpp)}</span>
+                                                <span>ROAS: {c.totals.roas.toFixed(1)}x</span>
+                                            </div>
+                                            <div style={{
+                                                marginTop: '10px',
+                                                fontSize: '0.75rem', fontWeight: 700,
+                                                color: '#8B5CF6',
+                                            }}>
+                                                MỞ CREATIVE STUDIO →
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
+                {/* Creative Studio Overlay (standalone) */}
+                {creativeStudioCampaign && (
+                    <CreativeStudio
+                        campaignId={creativeStudioCampaign.id}
+                        campaignName={creativeStudioCampaign.name}
+                        startDate={startDate}
+                        endDate={endDate}
+                        onClose={() => setCreativeStudioCampaign(null)}
+                    />
                 )}
 
                 {/* AUTOPILOT Floating Button — Bottom Left */}

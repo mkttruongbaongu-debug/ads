@@ -20,7 +20,7 @@ import OpenAI from 'openai';
 // STEP 1: GENERATE CAPTION + IMAGE PROMPT (Gemini 2.5 Flash)
 // ===================================================================
 
-function buildCaptionPrompt(briefData: any): string {
+function buildCaptionPrompt(briefData: any, referenceImageCount?: number): string {
     const { creativeBrief, winningPatterns, topAds, campaignName, genMode, winnerCaption } = briefData;
     const mode = genMode || 'inspired';
 
@@ -161,7 +161,8 @@ Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
 ✅ VÍ DỤ PROMPT CHUẨN UGC (1 ảnh = 4:5):
 "Inspired by Ad #1 (ROAS 16x). Casual smartphone photo, slightly tilted angle, taken from first-person POV at a typical Vietnamese family dinner table. The main dish is in the foreground, slightly off-center to the left. Background shows other dishes, a rice cooker, condiment bottles, and someone's elbow across the table. Warm yellowish indoor lighting from overhead fluorescent tube, creating slight color cast. Table surface is a common formica/plastic top with some water drops and used napkins nearby. A pair of chopsticks resting on the bowl edge. The photo has natural smartphone depth of field — foreground sharp, background slightly soft. Slight motion blur on the steam. The whole scene feels like someone just sat down to eat and quickly snapped a photo to share on Facebook. NOT a professional photo, NOT studio lighting, NOT perfectly composed. Authentic, messy, real. Aspect ratio: 4:5 portrait (1080x1350px)."
 
-Số lượng ảnh: 1, 2, hoặc 4 (tuỳ content format)
+Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
+${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}
 DÙNG TIẾNG ANH cho image prompt
 
 Trả lời JSON (không markdown, không \`\`\`):
@@ -334,6 +335,7 @@ export async function POST(
         // ─── STEP 1: Generate Caption + Image Prompts ────────────────
         console.log('[GENERATE_CREATIVE] 📝 Step 1: Generating caption + image prompts...');
 
+        const referenceUrls: string[] = body.topAdImageUrls || [];
         const captionPrompt = buildCaptionPrompt({
             creativeBrief,
             winningPatterns,
@@ -341,7 +343,7 @@ export async function POST(
             campaignName,
             genMode: genMode || 'inspired',
             winnerCaption: winnerCaption || '',
-        });
+        }, genMode === 'clone' ? referenceUrls.length : undefined);
 
         const captionResponse = await client.chat.completions.create({
             model: 'google/gemini-2.5-flash',
@@ -362,14 +364,25 @@ export async function POST(
         };
 
         try {
-            // Remove markdown code blocks if present
-            const cleaned = captionText
-                .replace(/```json\s*/gi, '')
-                .replace(/```\s*/g, '')
-                .trim();
-            captionResult = JSON.parse(cleaned);
+            // Step 1: Strip markdown code fences
+            let cleaned = captionText;
+            const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+            if (fenceMatch) {
+                cleaned = fenceMatch[1];
+            }
+            // Step 2: Balanced brace matching
+            const startIdx = cleaned.indexOf('{');
+            if (startIdx === -1) throw new Error('No JSON object found');
+            let depth = 0;
+            let endIdx = -1;
+            for (let i = startIdx; i < cleaned.length; i++) {
+                if (cleaned[i] === '{') depth++;
+                else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+            }
+            if (endIdx === -1) throw new Error('Unbalanced JSON braces');
+            captionResult = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
         } catch {
-            console.error('[GENERATE_CREATIVE] ❌ Failed to parse caption JSON:', captionText);
+            console.error('[GENERATE_CREATIVE] ❌ Failed to parse caption JSON:', captionText.slice(0, 500));
             return NextResponse.json({
                 success: false,
                 error: 'AI trả về format không hợp lệ. Vui lòng thử lại.',
@@ -382,7 +395,7 @@ export async function POST(
         // ─── STEP 2: Generate Images with Nano Banana Pro ────────────
         console.log(`[GENERATE_CREATIVE] 🖼️ Step 2: Generating ${captionResult.imageCount} image(s)...`);
 
-        const referenceUrls: string[] = topAdImageUrls || [];
+        // referenceUrls already declared above (line 338)
         const generatedImages: string[] = [];
         const mode = genMode || 'inspired';
 

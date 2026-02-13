@@ -806,6 +806,25 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
     const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({});
     const [showImageDebug, setShowImageDebug] = useState(false);
 
+    // Sequential video loading: 'idle' | 'loading' | 'loaded' | 'error'
+    const [videoLoadState, setVideoLoadState] = useState<Record<string, string>>({});
+
+    // Sequential video loading: when one finishes, start the next
+    useEffect(() => {
+        if (ads.length === 0) return;
+        const videoAds = ads.filter(a => a.videoUrl);
+        if (videoAds.length === 0) return;
+
+        // Find first video that hasn't started loading
+        const currentlyLoading = videoAds.find(a => videoLoadState[a.id] === 'loading');
+        if (currentlyLoading) return; // one is already loading
+
+        const nextToLoad = videoAds.find(a => !videoLoadState[a.id] || videoLoadState[a.id] === 'idle');
+        if (nextToLoad) {
+            setVideoLoadState(prev => ({ ...prev, [nextToLoad.id]: 'loading' }));
+        }
+    }, [ads, videoLoadState]);
+
     // FAST: Fetch trend data for charts — separate from AI to render instantly
     const fetchTrend = async () => {
         setIsLoadingTrend(true);
@@ -2494,12 +2513,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                 }}
                                                     onClick={(e) => {
                                                         const video = (e.currentTarget as HTMLDivElement).querySelector('video');
-                                                        if (video) {
-                                                            if (!video.src && ad.videoUrl) {
-                                                                // First click: load the video
-                                                                video.src = ad.videoUrl;
-                                                                video.load();
-                                                            }
+                                                        if (video && video.src) {
                                                             if (video.paused) {
                                                                 video.play().catch(() => { });
                                                             } else {
@@ -2508,30 +2522,49 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                         }
                                                     }}
                                                 >
-                                                    <video
-                                                        poster={ad.thumbnail || undefined}
-                                                        muted
-                                                        loop
-                                                        playsInline
-                                                        preload="none"
-                                                        style={{
-                                                            width: '160px',
-                                                            height: '160px',
-                                                            objectFit: 'cover',
-                                                            display: 'block',
-                                                        }}
-                                                        onError={(e) => {
-                                                            const video = e.currentTarget;
-                                                            video.style.display = 'none';
-                                                            const fallback = video.nextElementSibling as HTMLElement;
-                                                            if (fallback && fallback.dataset.fallback) {
-                                                                fallback.style.display = 'block';
-                                                            }
-                                                        }}
-                                                        onLoadedData={(e) => {
-                                                            e.currentTarget.play().catch(() => { });
-                                                        }}
-                                                    />
+                                                    {videoLoadState[ad.id] === 'loading' || videoLoadState[ad.id] === 'loaded' ? (
+                                                        <video
+                                                            src={ad.videoUrl!}
+                                                            poster={ad.thumbnail || undefined}
+                                                            muted
+                                                            loop
+                                                            playsInline
+                                                            preload="auto"
+                                                            style={{
+                                                                width: '160px',
+                                                                height: '160px',
+                                                                objectFit: 'cover',
+                                                                display: 'block',
+                                                            }}
+                                                            onError={() => {
+                                                                setVideoLoadState(prev => ({ ...prev, [ad.id]: 'error' }));
+                                                            }}
+                                                            onLoadedData={(e) => {
+                                                                setVideoLoadState(prev => ({ ...prev, [ad.id]: 'loaded' }));
+                                                                e.currentTarget.play().catch(() => { });
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={ad.thumbnail || ''}
+                                                            alt={ad.name}
+                                                            style={{ width: '160px', height: '160px', objectFit: 'cover', display: 'block' }}
+                                                        />
+                                                    )}
+                                                    {/* Loading indicator */}
+                                                    {videoLoadState[ad.id] === 'loading' && (
+                                                        <div style={{
+                                                            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            background: 'rgba(0,0,0,0.4)',
+                                                        }}>
+                                                            <span style={{
+                                                                fontSize: '0.5rem', fontWeight: 600, color: '#fff',
+                                                                background: 'rgba(0,0,0,0.6)', padding: '2px 8px',
+                                                                borderRadius: '3px', fontFamily: '"JetBrains Mono", monospace',
+                                                            }}>ĐANG TẢI...</span>
+                                                        </div>
+                                                    )}
                                                     {/* Fallback image when video fails */}
                                                     <div data-fallback="true" style={{ display: 'none', width: '160px', height: '160px', position: 'relative' }}>
                                                         <img

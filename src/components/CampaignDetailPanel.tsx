@@ -1657,11 +1657,12 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
 
                                 // Fallback: compute ma/sigma locally when AI bands not yet available
                                 // CPP/ROAS: weighted MA (ratio-of-sums) | CTR/Spend: simple MA
+                                // NOTE: For CPP/ROAS, we ALWAYS compute local weighted MA to match header metrics
+                                // Server bands use rolling-window average which can differ from ratio-of-sums
                                 const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas' | 'spend') => {
-                                    if (bands?.[key]?.ma) return bands[key];
-
                                     if (key === 'cpp' || key === 'roas') {
                                         // Weighted MA: sum(spend)/sum(purchases) for CPP, sum(revenue)/sum(spend) for ROAS
+                                        // This ALWAYS matches the header metrics (ratio-of-sums)
                                         const totalSpend = dailyTrend.reduce((s: number, d: any) => s + (d.spend || 0), 0);
                                         const totalPurchases = dailyTrend.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
                                         const totalRevenue = dailyTrend.reduce((s: number, d: any) => s + (d.revenue || (d.spend || 0) * (d.roas || 0)), 0);
@@ -1674,7 +1675,14 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         }
                                         if (ma === undefined) return { ma: undefined, sigma: undefined };
 
-                                        // Sigma: based on daily weighted values (only days with purchases/spend)
+                                        // σ: use server bands sigma if available (better rolling-window calculation)
+                                        // otherwise compute locally from daily values
+                                        const serverSigma = bands?.[key]?.sigma;
+                                        if (serverSigma && serverSigma > 0) {
+                                            return { ma, sigma: serverSigma };
+                                        }
+
+                                        // Local σ: based on daily weighted values (only days with purchases/spend)
                                         const dailyVals = dailyTrend
                                             .map((d: any) => {
                                                 if (key === 'cpp') return d.purchases > 0 ? d.spend / d.purchases : null;
@@ -1687,6 +1695,9 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         const sigma = Math.sqrt(variance);
                                         return { ma, sigma };
                                     }
+
+                                    // CTR/Spend: use server bands if available, otherwise simple MA
+                                    if (bands?.[key]?.ma) return bands[key];
 
                                     // CTR/Spend: simple MA (per-day values are meaningful)
                                     const vals = dailyTrend

@@ -2495,6 +2495,11 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     onClick={(e) => {
                                                         const video = (e.currentTarget as HTMLDivElement).querySelector('video');
                                                         if (video) {
+                                                            if (!video.src && ad.videoUrl) {
+                                                                // First click: load the video
+                                                                video.src = ad.videoUrl;
+                                                                video.load();
+                                                            }
                                                             if (video.paused) {
                                                                 video.play().catch(() => { });
                                                             } else {
@@ -2504,13 +2509,11 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                     }}
                                                 >
                                                     <video
-                                                        src={ad.videoUrl}
                                                         poster={ad.thumbnail || undefined}
                                                         muted
                                                         loop
                                                         playsInline
-                                                        preload="metadata"
-                                                        crossOrigin="anonymous"
+                                                        preload="none"
                                                         style={{
                                                             width: '160px',
                                                             height: '160px',
@@ -2518,7 +2521,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             display: 'block',
                                                         }}
                                                         onError={(e) => {
-                                                            // Video failed to load — hide video, show poster fallback
                                                             const video = e.currentTarget;
                                                             video.style.display = 'none';
                                                             const fallback = video.nextElementSibling as HTMLElement;
@@ -2527,7 +2529,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                                             }
                                                         }}
                                                         onLoadedData={(e) => {
-                                                            // Auto-play when data is loaded
                                                             e.currentTarget.play().catch(() => { });
                                                         }}
                                                     />

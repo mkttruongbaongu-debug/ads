@@ -130,6 +130,7 @@ function BandsChart({
     ma,
     sigma,
     windowDays = 7,
+    maLabel = 'MA',
 }: {
     data: Array<{ date: string;[key: string]: number | string }>;
     metricKey: 'cpp' | 'ctr' | 'roas' | 'spend';
@@ -138,6 +139,7 @@ function BandsChart({
     ma?: number;
     sigma?: number;
     windowDays?: number;
+    maLabel?: string;
 }) {
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
@@ -387,7 +389,7 @@ function BandsChart({
                         x={W - PAD_R - 2} y={toY(ma) - 4}
                         textAnchor="end" fill={colors.primary} fontSize="7.5"
                         fontFamily='"JetBrains Mono", monospace' fontWeight="600"
-                    >MA {formatValue(ma)}</text>
+                    >{maLabel} {formatValue(ma)}</text>
                 )}
 
                 {/* Band labels */}
@@ -1655,14 +1657,15 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                 const bands = campaign.actionRecommendation?.debugData?.processing?.bands;
                                 const windowDays = campaign.actionRecommendation?.debugData?.processing?.historySplit?.windowDays || 7;
 
-                                // Fallback: compute ma/sigma locally when AI bands not yet available
-                                // CPP/ROAS: weighted MA (ratio-of-sums) | CTR/Spend: simple MA
-                                // NOTE: For CPP/ROAS, we ALWAYS compute local weighted MA to match header metrics
-                                // Server bands use rolling-window average which can differ from ratio-of-sums
+                                // Compute MA + σ for chart Bollinger Bands
+                                // CPP/ROAS: server rolling-window MA (better for trend detection)
+                                // CTR/Spend: server bands or simple MA fallback
                                 const computeLocalBand = (key: 'cpp' | 'ctr' | 'roas' | 'spend') => {
+                                    // Use server bands if available (rolling-window aggregate)
+                                    if (bands?.[key]?.ma) return bands[key];
+
                                     if (key === 'cpp' || key === 'roas') {
-                                        // Weighted MA: sum(spend)/sum(purchases) for CPP, sum(revenue)/sum(spend) for ROAS
-                                        // This ALWAYS matches the header metrics (ratio-of-sums)
+                                        // Fallback: weighted MA (ratio-of-sums)
                                         const totalSpend = dailyTrend.reduce((s: number, d: any) => s + (d.spend || 0), 0);
                                         const totalPurchases = dailyTrend.reduce((s: number, d: any) => s + (d.purchases || 0), 0);
                                         const totalRevenue = dailyTrend.reduce((s: number, d: any) => s + (d.revenue || (d.spend || 0) * (d.roas || 0)), 0);
@@ -1675,14 +1678,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         }
                                         if (ma === undefined) return { ma: undefined, sigma: undefined };
 
-                                        // σ: use server bands sigma if available (better rolling-window calculation)
-                                        // otherwise compute locally from daily values
-                                        const serverSigma = bands?.[key]?.sigma;
-                                        if (serverSigma && serverSigma > 0) {
-                                            return { ma, sigma: serverSigma };
-                                        }
-
-                                        // Local σ: based on daily weighted values (only days with purchases/spend)
+                                        // σ from daily values
                                         const dailyVals = dailyTrend
                                             .map((d: any) => {
                                                 if (key === 'cpp') return d.purchases > 0 ? d.spend / d.purchases : null;
@@ -1695,9 +1691,6 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                         const sigma = Math.sqrt(variance);
                                         return { ma, sigma };
                                     }
-
-                                    // CTR/Spend: use server bands if available, otherwise simple MA
-                                    if (bands?.[key]?.ma) return bands[key];
 
                                     // CTR/Spend: simple MA (per-day values are meaningful)
                                     const vals = dailyTrend
@@ -1740,6 +1733,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             ma={cppBand.ma}
                                             sigma={cppBand.sigma}
                                             windowDays={windowDays}
+                                            maLabel="TB ROLLING"
                                         />
                                         <BandsChart
                                             data={dailyTrend}
@@ -1758,6 +1752,7 @@ export default function CampaignDetailPanel({ campaign, dateRange, onClose, form
                                             ma={roasBand.ma}
                                             sigma={roasBand.sigma}
                                             windowDays={windowDays}
+                                            maLabel="TB ROLLING"
                                         />
                                     </div>
                                 );

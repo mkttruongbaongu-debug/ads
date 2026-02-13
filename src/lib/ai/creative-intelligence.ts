@@ -234,15 +234,30 @@ export async function analyzeCreativeIntelligence(
     const content = response.choices[0]?.message?.content || '';
     console.log(`[CREATIVE_INTEL] 📝 AI response length: ${content.length}`);
 
-    // Parse JSON
+    // Parse JSON — robust extraction
     let parsed: any;
     try {
-        // Try to extract JSON from response
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('No JSON found in response');
-        parsed = JSON.parse(jsonMatch[0]);
+        // Step 1: Strip markdown code fences (```json ... ```)
+        let cleaned = content;
+        const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+        if (fenceMatch) {
+            cleaned = fenceMatch[1];
+        }
+
+        // Step 2: Find the outermost { ... } using balanced brace matching
+        const startIdx = cleaned.indexOf('{');
+        if (startIdx === -1) throw new Error('No JSON object found');
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = startIdx; i < cleaned.length; i++) {
+            if (cleaned[i] === '{') depth++;
+            else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+        }
+        if (endIdx === -1) throw new Error('Unbalanced JSON braces');
+        parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
     } catch (err) {
         console.error('[CREATIVE_INTEL] ❌ Parse error:', err);
+        console.error('[CREATIVE_INTEL] 📝 Raw response (first 500):', content.slice(0, 500));
         throw new Error('AI trả về format không hợp lệ');
     }
 

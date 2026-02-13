@@ -264,23 +264,65 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             modalities: ['image', 'text'],
         } as any);
 
-        // Extract base64 image from response
+        // ─── DEBUG: Log raw response structure ───
         const message = response.choices?.[0]?.message;
-        if (message && (message as any).images && (message as any).images.length > 0) {
-            return (message as any).images[0].image_url?.url || (message as any).images[0].imageUrl?.url || null;
+        console.log('[GENERATE_CREATIVE] 🔍 Message keys:', JSON.stringify(Object.keys(message || {})));
+        console.log('[GENERATE_CREATIVE] 🔍 Content type:', typeof message?.content, Array.isArray(message?.content) ? `(array len=${(message?.content as any[]).length})` : '');
+        if ((message as any)?.images) {
+            console.log('[GENERATE_CREATIVE] 🔍 images field len:', (message as any).images.length);
+            if ((message as any).images[0]) console.log('[GENERATE_CREATIVE] 🔍 images[0] keys:', JSON.stringify(Object.keys((message as any).images[0])));
+        }
+        if (Array.isArray(message?.content)) {
+            (message!.content as any[]).forEach((part: any, i: number) => {
+                console.log(`[GENERATE_CREATIVE] 🔍 content[${i}]:`, part?.type || 'no-type', JSON.stringify(Object.keys(part || {})));
+            });
+        } else if (typeof message?.content === 'string') {
+            console.log('[GENERATE_CREATIVE] 🔍 Content len:', message.content.length, 'preview:', message.content.substring(0, 150));
         }
 
-        // Fallback: check content for inline images
-        const content = message?.content || '';
-        const base64Match = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-        if (base64Match) {
-            return base64Match[0];
+        // ─── Extract image (multi-format) ───
+        // Format 1: content is array with image parts (Gemini multimodal)
+        if (Array.isArray(message?.content)) {
+            for (const part of (message!.content as any[])) {
+                if (part?.inline_data?.data) {
+                    const mime = part.inline_data.mime_type || 'image/png';
+                    console.log('[GENERATE_CREATIVE] ✅ Found inline_data image');
+                    return `data:${mime};base64,${part.inline_data.data}`;
+                }
+                if (part?.type === 'image_url' && part?.image_url?.url) {
+                    console.log('[GENERATE_CREATIVE] ✅ Found image_url in content array');
+                    return part.image_url.url;
+                }
+                if (part?.type === 'image' && (part?.url || part?.image_url?.url)) {
+                    console.log('[GENERATE_CREATIVE] ✅ Found image part');
+                    return part.url || part.image_url.url;
+                }
+                if (part?.type === 'text' && typeof part?.text === 'string') {
+                    const m = part.text.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                    if (m) { console.log('[GENERATE_CREATIVE] ✅ Found data URL in text part'); return m[0]; }
+                }
+            }
         }
 
-        console.warn('[GENERATE_CREATIVE] ⚠️ No image in response');
+        // Format 2: message.images array (OpenRouter normalized)
+        if (message && (message as any).images?.length > 0) {
+            const img = (message as any).images[0];
+            const url = img?.image_url?.url || img?.imageUrl?.url || img?.url || (typeof img === 'string' ? img : null);
+            if (url) { console.log('[GENERATE_CREATIVE] ✅ Found in .images[]'); return url; }
+        }
+
+        // Format 3: content string with embedded data URL
+        const content = typeof message?.content === 'string' ? message.content : '';
+        if (content) {
+            const base64Match = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+            if (base64Match) { console.log('[GENERATE_CREATIVE] ✅ Found data URL in string'); return base64Match[0]; }
+        }
+
+        console.warn('[GENERATE_CREATIVE] ⚠️ No image found. Dump:', JSON.stringify(response.choices?.[0], null, 2).substring(0, 3000));
         return null;
-    } catch (error) {
-        console.error('[GENERATE_CREATIVE] ❌ Image generation failed:', error);
+    } catch (error: any) {
+        console.error('[GENERATE_CREATIVE] ❌ Image gen failed:', error?.message || error);
+        console.error('[GENERATE_CREATIVE] ❌ Details:', JSON.stringify({ status: error?.status, code: error?.code, type: error?.type }));
         return null;
     }
 }

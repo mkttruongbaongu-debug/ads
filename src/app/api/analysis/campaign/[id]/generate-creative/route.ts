@@ -61,11 +61,41 @@ Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc).
 Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone.
 Image prompts phải khớp với nội dung caption.`;
     }
+    // Clone mode: add explicit product-matching rule
+    if (mode === 'clone') {
+        missionBlock += `\n\n⛔ QUY TẮC SẢN PHẨM (TUYỆT ĐỐI):
+- Sản phẩm trong caption spin PHẢI GIỐNG Y sản phẩm trong caption gốc
+- TUYỆT ĐỐI KHÔNG thay đổi sản phẩm, KHÔNG trộn lẫn sản phẩm khác
+- Nếu caption gốc nói về "thịt kho" → caption mới PHẢI nói về "thịt kho"
+- Image prompts cũng PHẢI mô tả ĐÚNG sản phẩm trong caption gốc`;
+    }
+
+    // Clone mode: only style guidelines, NO product-specific data from other ads
+    const briefBlock = mode === 'clone' ? `## STYLE GUIDELINES (từ Creative Brief)
+- Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
+- Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
+- CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}` : `## CREATIVE BRIEF
+- Summary: ${creativeBrief?.summary || 'N/A'}
+- Target Audience: ${creativeBrief?.targetAudience || 'N/A'}
+- Content Format: ${creativeBrief?.contentFormat || 'N/A'}
+- Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
+- Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
+- CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}`;
+
+    // Clone mode: skip captionExamples, winningPatterns, topAds (they reference other products)
+    const captionExamplesBlock = mode === 'clone' ? '' :
+        (mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG\n${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)');
+
+    const winningPatternsBlock = mode === 'clone' ? '' :
+        (mode !== 'fresh' ? `## WINNING PATTERNS\n${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : '');
+
+    const topAdsBlock = mode === 'clone' ? '' :
+        (mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)\n${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : '');
 
     return `Bạn là CHUYÊN GIA CREATIVE quảng cáo Facebook Việt Nam — chuyên tạo nội dung UGC (User-Generated Content) chân thực, tự nhiên.
 
 ## NHIỆM VỤ
-Dựa vào Creative Brief và Winning Patterns, tạo:
+${mode === 'clone' ? 'SPIN caption gốc thành caption mới, giữ nguyên sản phẩm và phong cách.' : 'Dựa vào Creative Brief và Winning Patterns, tạo:'}
 1. **Caption** quảng cáo tự nhiên, đọc như người thật viết
 2. **Image prompts CHI TIẾT** — mô tả ảnh kiểu NGƯỜI THẬT CHỤP BẰNG ĐIỆN THOẠI (UGC / POV style)
 
@@ -73,22 +103,13 @@ Dựa vào Creative Brief và Winning Patterns, tạo:
 
 ${missionBlock}
 
-## CREATIVE BRIEF
-- Summary: ${creativeBrief?.summary || 'N/A'}
-- Target Audience: ${creativeBrief?.targetAudience || 'N/A'}
-- Content Format: ${creativeBrief?.contentFormat || 'N/A'}
-- Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
-- Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
-- CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}
+${briefBlock}
 
-${mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG
-${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)'}
+${captionExamplesBlock}
 
-${mode !== 'fresh' ? `## WINNING PATTERNS
-${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : ''}
+${winningPatternsBlock}
 
-${mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
-${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : ''}
+${topAdsBlock}
 
 ## NÊN LÀM
 ${creativeBrief?.doList?.map((d: string) => `✓ ${d}`).join('\n') || 'N/A'}

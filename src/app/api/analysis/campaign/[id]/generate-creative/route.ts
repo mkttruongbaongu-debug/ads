@@ -185,27 +185,69 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: st
     }
 }
 
+// Validate if a URL is accessible (quick HEAD check)
+async function isUrlAccessible(url: string): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        const res = await fetch(url, {
+            method: 'HEAD',
+            signal: controller.signal,
+            redirect: 'follow',
+        });
+        clearTimeout(timeout);
+        return res.ok; // 200-299
+    } catch {
+        return false;
+    }
+}
+
 async function generateImage(
     client: OpenAI,
     prompt: string,
     referenceImageUrl: string | null,
     imageCount: number,
+    sendDebug?: (msg: string) => void,
 ): Promise<string | null> {
-    try {
-        const aspectSpec = getAspectRatioSpec(imageCount);
+    const log = (msg: string) => {
+        console.log(msg);
+        sendDebug?.(msg);
+    };
 
-        // Build multimodal content: ultra-detailed photography prompt + reference image
-        const contentParts: any[] = [
-            {
-                type: 'text',
-                text: `You are creating an AUTHENTIC smartphone photo that looks like a REAL PERSON took it and posted on social media. This is for a Vietnamese Facebook ad.
+    // ─── Validate reference URL before using it ───
+    let validRefUrl = referenceImageUrl;
+    if (validRefUrl) {
+        log(`[IMG] Validating ref URL: ${validRefUrl.substring(0, 80)}...`);
+        const accessible = await isUrlAccessible(validRefUrl);
+        if (!accessible) {
+            log(`[IMG] ⚠️ Ref URL NOT accessible (expired/blocked) → will generate WITHOUT reference`);
+            validRefUrl = null;
+        } else {
+            log(`[IMG] ✅ Ref URL accessible`);
+        }
+    }
+
+    // ─── Attempt generation (with retry) ───
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const useRef = attempt === 1 ? validRefUrl : null; // retry without ref
+        if (attempt === 2) {
+            log(`[IMG] 🔄 RETRY attempt 2 — generating WITHOUT reference image`);
+        }
+
+        try {
+            const aspectSpec = getAspectRatioSpec(imageCount);
+
+            const contentParts: any[] = [
+                {
+                    type: 'text',
+                    text: `You are creating an AUTHENTIC smartphone photo that looks like a REAL PERSON took it and posted on social media. This is for a Vietnamese Facebook ad.
 
 CRITICAL IDENTITY: You are NOT a professional photographer. You are a REGULAR PERSON casually taking a quick photo with your phone to share with friends on Facebook. The photo should feel SPONTANEOUS and LIVED-IN.
 
 ⚠️ MANDATORY ASPECT RATIO: ${aspectSpec.instruction}
 The image MUST be generated in ${aspectSpec.ratio} ratio (${aspectSpec.resolution}). This is NON-NEGOTIABLE.
 
-${referenceImageUrl ? `REFERENCE IMAGE: The attached image is the ORIGINAL winning ad photo. Your job is to create a NEW photo that:
+${useRef ? `REFERENCE IMAGE: The attached image is the ORIGINAL winning ad photo. Your job is to create a NEW photo that:
 - Has the SAME composition, angle, and framing as the reference
 - Features the SAME type of product/subject in a SIMILAR setting
 - Matches the SAME lighting conditions and color temperature
@@ -241,90 +283,104 @@ ABSOLUTELY FORBIDDEN — Dead giveaways of fake/staged photos:
 THE ULTIMATE TEST: If someone scrolling Facebook would pause and think "this looks like a real person posted this, not an ad" — you succeeded.
 
 OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspect ratio.`,
-            },
-        ];
-
-        // Add single reference image (1:1 mapping)
-        if (referenceImageUrl) {
-            contentParts.push({
-                type: 'image_url',
-                image_url: { url: referenceImageUrl },
-            });
-        }
-
-        const response = await client.chat.completions.create({
-            model: 'google/gemini-3-pro-image-preview',
-            messages: [
-                {
-                    role: 'user',
-                    content: contentParts,
                 },
-            ],
-            // @ts-ignore - OpenRouter specific: modalities for image generation
-            modalities: ['image', 'text'],
-        } as any);
+            ];
 
-        // ─── DEBUG: Log raw response structure ───
-        const message = response.choices?.[0]?.message;
-        console.log('[GENERATE_CREATIVE] 🔍 Message keys:', JSON.stringify(Object.keys(message || {})));
-        console.log('[GENERATE_CREATIVE] 🔍 Content type:', typeof message?.content, Array.isArray(message?.content) ? `(array len=${(message?.content as any[]).length})` : '');
-        if ((message as any)?.images) {
-            console.log('[GENERATE_CREATIVE] 🔍 images field len:', (message as any).images.length);
-            if ((message as any).images[0]) console.log('[GENERATE_CREATIVE] 🔍 images[0] keys:', JSON.stringify(Object.keys((message as any).images[0])));
-        }
-        if (Array.isArray(message?.content)) {
-            (message!.content as any[]).forEach((part: any, i: number) => {
-                console.log(`[GENERATE_CREATIVE] 🔍 content[${i}]:`, part?.type || 'no-type', JSON.stringify(Object.keys(part || {})));
-            });
-        } else if (typeof message?.content === 'string') {
-            console.log('[GENERATE_CREATIVE] 🔍 Content len:', message.content.length, 'preview:', message.content.substring(0, 150));
-        }
+            if (useRef) {
+                contentParts.push({
+                    type: 'image_url',
+                    image_url: { url: useRef },
+                });
+            }
 
-        // ─── Extract image (multi-format) ───
-        // Format 1: content is array with image parts (Gemini multimodal)
-        if (Array.isArray(message?.content)) {
-            for (const part of (message!.content as any[])) {
-                if (part?.inline_data?.data) {
-                    const mime = part.inline_data.mime_type || 'image/png';
-                    console.log('[GENERATE_CREATIVE] ✅ Found inline_data image');
-                    return `data:${mime};base64,${part.inline_data.data}`;
-                }
-                if (part?.type === 'image_url' && part?.image_url?.url) {
-                    console.log('[GENERATE_CREATIVE] ✅ Found image_url in content array');
-                    return part.image_url.url;
-                }
-                if (part?.type === 'image' && (part?.url || part?.image_url?.url)) {
-                    console.log('[GENERATE_CREATIVE] ✅ Found image part');
-                    return part.url || part.image_url.url;
-                }
-                if (part?.type === 'text' && typeof part?.text === 'string') {
-                    const m = part.text.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-                    if (m) { console.log('[GENERATE_CREATIVE] ✅ Found data URL in text part'); return m[0]; }
+            log(`[IMG] Calling OpenRouter (attempt ${attempt}, ref=${useRef ? 'YES' : 'NO'})...`);
+
+            const response = await client.chat.completions.create({
+                model: 'google/gemini-3-pro-image-preview',
+                messages: [
+                    {
+                        role: 'user',
+                        content: contentParts,
+                    },
+                ],
+                // @ts-ignore - OpenRouter specific: modalities for image generation
+                modalities: ['image', 'text'],
+            } as any);
+
+            // ─── DEBUG: Log raw response structure ───
+            const message = response.choices?.[0]?.message;
+            log(`[IMG] Response keys: ${JSON.stringify(Object.keys(message || {}))}`);
+            if (Array.isArray(message?.content)) {
+                log(`[IMG] Content array len=${(message?.content as any[]).length}`);
+                (message!.content as any[]).forEach((part: any, i: number) => {
+                    log(`[IMG] content[${i}]: type=${part?.type || 'none'} keys=${JSON.stringify(Object.keys(part || {}))}`);
+                });
+            } else if (typeof message?.content === 'string') {
+                log(`[IMG] Content string len=${message.content.length}, preview: ${message.content.substring(0, 100)}`);
+            }
+
+            // ─── Extract image (multi-format) ───
+            if (Array.isArray(message?.content)) {
+                for (const part of (message!.content as any[])) {
+                    if (part?.inline_data?.data) {
+                        const mime = part.inline_data.mime_type || 'image/png';
+                        log(`[IMG] ✅ Found inline_data image (${mime})`);
+                        return `data:${mime};base64,${part.inline_data.data}`;
+                    }
+                    if (part?.type === 'image_url' && part?.image_url?.url) {
+                        log(`[IMG] ✅ Found image_url in content array`);
+                        return part.image_url.url;
+                    }
+                    if (part?.type === 'image' && (part?.url || part?.image_url?.url)) {
+                        log(`[IMG] ✅ Found image part`);
+                        return part.url || part.image_url.url;
+                    }
+                    if (part?.type === 'text' && typeof part?.text === 'string') {
+                        const m = part.text.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                        if (m) { log(`[IMG] ✅ Found data URL in text part`); return m[0]; }
+                    }
                 }
             }
-        }
 
-        // Format 2: message.images array (OpenRouter normalized)
-        if (message && (message as any).images?.length > 0) {
-            const img = (message as any).images[0];
-            const url = img?.image_url?.url || img?.imageUrl?.url || img?.url || (typeof img === 'string' ? img : null);
-            if (url) { console.log('[GENERATE_CREATIVE] ✅ Found in .images[]'); return url; }
-        }
+            if (message && (message as any).images?.length > 0) {
+                const img = (message as any).images[0];
+                const url = img?.image_url?.url || img?.imageUrl?.url || img?.url || (typeof img === 'string' ? img : null);
+                if (url) { log(`[IMG] ✅ Found in .images[]`); return url; }
+            }
 
-        // Format 3: content string with embedded data URL
-        const content = typeof message?.content === 'string' ? message.content : '';
-        if (content) {
-            const base64Match = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-            if (base64Match) { console.log('[GENERATE_CREATIVE] ✅ Found data URL in string'); return base64Match[0]; }
-        }
+            const content = typeof message?.content === 'string' ? message.content : '';
+            if (content) {
+                const base64Match = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                if (base64Match) { log(`[IMG] ✅ Found data URL in string`); return base64Match[0]; }
+            }
 
-        console.warn('[GENERATE_CREATIVE] ⚠️ No image found. Dump:', JSON.stringify(response.choices?.[0], null, 2).substring(0, 3000));
-        return null;
-    } catch (error: any) {
-        console.error('[GENERATE_CREATIVE] ❌ Image gen failed:', error?.message || error);
-        console.error('[GENERATE_CREATIVE] ❌ Details:', JSON.stringify({ status: error?.status, code: error?.code, type: error?.type }));
-        return null;
+            const dumpStr = JSON.stringify(response.choices?.[0], null, 2).substring(0, 2000);
+            log(`[IMG] ⚠️ No image found in response. Dump: ${dumpStr}`);
+
+            // If this was attempt 1 with ref, retry without ref
+            if (attempt === 1 && validRefUrl) {
+                log(`[IMG] Will retry without reference image...`);
+                continue;
+            }
+            return null;
+
+        } catch (error: any) {
+            const errMsg = error?.message || String(error);
+            const errStatus = error?.status || error?.statusCode || 'unknown';
+            const errCode = error?.code || 'unknown';
+            const errType = error?.type || 'unknown';
+            log(`[IMG] ❌ FAILED (attempt ${attempt}): ${errMsg}`);
+            log(`[IMG] ❌ Details: status=${errStatus}, code=${errCode}, type=${errType}`);
+
+            // If attempt 1 with ref failed, retry without ref
+            if (attempt === 1 && validRefUrl) {
+                log(`[IMG] Will retry without reference image...`);
+                continue;
+            }
+            return null;
+        }
     }
+    return null;
 }
 
 // ===================================================================
@@ -484,7 +540,8 @@ export async function POST(
                     console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? refImage.substring(0, 100) : 'NONE'}`);
                     console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1} prompt: ${prompt.substring(0, 100)}...`);
 
-                    const image = await generateImage(client, prompt, refImage, effectiveImageCount);
+                    const sendDebug = (msg: string) => send({ type: 'debug', message: msg });
+                    const image = await generateImage(client, prompt, refImage, effectiveImageCount, sendDebug);
 
                     send({
                         type: 'image',

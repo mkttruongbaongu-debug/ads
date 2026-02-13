@@ -282,6 +282,14 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
             }
             // fresh: topAdImageUrls stays empty
 
+            // For clone mode: send the winning ad's caption for spinning
+            let winnerCaption = '';
+            if (genMode === 'clone') {
+                const topAdsWithPurchases = ads.filter(a => a.metrics.purchases > 0);
+                const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
+                winnerCaption = refAd?.caption || '';
+            }
+
             const res = await fetch(
                 `/api/analysis/campaign/${campaignId}/generate-creative`,
                 {
@@ -289,6 +297,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         genMode,
+                        winnerCaption,
                         creativeBrief: intel.creativeBrief,
                         winningPatterns: intel.winningPatterns,
                         topAds: intel.topAds,

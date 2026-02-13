@@ -21,7 +21,46 @@ import OpenAI from 'openai';
 // ===================================================================
 
 function buildCaptionPrompt(briefData: any): string {
-    const { creativeBrief, winningPatterns, topAds, campaignName } = briefData;
+    const { creativeBrief, winningPatterns, topAds, campaignName, genMode, winnerCaption } = briefData;
+    const mode = genMode || 'inspired';
+
+    // Mode-specific mission description
+    let missionBlock = '';
+    if (mode === 'clone' && winnerCaption) {
+        missionBlock = `## CHẾ ĐỘ: NHÂN BẢN (SPIN)
+⚠️ BẮT BUỘC: Bạn PHẢI SPIN caption gốc bên dưới. Giữ NGUYÊN:
+- Cấu trúc (số dòng, nhịp câu, flow logic)
+- Tone of voice (tự nhiên, review, hài hước... giống y caption gốc)
+- CTA kiểu (cùng kiểu kêu gọi hành động)
+- Độ dài (tương đương)
+
+ĐỔI:
+- Từ ngữ khác (paraphrase, đồng nghĩa)
+- Ví dụ/chi tiết cụ thể khác (nhưng cùng loại)
+- Emoji vị trí khác (nếu gốc có)
+
+CAPTION GỐC CẦN SPIN:
+"""
+${winnerCaption}
+"""
+
+Image prompts cũng phải MATCH nội dung caption mới — mô tả cùng loại sản phẩm/cảnh trong bài viết.`;
+    } else if (mode === 'fresh') {
+        missionBlock = `## CHẾ ĐỘ: SÁNG TẠO MỚI
+⚠️ BẮT BUỘC: Viết caption HOÀN TOÀN MỚI:
+- GÓC TIẾP CẬN KHÁC so với winning ads (nếu gốc là review → thử so sánh trước/sau, 
+nếu gốc là UGC → thử storytelling, nếu gốc là testimonial → thử tips/tricks)
+- KHÔNG copy cấu trúc caption mẫu
+- Chỉ dựa trên Creative Brief và thông tin sản phẩm
+- Vẫn giữ tone tự nhiên, viết như người thật
+- Image prompts phải TỰ SÁNG TẠO — không dựa vào winning ads`;
+    } else {
+        // inspired (default)
+        missionBlock = `## CHẾ ĐỘ: LẤY CẢM HỨNG
+Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc).
+Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone.
+Image prompts phải khớp với nội dung caption.`;
+    }
 
     return `Bạn là CHUYÊN GIA CREATIVE quảng cáo Facebook Việt Nam — chuyên tạo nội dung UGC (User-Generated Content) chân thực, tự nhiên.
 
@@ -32,6 +71,8 @@ Dựa vào Creative Brief và Winning Patterns, tạo:
 
 ## CHIẾN DỊCH: ${campaignName}
 
+${missionBlock}
+
 ## CREATIVE BRIEF
 - Summary: ${creativeBrief?.summary || 'N/A'}
 - Target Audience: ${creativeBrief?.targetAudience || 'N/A'}
@@ -40,14 +81,14 @@ Dựa vào Creative Brief và Winning Patterns, tạo:
 - Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
 - CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}
 
-## CAPTION MẪU TỪ ADS THẮNG
-${creativeBrief?.captionExamples?.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n') || 'Không có'}
+${mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG
+${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)'}
 
-## WINNING PATTERNS
-${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}
+${mode !== 'fresh' ? `## WINNING PATTERNS
+${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : ''}
 
-## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
-${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}
+${mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
+${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : ''}
 
 ## NÊN LÀM
 ${creativeBrief?.doList?.map((d: string) => `✓ ${d}`).join('\n') || 'N/A'}
@@ -59,8 +100,7 @@ ${creativeBrief?.dontList?.map((d: string) => `✕ ${d}`).join('\n') || 'N/A'}
 
 ### Caption:
 - Viết bằng tiếng Việt, phong cách TỰ NHIÊN, như người thật chia sẻ trải nghiệm
-- Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)
-- Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone
+${mode === 'clone' ? '- SPIN caption gốc: cùng cấu trúc, cùng flow, khác từ ngữ' : mode === 'fresh' ? '- Sáng tạo góc tiếp cận MỚI, KHÁC hẳn winning ads' : '- Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)\n- Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone'}
 - Có CTA phù hợp ở cuối
 - ⚠️ QUY TẮC EMOJI — TUYỆT ĐỐI TUÂN THỦ:
   + Tối đa 2-3 emoji trong TOÀN BỘ caption
@@ -263,7 +303,7 @@ export async function POST(
         const { id: campaignId } = await params;
         const body = await request.json();
 
-        const { genMode, creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
+        const { genMode, winnerCaption, creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
 
         if (!creativeBrief) {
             return NextResponse.json(
@@ -299,6 +339,8 @@ export async function POST(
             winningPatterns,
             topAds,
             campaignName,
+            genMode: genMode || 'inspired',
+            winnerCaption: winnerCaption || '',
         });
 
         const captionResponse = await client.chat.completions.create({

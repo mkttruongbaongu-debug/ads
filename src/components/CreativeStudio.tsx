@@ -916,9 +916,9 @@ Tổng ads: ${ads.length}`}
                                         </span>
                                         <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
                                             {([
-                                                { id: 'clone' as const, label: 'NHÂN BẢN', desc: 'Clone 1:1 từ ad mẫu', icon: '📋' },
-                                                { id: 'inspired' as const, label: 'CẢM HỨNG', desc: 'Mix từ top 3 ads', icon: '✨' },
-                                                { id: 'fresh' as const, label: 'MỚI HOÀN TOÀN', desc: 'Chỉ dùng brief', icon: '🆕' },
+                                                { id: 'clone' as const, label: 'NHÂN BẢN', desc: 'Clone 1:1 từ ad mẫu' },
+                                                { id: 'inspired' as const, label: 'CẢM HỨNG', desc: 'Mix từ top 3 ads' },
+                                                { id: 'fresh' as const, label: 'MỚI HOÀN TOÀN', desc: 'Chỉ dùng brief' },
                                             ]).map(mode => (
                                                 <button
                                                     key={mode.id}
@@ -932,7 +932,6 @@ Tổng ads: ${ads.length}`}
                                                         transition: 'all 0.15s',
                                                     }}
                                                 >
-                                                    <div style={{ fontSize: '0.875rem', marginBottom: '2px' }}>{mode.icon}</div>
                                                     <div style={{
                                                         fontSize: '0.5625rem', fontWeight: 700,
                                                         color: genMode === mode.id ? colors.primary : colors.text,
@@ -1002,7 +1001,7 @@ Tổng ads: ${ads.length}`}
                                             disabled={isGenerating}
                                             style={{
                                                 width: '100%', padding: '14px',
-                                                background: isGenerating ? colors.bgAlt : `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
+                                                background: isGenerating ? colors.bgAlt : colors.primary,
                                                 border: 'none', borderRadius: '8px',
                                                 color: isGenerating ? colors.textMuted : '#000',
                                                 fontSize: '0.8125rem', fontWeight: 700,

@@ -28,6 +28,7 @@ export async function GET(
         const searchParams = request.nextUrl.searchParams;
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
+        const productFocus = searchParams.get('product') || undefined;
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -195,7 +196,10 @@ export async function GET(
         }
 
         // Step 3: Run AI analysis
-        const result = await analyzeCreativeIntelligence(ads);
+        if (productFocus) {
+            console.log(`[CREATIVE_INTEL_API] 🎯 Product focus: "${productFocus}"`);
+        }
+        const result = await analyzeCreativeIntelligence(ads, productFocus);
 
         return NextResponse.json({
             success: true,

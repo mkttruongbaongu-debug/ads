@@ -1,20 +1,23 @@
 /**
  * ===================================================================
- * API: GENERATE CREATIVE (Caption + Image)
+ * API: GENERATE CREATIVE (Caption + Image) — STREAMING
  * ===================================================================
  * Route: POST /api/analysis/campaign/[id]/generate-creative
  *
  * Input: Creative Brief + Top Ads data
- * Output: Caption + Generated Images (base64)
+ * Output: NDJSON Stream — caption first, then images one-by-one
  *
  * Pipeline:
- * 1. Gemini 2.5 Flash → Caption + Image Prompt (học phong cách winning ads)
- * 2. Nano Banana Pro → Generate images (phong cách 99% giống gốc)
+ * 1. Gemini 2.5 Flash → Caption + Image Prompt
+ * 2. Gemini 3 Pro Image Preview → Generate images (streamed 1 by 1)
  * ===================================================================
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
+
+// Extend serverless timeout (Vercel/Netlify)
+export const maxDuration = 300; // 5 minutes
 
 // ===================================================================
 // STEP 1: GENERATE CAPTION + IMAGE PROMPT (Gemini 2.5 Flash)
@@ -58,10 +61,10 @@ nếu gốc là UGC → thử storytelling, nếu gốc là testimonial → th�
         // inspired (default)
         missionBlock = `## CHẾ ĐỘ: LẤY CẢM HỨNG
 Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc).
-Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone.
-Image prompts phải khớp với nội dung caption.`;
+Tạo bản MỚI nhưng GIỮ NGUYÊN phong cách đã chứng minh hiệu quả.
+KHÔNG copy nguyên văn — paraphrase thông minh.`;
     }
-    // Clone mode: add explicit product-matching rule
+
     if (mode === 'clone') {
         missionBlock += `\n\n⛔ QUY TẮC SẢN PHẨM (TUYỆT ĐỐI):
 - Sản phẩm trong caption spin PHẢI GIỐNG Y sản phẩm trong caption gốc
@@ -70,7 +73,6 @@ Image prompts phải khớp với nội dung caption.`;
 - Image prompts cũng PHẢI mô tả ĐÚNG sản phẩm trong caption gốc`;
     }
 
-    // Clone mode: only style guidelines, NO product-specific data from other ads
     const briefBlock = mode === 'clone' ? `## STYLE GUIDELINES (từ Creative Brief)
 - Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
 - Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
@@ -82,15 +84,17 @@ Image prompts phải khớp với nội dung caption.`;
 - Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
 - CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}`;
 
-    // Clone mode: skip captionExamples, winningPatterns, topAds (they reference other products)
     const captionExamplesBlock = mode === 'clone' ? '' :
-        (mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG\n${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. "${ex}"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)');
+        (mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG
+${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. \"${ex}\"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)');
 
     const winningPatternsBlock = mode === 'clone' ? '' :
-        (mode !== 'fresh' ? `## WINNING PATTERNS\n${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : '');
+        (mode !== 'fresh' ? `## WINNING PATTERNS
+${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : '');
 
     const topAdsBlock = mode === 'clone' ? '' :
-        (mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)\n${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} "${ad.name}" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : '');
+        (mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
+${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} \"${ad.name}\" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : '');
 
     return `Bạn là CHUYÊN GIA CREATIVE quảng cáo Facebook Việt Nam — chuyên tạo nội dung UGC (User-Generated Content) chân thực, tự nhiên.
 
@@ -111,52 +115,20 @@ ${winningPatternsBlock}
 
 ${topAdsBlock}
 
-## NÊN LÀM
-${creativeBrief?.doList?.map((d: string) => `✓ ${d}`).join('\n') || 'N/A'}
+## IMAGE PROMPT REQUIREMENTS
 
-## KHÔNG NÊN
-${creativeBrief?.dontList?.map((d: string) => `✕ ${d}`).join('\n') || 'N/A'}
+### Phong cách TUYỆT ĐỐI: UGC / POV (User-Generated Content / Point-of-View)
 
-## YÊU CẦU OUTPUT
+Mỗi image prompt PHẢI mô tả ảnh trông như "NGƯỜI THẬT chụp bằng ĐIỆN THOẠI ở đời thường":
 
-### Caption:
-- Viết bằng tiếng Việt, phong cách TỰ NHIÊN, như người thật chia sẻ trải nghiệm
-${mode === 'clone' ? '- SPIN caption gốc: cùng cấu trúc, cùng flow, khác từ ngữ' : mode === 'fresh' ? '- Sáng tạo góc tiếp cận MỚI, KHÁC hẳn winning ads' : '- Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc)\n- Nội dung MỚI nhưng GIỮ NGUYÊN phong cách và tone'}
-- Có CTA phù hợp ở cuối
-- ⚠️ QUY TẮC EMOJI — TUYỆT ĐỐI TUÂN THỦ:
-  + Tối đa 2-3 emoji trong TOÀN BỘ caption
-  + Chỉ dùng emoji phù hợp ngữ cảnh (ít, tinh tế)
-  + CẤM spam emoji liên tục — trông rất bị AI
-  + CẤM emoji ở đầu mỗi dòng — trông như chatbot
-  + Caption phải đọc TỰ NHIÊN như người thật viết, KHÔNG PHẢI AI
-
-### Image Prompts — ⚠️ PHONG CÁCH UGC / POV — QUAN TRỌNG NHẤT ⚠️:
-
-#### TRIẾT LÝ CỐT LÕI:
-Ảnh PHẢI trông như NGƯỜI THẬT tự chụp bằng điện thoại rồi đăng lên mạng xã hội.
-KHÔNG PHẢI ảnh studio, KHÔNG PHẢI ảnh dàn dựng, KHÔNG PHẢI ảnh "đẹp hoàn hảo".
-Sự CHÂN THỰC và TỰ NHIÊN quan trọng hơn sự HOÀN HẢO.
-
-#### KHỔ ẢNH THEO SỐ LƯỢNG (BẮT BUỘC):
-- **1 ảnh**: Dọc 4:5 (1080×1350px)
-- **2 ảnh**: Mỗi ảnh dọc 4:5 (1080×1350px)
-- **4 ảnh**: Mỗi ảnh vuông 1:1 (1080×1080px)
-→ MỌI image prompt PHẢI ghi rõ aspect ratio + resolution ở CUỐI prompt
-
-Mỗi prompt PHẢI bao gồm TẤT CẢ các yếu tố sau:
-
-1. **Nguồn cảm hứng**: Chỉ rõ lấy cảm hứng từ ad nào
-2. **Thiết bị chụp**: LUÔN LÀ smartphone (VD: "Casual photo taken with iPhone", "Quick snap from Samsung Galaxy")
-3. **Góc chụp**: POV (first-person), selfie angle, slightly tilted, off-center — KHÔNG bao giờ perfectly centered hoặc symmetrical
-4. **Ánh sáng**: Ánh sáng THỰC TẾ phù hợp với bối cảnh sử dụng sản phẩm. TUỲ NGÀNH mà chọn ánh sáng khác nhau:
-   - Đồ ăn bình dân: đèn tuýp, đèn LED trắng quán ăn
-   - Đồ ăn cao cấp/café: ánh đèn vàng ấm 3000K, nến, đèn trang trí
-   - Mỹ phẩm/skincare: ánh sáng cửa sổ ban ngày mềm mại, đèn bàn trang điểm
-   - Thời trang: ánh sáng tự nhiên ngoài trời, golden hour, ánh đèn fitting room
-   - Nội thất/gia dụng: đèn phòng khách ấm, đèn bếp, ánh sáng ban công
-   - Ngoài trời: sunlight tự nhiên, ánh đèn đường, đèn quán vỉa hè
-   → Quy tắc duy nhất: KHÔNG BAO GIỜ dùng softbox, studio light, rim light, hay thiết bị chiếu sáng chuyên nghiệp. Ánh sáng phải là ánh sáng MÔI TRƯỜNG có sẵn.
-5. **Bối cảnh (Setting)**: Môi trường THẬT nơi sản phẩm được SỬ DỤNG, có chi tiết "lộn xộn" tự nhiên phù hợp bối cảnh. TUỲ NGÀNH:
+1. **Camera**: LUÔN LÀ smartphone camera (iPhone 13/14/15, Samsung Galaxy S23/S24). KHÔNG BAO GIỜ dùng DSLR, mirrorless, hay bất kỳ camera chuyên nghiệp nào.
+2. **Góc chụp**: Slightly tilted (2-5 degrees), first-person POV, selfie-with-product, or casual overhead. KHÔNG BAO GIỜ centered/symmetrical.
+3. **Ánh sáng**: Chỉ dùng ánh sáng thực tế tại chỗ:
+   - Trong nhà: đèn huỳnh quang trần (ánh vàng), đèn LED (ánh trắng lạnh), ánh sáng cửa sổ
+   - Quán ăn: đèn neon, đèn treo warm, ánh sáng lẫn từ nhiều nguồn
+   - Ngoài trời: nắng tự nhiên, bóng râm, golden hour
+   → KHÔNG BAO GIỜ studio lighting, softbox, ring light
+4. **Background**: LUÔN messy/cluttered — nền thực tế không dọn dẹp:
    - Đồ ăn: bàn ăn có ly nước dùng dở, khăn giấy, chai nước mắm, bát đũa lung tung
    - Mỹ phẩm/skincare: bàn trang điểm có gương, bông tẩy trang, vài lọ khác bày bừa, điện thoại
    - Thời trang: phòng thử đồ có gương, tủ quần áo, sàn có giày dép, túi shopping
@@ -314,178 +286,189 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 }
 
 // ===================================================================
-// MAIN HANDLER
+// MAIN HANDLER — STREAMING NDJSON
 // ===================================================================
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: campaignId } = await params;
+    let body: any;
     try {
-        const { id: campaignId } = await params;
-        const body = await request.json();
-
-        const { genMode, winnerCaption, creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
-
-        if (!creativeBrief) {
-            return NextResponse.json(
-                { success: false, error: 'creativeBrief is required' },
-                { status: 400 }
-            );
-        }
-
-        const openrouterKey = process.env.OPENROUTER_API_KEY;
-        if (!openrouterKey) {
-            return NextResponse.json(
-                { success: false, error: 'OPENROUTER_API_KEY not configured' },
-                { status: 500 }
-            );
-        }
-
-        const client = new OpenAI({
-            apiKey: openrouterKey,
-            baseURL: 'https://openrouter.ai/api/v1',
-            defaultHeaders: {
-                'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
-                'X-Title': 'THO ADS AI - Creative Studio',
-            },
-        });
-
-        console.log(`[GENERATE_CREATIVE] 🎨 Campaign ${campaignId} — Starting pipeline...`);
-
-        // ─── STEP 1: Generate Caption + Image Prompts ────────────────
-        console.log('[GENERATE_CREATIVE] 📝 Step 1: Generating caption + image prompts...');
-
-        const referenceUrls: string[] = body.topAdImageUrls || [];
-        const captionPrompt = buildCaptionPrompt({
-            creativeBrief,
-            winningPatterns,
-            topAds,
-            campaignName,
-            genMode: genMode || 'inspired',
-            winnerCaption: winnerCaption || '',
-        }, genMode === 'clone' ? referenceUrls.length : undefined);
-
-        const captionResponse = await client.chat.completions.create({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-                { role: 'user', content: captionPrompt },
-            ],
-            temperature: 0.8,
-        });
-
-        const captionText = captionResponse.choices?.[0]?.message?.content || '';
-
-        // Parse JSON from response
-        let captionResult: {
-            caption: string;
-            imageCount: number;
-            imagePrompts: string[];
-            keyMessage: string;
-        };
-
-        try {
-            // Step 1: Strip markdown code fences
-            let cleaned = captionText;
-            const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-            if (fenceMatch) {
-                cleaned = fenceMatch[1];
-            }
-            // Step 2: Balanced brace matching
-            const startIdx = cleaned.indexOf('{');
-            if (startIdx === -1) throw new Error('No JSON object found');
-            let depth = 0;
-            let endIdx = -1;
-            for (let i = startIdx; i < cleaned.length; i++) {
-                if (cleaned[i] === '{') depth++;
-                else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
-            }
-            if (endIdx === -1) throw new Error('Unbalanced JSON braces');
-            captionResult = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
-        } catch {
-            console.error('[GENERATE_CREATIVE] ❌ Failed to parse caption JSON:', captionText.slice(0, 500));
-            return NextResponse.json({
-                success: false,
-                error: 'AI trả về format không hợp lệ. Vui lòng thử lại.',
-            }, { status: 500 });
-        }
-
-        console.log(`[GENERATE_CREATIVE] ✅ Caption generated, ${captionResult.imageCount} images requested`);
-        console.log(`[GENERATE_CREATIVE] 💬 Key message: ${captionResult.keyMessage}`);
-
-        // ─── STEP 2: Generate Images with Nano Banana Pro ────────────
-        console.log(`[GENERATE_CREATIVE] 🖼️ Step 2: Generating ${captionResult.imageCount} image(s)...`);
-
-        // referenceUrls already declared above (line 338)
-        const generatedImages: string[] = [];
-        const mode = genMode || 'inspired';
-
-        // Determine effective image count and reference strategy based on mode
-        let effectiveImageCount: number;
-        if (mode === 'clone' && referenceUrls.length > 0) {
-            // Clone: force imageCount to match reference images (1:1)
-            effectiveImageCount = referenceUrls.length;
-        } else {
-            // Inspired/Fresh: use AI's suggested count
-            effectiveImageCount = captionResult.imageCount;
-        }
-
-        const effectivePrompts = captionResult.imagePrompts.slice(0, effectiveImageCount);
-        // Pad prompts if fewer than needed
-        while (effectivePrompts.length < effectiveImageCount) {
-            effectivePrompts.push(captionResult.imagePrompts[captionResult.imagePrompts.length - 1] || captionResult.imagePrompts[0]);
-        }
-
-        console.log(`[GENERATE_CREATIVE] 🖼️ Mode: ${mode.toUpperCase()}, generating ${effectiveImageCount} image(s) (${referenceUrls.length} references)...`);
-
-        // Generate images based on mode
-        const imagePromises = effectivePrompts
-            .map(async (prompt, idx) => {
-                let refImage: string | null = null;
-                if (mode === 'clone') {
-                    // 1:1 mapping: each image gets its corresponding reference
-                    refImage = referenceUrls[idx] || null;
-                } else if (mode === 'inspired') {
-                    // Send the first available reference for general inspiration
-                    refImage = referenceUrls[idx % referenceUrls.length] || null;
-                }
-                // fresh: refImage stays null
-                console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? 'YES' : 'NO'}`);
-                const image = await generateImage(client, prompt, refImage, effectiveImageCount);
-                return { idx, image };
-            });
-
-        const imageResults = await Promise.all(imagePromises);
-
-        for (const { idx, image } of imageResults.sort((a, b) => a.idx - b.idx)) {
-            if (image) {
-                generatedImages.push(image);
-                console.log(`[GENERATE_CREATIVE] ✅ Image ${idx + 1} generated`);
-            } else {
-                console.warn(`[GENERATE_CREATIVE] ⚠️ Image ${idx + 1} failed`);
-            }
-        }
-
-        console.log(`[GENERATE_CREATIVE] 🎉 Done! ${generatedImages.length}/${captionResult.imageCount} images generated`);
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                caption: captionResult.caption,
-                keyMessage: captionResult.keyMessage,
-                imageCount: captionResult.imageCount,
-                imagePrompts: captionResult.imagePrompts,
-                images: generatedImages,
-                captionPrompt, // Trả về prompt gốc để debug & cải tiến
-                referenceImageUrls: referenceUrls, // URLs ảnh tham khảo đã dùng
-            },
-        });
-
-    } catch (error) {
-        console.error('[GENERATE_CREATIVE] ❌', error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        }, { status: 500 });
+        body = await request.json();
+    } catch {
+        return new Response(
+            JSON.stringify({ type: 'error', error: 'Invalid JSON body' }) + '\n',
+            { status: 400, headers: { 'Content-Type': 'application/x-ndjson' } }
+        );
     }
+
+    const { genMode, winnerCaption, creativeBrief, winningPatterns, topAds, campaignName, topAdImageUrls } = body;
+
+    if (!creativeBrief) {
+        return new Response(
+            JSON.stringify({ type: 'error', error: 'creativeBrief is required' }) + '\n',
+            { status: 400, headers: { 'Content-Type': 'application/x-ndjson' } }
+        );
+    }
+
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey) {
+        return new Response(
+            JSON.stringify({ type: 'error', error: 'OPENROUTER_API_KEY not configured' }) + '\n',
+            { status: 500, headers: { 'Content-Type': 'application/x-ndjson' } }
+        );
+    }
+
+    const client = new OpenAI({
+        apiKey: openrouterKey,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+            'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+            'X-Title': 'THO ADS AI - Creative Studio',
+        },
+    });
+
+    const referenceUrls: string[] = topAdImageUrls || [];
+    const mode = genMode || 'inspired';
+
+    console.log(`[GENERATE_CREATIVE] 🎨 Campaign ${campaignId} — STREAMING pipeline, mode=${mode}`);
+
+    // Create streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+        async start(controller) {
+            const send = (data: any) => {
+                controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'));
+            };
+
+            try {
+                // ─── STEP 1: Generate Caption + Image Prompts ────────────
+                send({ type: 'step', message: 'Đang tạo caption & image prompts...' });
+
+                const captionPrompt = buildCaptionPrompt({
+                    creativeBrief,
+                    winningPatterns,
+                    topAds,
+                    campaignName,
+                    genMode: mode,
+                    winnerCaption: winnerCaption || '',
+                }, mode === 'clone' ? referenceUrls.length : undefined);
+
+                const captionResponse = await client.chat.completions.create({
+                    model: 'google/gemini-2.5-flash',
+                    messages: [{ role: 'user', content: captionPrompt }],
+                    temperature: 0.8,
+                });
+
+                const captionText = captionResponse.choices?.[0]?.message?.content || '';
+
+                // Parse JSON from response
+                let captionResult: {
+                    caption: string;
+                    imageCount: number;
+                    imagePrompts: string[];
+                    keyMessage: string;
+                };
+
+                try {
+                    let cleaned = captionText;
+                    const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+                    if (fenceMatch) cleaned = fenceMatch[1];
+                    const startIdx = cleaned.indexOf('{');
+                    if (startIdx === -1) throw new Error('No JSON object found');
+                    let depth = 0;
+                    let endIdx = -1;
+                    for (let i = startIdx; i < cleaned.length; i++) {
+                        if (cleaned[i] === '{') depth++;
+                        else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+                    }
+                    if (endIdx === -1) throw new Error('Unbalanced JSON braces');
+                    captionResult = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
+                } catch {
+                    console.error('[GENERATE_CREATIVE] ❌ Failed to parse caption JSON:', captionText.slice(0, 500));
+                    send({ type: 'error', error: 'AI trả về format không hợp lệ. Vui lòng thử lại.' });
+                    controller.close();
+                    return;
+                }
+
+                console.log(`[GENERATE_CREATIVE] ✅ Caption generated, ${captionResult.imageCount} images requested`);
+
+                // Stream caption result immediately
+                send({
+                    type: 'caption',
+                    data: {
+                        caption: captionResult.caption,
+                        keyMessage: captionResult.keyMessage,
+                        imageCount: captionResult.imageCount,
+                        imagePrompts: captionResult.imagePrompts,
+                        captionPrompt, // debug
+                        referenceImageUrls: referenceUrls,
+                    },
+                });
+
+                // ─── STEP 2: Generate Images ONE BY ONE ────────────
+                let effectiveImageCount: number;
+                if (mode === 'clone' && referenceUrls.length > 0) {
+                    effectiveImageCount = referenceUrls.length;
+                } else {
+                    effectiveImageCount = captionResult.imageCount;
+                }
+
+                const effectivePrompts = captionResult.imagePrompts.slice(0, effectiveImageCount);
+                while (effectivePrompts.length < effectiveImageCount) {
+                    effectivePrompts.push(captionResult.imagePrompts[captionResult.imagePrompts.length - 1] || captionResult.imagePrompts[0]);
+                }
+
+                send({ type: 'step', message: `Đang tạo ${effectiveImageCount} ảnh...` });
+
+                for (let idx = 0; idx < effectiveImageCount; idx++) {
+                    const prompt = effectivePrompts[idx];
+                    let refImage: string | null = null;
+                    if (mode === 'clone') {
+                        refImage = referenceUrls[idx] || null;
+                    } else if (mode === 'inspired') {
+                        refImage = referenceUrls[idx % referenceUrls.length] || null;
+                    }
+
+                    send({ type: 'step', message: `Đang vẽ ảnh ${idx + 1}/${effectiveImageCount}...` });
+                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? 'YES' : 'NO'}`);
+
+                    const image = await generateImage(client, prompt, refImage, effectiveImageCount);
+
+                    send({
+                        type: 'image',
+                        index: idx,
+                        total: effectiveImageCount,
+                        data: image, // base64 or null
+                    });
+
+                    if (image) {
+                        console.log(`[GENERATE_CREATIVE] ✅ Image ${idx + 1} generated`);
+                    } else {
+                        console.warn(`[GENERATE_CREATIVE] ⚠️ Image ${idx + 1} failed`);
+                    }
+                }
+
+                // ─── DONE ────────────
+                send({ type: 'done' });
+                console.log(`[GENERATE_CREATIVE] 🎉 Streaming pipeline done`);
+
+            } catch (error) {
+                console.error('[GENERATE_CREATIVE] ❌', error);
+                send({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' });
+            } finally {
+                controller.close();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'application/x-ndjson',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    });
 }

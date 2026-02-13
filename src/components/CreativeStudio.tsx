@@ -145,8 +145,86 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
     const [genMode, setGenMode] = useState<'clone' | 'inspired' | 'fresh'>('inspired');
     const [selectedRefAdIdx, setSelectedRefAdIdx] = useState(0); // Index of ad to use as reference
 
+    // Product filter
+    const [detectedProducts, setDetectedProducts] = useState<string[]>([]);
+    const [selectedProduct, setSelectedProduct] = useState<string>(''); // '' = all
+
     // Debug
     const [showDebug, setShowDebug] = useState(false);
+
+    // ===== PRODUCT DETECTION =====
+    // Detect products by finding distinctive multi-word phrases in captions
+    const detectProducts = useCallback((adList: AdItem[]): string[] => {
+        if (adList.length < 3) return [];
+
+        // Build 2-4 word n-gram frequency from captions
+        const phraseAdMap = new Map<string, Set<number>>();
+
+        adList.forEach((ad, idx) => {
+            const text = (ad.ad_name + ' ' + (ad.caption || '')).toLowerCase()
+                .normalize('NFC')
+                .replace(/[,.!?;:(){}\[\]"'—–\-\/\\@#$%^&*…\n\r]/g, ' ');
+            const words = text.split(/\s+/).filter(w => w.length > 1);
+
+            for (let len = 2; len <= 4; len++) {
+                for (let j = 0; j <= words.length - len; j++) {
+                    const phrase = words.slice(j, j + len).join(' ');
+                    if (phrase.length < 5) continue; // skip very short
+                    if (!phraseAdMap.has(phrase)) phraseAdMap.set(phrase, new Set());
+                    phraseAdMap.get(phrase)!.add(idx);
+                }
+            }
+        });
+
+        // Find discriminative phrases: in 20-70% of ads (not too common, not too rare)
+        const minAds = Math.max(2, Math.floor(adList.length * 0.15));
+        const maxAds = Math.floor(adList.length * 0.75);
+
+        const candidates = Array.from(phraseAdMap.entries())
+            .filter(([phrase, adSet]) => {
+                const count = adSet.size;
+                if (count < minAds || count > maxAds) return false;
+                // Filter out common Vietnamese stop-phrases
+                const stopWords = ['của', 'và', 'cho', 'với', 'này', 'cái', 'một', 'nhà', 'thì', 'mà', 'là', 'có'];
+                const phraseWords = phrase.split(' ');
+                if (phraseWords.every(w => stopWords.includes(w) || w.length <= 2)) return false;
+                return true;
+            })
+            .sort((a, b) => {
+                // Prefer longer phrases (more specific)
+                const lenDiff = b[0].split(' ').length - a[0].split(' ').length;
+                if (lenDiff !== 0) return lenDiff;
+                // Then by frequency
+                return b[1].size - a[1].size;
+            });
+
+        // Greedy clustering: pick top phrases that cover non-overlapping ad sets
+        const usedAds = new Set<number>();
+        const products: string[] = [];
+
+        for (const [phrase, adSet] of candidates) {
+            // Skip if most ads in this phrase are already covered
+            const newAds = Array.from(adSet).filter(i => !usedAds.has(i));
+            if (newAds.length < minAds) continue;
+
+            // Capitalize first letter of each word
+            const name = phrase.replace(/\b\w/g, c => c.toUpperCase());
+            products.push(name);
+            adSet.forEach(i => usedAds.add(i));
+
+            if (products.length >= 5) break; // max 5 products
+        }
+
+        return products;
+    }, []);
+
+    // Compute filtered ads based on selected product
+    const filteredAds = selectedProduct
+        ? ads.filter(a => {
+            const text = (a.ad_name + ' ' + (a.caption || '')).toLowerCase();
+            return text.includes(selectedProduct.toLowerCase());
+        })
+        : ads;
 
     // ===== FETCH ADS DATA =====
     const fetchAds = useCallback(async () => {
@@ -195,8 +273,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         setLoadingIntel(true);
         setIntelError('');
         try {
+            const productParam = selectedProduct ? `&product=${encodeURIComponent(selectedProduct)}` : '';
             const res = await fetch(
-                `/api/analysis/campaign/${campaignId}/creative-intel?startDate=${startDate}&endDate=${endDate}`
+                `/api/analysis/campaign/${campaignId}/creative-intel?startDate=${startDate}&endDate=${endDate}${productParam}`
             );
             const json = await res.json();
             if (json.success && json.data) {
@@ -210,12 +289,19 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         } finally {
             setLoadingIntel(false);
         }
-    }, [campaignId, startDate, endDate]);
+    }, [campaignId, startDate, endDate, selectedProduct]);
 
-    // Auto-fetch ads on mount
+    // Auto-fetch ads on mount + detect products when ads change
     useEffect(() => {
         fetchAds();
     }, [fetchAds]);
+
+    useEffect(() => {
+        if (ads.length > 0) {
+            const products = detectProducts(ads);
+            setDetectedProducts(products);
+        }
+    }, [ads, detectProducts]);
 
     // ===== FETCH AD SETS =====
     const fetchAdSets = useCallback(async () => {
@@ -256,36 +342,36 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
             fetchAdSets();
         }
     }, [generatedCaption, fetchAdSets]); // eslint-disable-line react-hooks/exhaustive-deps
-    // ===== GENERATE CREATIVE (Caption + Images) =====
+    // ===== GENERATE CREATIVE (Caption + Images) — STREAMING =====
     const generateCreative = useCallback(async () => {
         if (!intel) return;
         setIsGenerating(true);
         setGenerateError('');
-        setGenerateStep('Đang tạo caption & image prompts...');
+        setGenerateStep('Đang kết nối...');
         setGeneratedCaption('');
         setGeneratedImages([]);
+        setGeneratedKeyMessage('');
+        setGeneratedImagePrompts([]);
+        setGeneratedCaptionPrompt('');
+        setReferenceImageUrls([]);
 
         try {
             // Build reference URLs based on generation mode
             let topAdImageUrls: string[] = [];
             if (genMode === 'clone') {
-                // 1:1 clone: full ảnh từ ad được chọn
-                const topAdsWithPurchases = ads.filter(a => a.metrics.purchases > 0);
+                const topAdsWithPurchases = filteredAds.filter(a => a.metrics.purchases > 0);
                 const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
                 topAdImageUrls = refAd?.image_urls?.length
                     ? refAd.image_urls
                     : [refAd?.image_url].filter(Boolean) as string[];
             } else if (genMode === 'inspired') {
-                // Mix từ top 3 ads
-                const top3 = ads.filter(a => a.metrics.purchases > 0).slice(0, 3);
+                const top3 = filteredAds.filter(a => a.metrics.purchases > 0).slice(0, 3);
                 topAdImageUrls = top3.flatMap(a => a.image_urls?.length ? a.image_urls.slice(0, 2) : [a.image_url]).filter(Boolean) as string[];
             }
-            // fresh: topAdImageUrls stays empty
 
-            // For clone mode: send the winning ad's caption for spinning
             let winnerCaption = '';
             if (genMode === 'clone') {
-                const topAdsWithPurchases = ads.filter(a => a.metrics.purchases > 0);
+                const topAdsWithPurchases = filteredAds.filter(a => a.metrics.purchases > 0);
                 const refAd = topAdsWithPurchases[selectedRefAdIdx] || topAdsWithPurchases[0];
                 winnerCaption = refAd?.caption || '';
             }
@@ -307,27 +393,71 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                 }
             );
 
-            setGenerateStep('Đang tạo ảnh với Nano Banana Pro...');
-            const json = await res.json();
-
-            if (json.success && json.data) {
-                setGeneratedCaption(json.data.caption || '');
-                setGeneratedImages(json.data.images || []);
-                setGeneratedKeyMessage(json.data.keyMessage || '');
-                setGeneratedImagePrompts(json.data.imagePrompts || []);
-                setGeneratedCaptionPrompt(json.data.captionPrompt || '');
-                setReferenceImageUrls(json.data.referenceImageUrls || []);
-                setActiveTab('output');
-            } else {
-                setGenerateError(json.error || 'Không thể tạo creative');
+            if (!res.ok || !res.body) {
+                // Fallback: try reading as JSON error
+                try {
+                    const errorJson = await res.json();
+                    setGenerateError(errorJson.error || `HTTP ${res.status}`);
+                } catch {
+                    setGenerateError(`Lỗi server: HTTP ${res.status}`);
+                }
+                return;
             }
+
+            // Read NDJSON stream
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const collectedImages: string[] = [];
+            let switchedToOutput = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const event = JSON.parse(line);
+
+                        if (event.type === 'step') {
+                            setGenerateStep(event.message || '');
+                        } else if (event.type === 'caption') {
+                            setGeneratedCaption(event.data.caption || '');
+                            setGeneratedKeyMessage(event.data.keyMessage || '');
+                            setGeneratedImagePrompts(event.data.imagePrompts || []);
+                            setGeneratedCaptionPrompt(event.data.captionPrompt || '');
+                            setReferenceImageUrls(event.data.referenceImageUrls || []);
+                            // Switch to OUTPUT tab immediately when caption arrives
+                            if (!switchedToOutput) {
+                                setActiveTab('output');
+                                switchedToOutput = true;
+                            }
+                        } else if (event.type === 'image') {
+                            if (event.data) {
+                                collectedImages.push(event.data);
+                                setGeneratedImages([...collectedImages]);
+                            }
+                        } else if (event.type === 'error') {
+                            setGenerateError(event.error || 'Lỗi không xác định');
+                        }
+                    } catch {
+                        // Skip malformed JSON lines
+                    }
+                }
+            }
+
         } catch (err) {
             setGenerateError(err instanceof Error ? err.message : 'Lỗi kết nối');
         } finally {
             setIsGenerating(false);
             setGenerateStep('');
         }
-    }, [intel, ads, campaignId, campaignName]);
+    }, [intel, filteredAds, campaignId, campaignName, genMode, selectedRefAdIdx]);
 
     // ===== RENDER HELPERS =====
 
@@ -521,15 +651,79 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
 
                             {!loadingAds && ads.length > 0 && (
                                 <>
+                                    {/* Product Filter */}
+                                    {detectedProducts.length > 0 && (
+                                        <div style={{ marginBottom: '16px', paddingBottom: '12px', borderBottom: `1px solid ${colors.border}` }}>
+                                            <span style={{
+                                                fontSize: '0.5625rem', fontWeight: 700, color: colors.textMuted,
+                                                letterSpacing: '0.1em', display: 'block', marginBottom: '8px',
+                                            }}>
+                                                LỌC THEO SẢN PHẨM
+                                            </span>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                                                <button
+                                                    onClick={() => { setSelectedProduct(''); setSelectedRefAdIdx(0); }}
+                                                    style={{
+                                                        padding: '5px 10px', fontSize: '0.6875rem', fontWeight: 600,
+                                                        background: !selectedProduct ? `${colors.primary}20` : 'transparent',
+                                                        border: `1px solid ${!selectedProduct ? colors.primary : colors.border}`,
+                                                        borderRadius: '4px', cursor: 'pointer',
+                                                        color: !selectedProduct ? colors.primary : colors.textMuted,
+                                                    }}
+                                                >
+                                                    TẤT CẢ ({ads.length})
+                                                </button>
+                                                {detectedProducts.map(product => {
+                                                    const count = ads.filter(a => (a.ad_name + ' ' + (a.caption || '')).toLowerCase().includes(product.toLowerCase())).length;
+                                                    const isActive = selectedProduct.toLowerCase() === product.toLowerCase();
+                                                    return (
+                                                        <button
+                                                            key={product}
+                                                            onClick={() => { setSelectedProduct(isActive ? '' : product); setSelectedRefAdIdx(0); }}
+                                                            style={{
+                                                                padding: '5px 10px', fontSize: '0.6875rem', fontWeight: 600,
+                                                                background: isActive ? `${colors.accent}20` : 'transparent',
+                                                                border: `1px solid ${isActive ? colors.accent : colors.border}`,
+                                                                borderRadius: '4px', cursor: 'pointer',
+                                                                color: isActive ? colors.accent : colors.textMuted,
+                                                            }}
+                                                        >
+                                                            {product} ({count})
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {/* Manual input */}
+                                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Hoặc nhập tên sản phẩm..."
+                                                    value={detectedProducts.some(p => p.toLowerCase() === selectedProduct.toLowerCase()) ? '' : selectedProduct}
+                                                    onChange={(e) => { setSelectedProduct(e.target.value); setSelectedRefAdIdx(0); }}
+                                                    style={{
+                                                        flex: 1, padding: '5px 8px', fontSize: '0.6875rem',
+                                                        background: colors.bg, border: `1px solid ${colors.border}`,
+                                                        borderRadius: '4px', color: colors.text, outline: 'none',
+                                                    }}
+                                                />
+                                                {selectedProduct && (
+                                                    <span style={{ fontSize: '0.625rem', color: colors.textMuted }}>
+                                                        {filteredAds.length} ads
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Top ads */}
                                     <div style={{ marginBottom: '20px' }}>
                                         <h3 style={{
                                             fontSize: '0.6875rem', fontWeight: 700, color: colors.accent,
                                             letterSpacing: '0.1em', margin: '0 0 10px',
                                         }}>
-                                            ▲ TOP PERFORMER ({Math.min(5, ads.filter(a => a.metrics.purchases > 0).length)})
+                                            ▲ TOP PERFORMER ({Math.min(5, filteredAds.filter(a => a.metrics.purchases > 0).length)})
                                         </h3>
-                                        {ads
+                                        {filteredAds
                                             .filter(a => a.metrics.purchases > 0)
                                             .slice(0, 5)
                                             .map((ad, i) => renderAdCard(ad, i + 1, true))
@@ -544,7 +738,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                         }}>
                                             ▼ UNDER PERFORMER
                                         </h3>
-                                        {ads
+                                        {filteredAds
                                             .filter(a => a.metrics.spend > 50000)
                                             .slice(-3)
                                             .reverse()
@@ -945,13 +1139,13 @@ Tổng ads: ${ads.length}`}
                                         </div>
 
                                         {/* Ad selector — only for clone mode */}
-                                        {genMode === 'clone' && ads.filter(a => a.metrics.purchases > 0).length > 1 && (
+                                        {genMode === 'clone' && filteredAds.filter(a => a.metrics.purchases > 0).length > 1 && (
                                             <div style={{ marginBottom: '12px' }}>
                                                 <span style={{ fontSize: '0.5625rem', color: colors.textMuted, fontWeight: 700, letterSpacing: '0.05em' }}>
-                                                    CHỌN AD LÀM MẪU
+                                                    CHỌN AD LÀM MẪU{selectedProduct ? ` (${selectedProduct})` : ''}
                                                 </span>
                                                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px', overflowX: 'auto' as const, paddingBottom: '4px' }}>
-                                                    {ads.filter(a => a.metrics.purchases > 0).slice(0, 5).map((ad, i) => (
+                                                    {filteredAds.filter(a => a.metrics.purchases > 0).slice(0, 5).map((ad, i) => (
                                                         <button
                                                             key={ad.ad_id}
                                                             onClick={() => setSelectedRefAdIdx(i)}

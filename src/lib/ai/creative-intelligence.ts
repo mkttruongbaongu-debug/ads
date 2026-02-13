@@ -71,7 +71,7 @@ export interface CreativeIntelligenceResult {
 // PROMPT
 // ===================================================================
 
-function buildAnalysisPrompt(ads: AdPerformanceData[]): string {
+function buildAnalysisPrompt(ads: AdPerformanceData[], productFocus?: string): string {
     // Sort by ROAS (best first)
     const sorted = [...ads].sort((a, b) => b.metrics.roas - a.metrics.roas);
     const top = sorted.slice(0, 5);
@@ -89,7 +89,16 @@ function buildAnalysisPrompt(ads: AdPerformanceData[]): string {
 `;
     };
 
-    return `Bạn là Creative Strategist chuyên phân tích quảng cáo Facebook cho ngành F&B (thực phẩm, đồ uống) tại Việt Nam.
+    const productInstruction = productFocus ? `
+
+⚠️ TRỌNG TÂM SẢN PHẨM: "${productFocus}"
+- CHỈ phân tích các ads liên quan đến sản phẩm "${productFocus}"
+- Creative Brief PHẢI tập trung 100% vào sản phẩm này
+- Caption examples PHẢI viết về sản phẩm "${productFocus}"
+- Visual direction PHẢI mô tả hình ảnh sản phẩm "${productFocus}"
+- Nếu ad không liên quan đến sản phẩm này, vẫn liệt kê nhưng ghi rõ "không thuộc sản phẩm trọng tâm"` : '';
+
+    return `Bạn là Creative Strategist chuyên phân tích quảng cáo Facebook cho ngành F&B (thực phẩm, đồ uống) tại Việt Nam.${productInstruction}
 
 === TOP PERFORMING ADS ===
 ${top.map((a, i) => formatAd(a, i + 1)).join('\n')}
@@ -154,6 +163,7 @@ LƯU Ý:
 
 export async function analyzeCreativeIntelligence(
     ads: AdPerformanceData[],
+    productFocus?: string,
 ): Promise<CreativeIntelligenceResult> {
     // OpenRouter API cho phân tích media chuyên dụng
     const openrouterKey = process.env.OPENROUTER_API_KEY;
@@ -189,7 +199,7 @@ export async function analyzeCreativeIntelligence(
 
     console.log(`[CREATIVE_INTEL] 🔗 Using ${openrouterKey ? 'OpenRouter' : 'OpenAI'} → ${model}`);
 
-    const prompt = buildAnalysisPrompt(meaningfulAds);
+    const prompt = buildAnalysisPrompt(meaningfulAds, productFocus);
 
     // Build vision messages: text prompt + top ad images
     const sorted = [...meaningfulAds].sort((a, b) => b.metrics.roas - a.metrics.roas);

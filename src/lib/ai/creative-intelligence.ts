@@ -173,13 +173,12 @@ export async function analyzeCreativeIntelligence(
         throw new Error('Missing OPENROUTER_API_KEY or OPENAI_API_KEY');
     }
 
-    // Filter ads with meaningful spend
-    const meaningfulAds = ads.filter(a => a.metrics.spend > 50000);
-    if (meaningfulAds.length < 2) {
-        throw new Error('Cần ít nhất 2 ads có chi tiêu > 50K để phân tích');
+    // User đã chọn ads thủ công qua checkbox → không filter thêm, chỉ cần >= 2
+    if (ads.length < 2) {
+        throw new Error('Cần chọn ít nhất 2 ads để phân tích creative intelligence');
     }
 
-    console.log(`[CREATIVE_INTEL] 🎨 Phân tích ${meaningfulAds.length} ads...`);
+    console.log(`[CREATIVE_INTEL] 🎨 Phân tích ${ads.length} ads...`);
 
     // Ưu tiên OpenRouter (chuyên media analysis), fallback OpenAI
     const client = openrouterKey
@@ -199,10 +198,10 @@ export async function analyzeCreativeIntelligence(
 
     console.log(`[CREATIVE_INTEL] 🔗 Using ${openrouterKey ? 'OpenRouter' : 'OpenAI'} → ${model}`);
 
-    const prompt = buildAnalysisPrompt(meaningfulAds, productFocus);
+    const prompt = buildAnalysisPrompt(ads, productFocus);
 
     // Build vision messages: text prompt + top ad images
-    const sorted = [...meaningfulAds].sort((a, b) => b.metrics.roas - a.metrics.roas);
+    const sorted = [...ads].sort((a, b) => b.metrics.roas - a.metrics.roas);
     const topAdsWithImages = sorted.slice(0, 5).filter(a => a.image_url || (a.image_urls && a.image_urls.length > 0));
     const bottomAdsWithImages = sorted.slice(-3).filter(a => a.image_url || (a.image_urls && a.image_urls.length > 0));
 

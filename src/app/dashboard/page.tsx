@@ -1618,25 +1618,25 @@ export default function DashboardPage() {
                                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                 <thead style={{ borderBottom: `1px solid ${colors.border}` }}>
                                                     <tr>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 16px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                             Chiến dịch
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             Chi tiêu
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             NS/ngày
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             ROAS
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             CTR
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             Tuổi
                                                         </th>
-                                                        <th style={{ padding: '14px 20px', fontSize: '0.8rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                        <th style={{ padding: '14px 12px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                                                             Đề xuất AI
                                                         </th>
                                                     </tr>
@@ -1662,7 +1662,7 @@ export default function DashboardPage() {
                                                                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                                                                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                                                             >
-                                                                <td style={{ padding: '16px 20px' }}>
+                                                                <td style={{ padding: '12px 16px', maxWidth: '280px' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                                         <div style={{
                                                                             width: '32px',
@@ -1679,8 +1679,8 @@ export default function DashboardPage() {
                                                                             {statusIcon}
                                                                         </div>
                                                                         <div>
-                                                                            <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                                <span>{campaign.name.length > 35 ? campaign.name.slice(0, 35) + '...' : campaign.name}</span>
+                                                                            <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px', display: 'inline-block' }} title={campaign.name}>{campaign.name}</span>
                                                                                 {analyzedCampaigns[campaign.id] && (
                                                                                     <span
                                                                                         style={{
@@ -1711,12 +1711,12 @@ export default function DashboardPage() {
                                                                         </div>
                                                                     </div>
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text }}>
                                                                         {formatMoney(campaign.totals.spend)}
                                                                     </span>
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                                     <div>
                                                                         <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 500, color: colors.text, fontSize: '0.9rem' }}>
                                                                             {formatMoney(campaign.daily_budget_estimated || 0)}
@@ -1726,17 +1726,17 @@ export default function DashboardPage() {
                                                                         </div>
                                                                     </div>
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: roasColor }}>
                                                                         {roasValue.toFixed(1)}x
                                                                     </span>
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                                     <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted }}>
                                                                         {campaign.totals.ctr.toFixed(2)}%
                                                                     </span>
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                                     {campaign.created_time ? (
                                                                         <span style={{ fontFamily: '"JetBrains Mono", monospace', color: colors.textMuted, fontSize: '0.85rem' }}>
                                                                             {Math.floor((Date.now() - new Date(campaign.created_time).getTime()) / (1000 * 60 * 60 * 24))}d
@@ -1745,18 +1745,19 @@ export default function DashboardPage() {
                                                                         <span style={{ color: colors.textSubtle }}>—</span>
                                                                     )}
                                                                 </td>
-                                                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                                                <td style={{ padding: '12px 12px', textAlign: 'right' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                                                                         <button style={{
                                                                             background: actionColor,
                                                                             color: action === 'WATCH' ? colors.bg : '#fff',
                                                                             border: 'none',
-                                                                            padding: '6px 16px',
+                                                                            padding: '5px 12px',
                                                                             borderRadius: '4px',
                                                                             fontWeight: 600,
-                                                                            fontSize: '0.8rem',
+                                                                            fontSize: '0.75rem',
                                                                             cursor: 'pointer',
                                                                             transition: 'opacity 0.15s',
+                                                                            whiteSpace: 'nowrap' as const,
                                                                         }}>
                                                                             {actionLabel}
                                                                         </button>

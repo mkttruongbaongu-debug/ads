@@ -154,13 +154,13 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: st
 async function generateImage(
     client: OpenAI,
     prompt: string,
-    referenceImageUrls: string[],
+    referenceImageUrl: string | null,
     imageCount: number,
 ): Promise<string | null> {
     try {
         const aspectSpec = getAspectRatioSpec(imageCount);
 
-        // Build multimodal content: ultra-detailed photography prompt + reference images
+        // Build multimodal content: ultra-detailed photography prompt + reference image
         const contentParts: any[] = [
             {
                 type: 'text',
@@ -171,7 +171,13 @@ CRITICAL IDENTITY: You are NOT a professional photographer. You are a REGULAR PE
 ⚠️ MANDATORY ASPECT RATIO: ${aspectSpec.instruction}
 The image MUST be generated in ${aspectSpec.ratio} ratio (${aspectSpec.resolution}). This is NON-NEGOTIABLE.
 
-REFERENCE IMAGES: Study the attached reference images. Match their overall vibe and mood, but make the output feel MORE CASUAL and AUTHENTIC — like a real customer sharing their experience.
+${referenceImageUrl ? `REFERENCE IMAGE: The attached image is the ORIGINAL winning ad photo. Your job is to create a NEW photo that:
+- Has the SAME composition, angle, and framing as the reference
+- Features the SAME type of product/subject in a SIMILAR setting
+- Matches the SAME lighting conditions and color temperature
+- Keeps the SAME mood and vibe
+- But with ENOUGH variation that it looks like a DIFFERENT photo (different angle, slightly different items, etc.)
+Think of it as: "Same person, same product, different day, different photo"` : 'No reference image available — create based on the prompt description only.'}
 
 PHOTOGRAPHY BRIEF:
 ${prompt}
@@ -204,14 +210,12 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             },
         ];
 
-        // Add reference images from winning ads
-        for (const url of referenceImageUrls.slice(0, 3)) {
-            if (url) {
-                contentParts.push({
-                    type: 'image_url',
-                    image_url: { url },
-                });
-            }
+        // Add single reference image (1:1 mapping)
+        if (referenceImageUrl) {
+            contentParts.push({
+                type: 'image_url',
+                image_url: { url: referenceImageUrl },
+            });
         }
 
         const response = await client.chat.completions.create({
@@ -339,12 +343,22 @@ export async function POST(
         const referenceUrls: string[] = topAdImageUrls || [];
         const generatedImages: string[] = [];
 
-        // Generate images in parallel (but with limit)
-        const imagePromises = captionResult.imagePrompts
-            .slice(0, captionResult.imageCount)
+        // Force imageCount to match reference images count (1:1 cloning)
+        const effectiveImageCount = referenceUrls.length > 0 ? referenceUrls.length : captionResult.imageCount;
+        const effectivePrompts = captionResult.imagePrompts.slice(0, effectiveImageCount);
+        // Pad prompts if fewer than reference images
+        while (effectivePrompts.length < effectiveImageCount) {
+            effectivePrompts.push(captionResult.imagePrompts[captionResult.imagePrompts.length - 1] || captionResult.imagePrompts[0]);
+        }
+
+        console.log(`[GENERATE_CREATIVE] 🖼️ Generating ${effectiveImageCount} image(s) (${referenceUrls.length} reference images)...`);
+
+        // Generate images in parallel — each referencing its corresponding original
+        const imagePromises = effectivePrompts
             .map(async (prompt, idx) => {
-                console.log(`[GENERATE_CREATIVE] 🖼️ Generating image ${idx + 1}/${captionResult.imageCount}...`);
-                const image = await generateImage(client, prompt, referenceUrls, captionResult.imageCount);
+                const refImage = referenceUrls[idx] || null; // 1:1 mapping
+                console.log(`[GENERATE_CREATIVE] 🖼️ Generating image ${idx + 1}/${effectiveImageCount} (ref: ${refImage ? 'YES' : 'NO'})...`);
+                const image = await generateImage(client, prompt, refImage, effectiveImageCount);
                 return { idx, image };
             });
 

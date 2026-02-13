@@ -159,8 +159,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                     ad_id: ad.id,
                     ad_name: ad.name,
                     caption: ad.message || '',
-                    content_type: ad.creativeId ? 'IMAGE' : 'UNKNOWN',
+                    content_type: ad.thumbnails?.length > 1 ? 'CAROUSEL' : (ad.videoUrl ? 'VIDEO' : (ad.thumbnail ? 'IMAGE' : 'UNKNOWN')),
                     image_url: ad.thumbnail || '',
+                    image_urls: ad.thumbnails?.length > 0 ? ad.thumbnails : (ad.thumbnail ? [ad.thumbnail] : []),
                     metrics: {
                         spend: ad.totals?.spend || 0,
                         purchases: ad.totals?.purchases || 0,
@@ -261,11 +262,11 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
         setGeneratedImages([]);
 
         try {
-            // Collect top ad image URLs for reference
-            const topAdImageUrls = ads
-                .slice(0, 5)
-                .map(a => a.image_url)
-                .filter(Boolean);
+            // Lấy full ảnh từ top winner ad (ad đầu tiên có purchases > 0)
+            const topWinnerAd = ads.find(a => a.metrics.purchases > 0);
+            const topAdImageUrls = topWinnerAd?.image_urls?.length
+                ? topWinnerAd.image_urls
+                : [topWinnerAd?.image_url].filter(Boolean) as string[];
 
             const res = await fetch(
                 `/api/analysis/campaign/${campaignId}/generate-creative`,

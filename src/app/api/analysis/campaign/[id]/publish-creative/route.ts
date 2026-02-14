@@ -97,14 +97,43 @@ export async function POST(
         // ─── Step 2: Upload image ────────────────────────────────────
         console.log('[PUBLISH_CREATIVE] 🖼️ Step 2: Uploading image...');
 
-        // Extract base64 data (remove data:image/...;base64, prefix if present)
-        const base64Data = image.replace(/^data:image\/[^;]+;base64,/, '');
+        // Handle both base64 data URLs and HTTP URLs (BytePlus returns URLs)
+        let imageBuffer: Buffer;
+        let mimeType = 'image/png';
+
+        if (image.startsWith('data:')) {
+            // Base64 data URL: data:image/png;base64,xxxxx
+            const base64Data = image.replace(/^data:image\/[^;]+;base64,/, '');
+            imageBuffer = Buffer.from(base64Data, 'base64');
+            const mimeMatch = image.match(/^data:(image\/[^;]+)/);
+            if (mimeMatch) mimeType = mimeMatch[1];
+            console.log(`[PUBLISH_CREATIVE] 📦 Base64 image (${Math.round(imageBuffer.length / 1024)}KB)`);
+        } else if (image.startsWith('http')) {
+            // HTTP URL: download image first
+            console.log(`[PUBLISH_CREATIVE] 🌐 Downloading image from URL...`);
+            const imgRes = await fetch(image, { signal: AbortSignal.timeout(30000) });
+            if (!imgRes.ok) {
+                return NextResponse.json(
+                    { success: false, error: `Failed to download image: HTTP ${imgRes.status}` },
+                    { status: 500 }
+                );
+            }
+            const contentType = imgRes.headers.get('content-type');
+            if (contentType) mimeType = contentType.split(';')[0].trim();
+            imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+            console.log(`[PUBLISH_CREATIVE] 📦 Downloaded image (${Math.round(imageBuffer.length / 1024)}KB, ${mimeType})`);
+        } else {
+            return NextResponse.json(
+                { success: false, error: 'Invalid image format: must be base64 data URL or HTTP URL' },
+                { status: 400 }
+            );
+        }
+
+        const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
+        const imageBlob = new Blob([new Uint8Array(imageBuffer)], { type: mimeType });
 
         const uploadForm = new FormData();
-        // Convert base64 to blob
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
-        uploadForm.append('filename', imageBlob, 'creative-studio.png');
+        uploadForm.append('filename', imageBlob, `creative-studio.${ext}`);
         uploadForm.append('access_token', accessToken);
 
         const uploadRes = await fetch(

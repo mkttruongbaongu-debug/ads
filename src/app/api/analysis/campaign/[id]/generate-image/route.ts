@@ -1,14 +1,15 @@
 /**
  * ===================================================================
- * API: GENERATE SINGLE IMAGE — Seedream 4.5 Only
+ * API: GENERATE SINGLE IMAGE — BytePlus Seedream 4.5 Direct
  * ===================================================================
  * Route: POST /api/analysis/campaign/[id]/generate-image
  *
  * Input: { prompt, referenceImageUrl, imageCount }
- * Output: { success, data: base64ImageUrl } or { success: false, error }
+ * Output: { success, data: imageUrl } or { success: false, error }
  *
- * Model: ByteDance Seedream 4.5 (text-to-image)
- * Strategy: 3 retries with progressively simpler prompts
+ * Uses BytePlus ARK API directly for Seedream 4.5:
+ *   - Text-to-Image (T2I): prompt only
+ *   - Image-to-Image (I2I): prompt + reference image URL
  * ===================================================================
  */
 
@@ -18,7 +19,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const maxDuration = 120; // 2 minutes per image
 
 // ─── Constants ───────────────────────────────────────────────────────
-const MODEL_SEEDREAM = 'bytedance-seed/seedream-4.5';
+const BYTEPLUS_ENDPOINT = 'https://ark.ap-southeast.bytepluses.com/api/v3/images/generations';
+const SEEDREAM_MODEL = 'seedream-4-5-251128';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -35,12 +37,16 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: st
 
 // ─── Xiaohongshu Food Photography Prompt (ADAPTIVE) ──────────────────
 
-function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
+function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
+    const refInstruction = hasRef
+        ? `\n=== REFERENCE IMAGE ===\nA reference image is attached. Create a NEW photo that:\n- Matches the SAME food type, composition, and angle\n- Preserves the SAME color temperature and lighting mood\n- Keeps similar props and environment\n- But with ENOUGH variation to look like a different photo\n`
+        : '';
+
     return `Create a STUNNING food photo in the Xiaohongshu (小红书) Chinese food photography style.
 
 === YOUR TASK ===
 Analyze the food subject below and AUTOMATICALLY choose the most appropriate visual style from the style palette. Each food type has its own ideal color grading, lighting, and mood — DO NOT use the same look for every dish.
-
+${refInstruction}
 === XIAOHONGSHU STYLE PALETTE (choose the BEST match) ===
 
 🍯 WARM AMBER GLAZE — for braised meats, kho, sốt nâu, caramelized dishes:
@@ -118,9 +124,13 @@ function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof
     return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
 }
 
-// ─── Call Seedream 4.5 (text-to-image, non-streaming) ────────────────
+// ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────
 
-async function callSeedream(apiKey: string, prompt: string): Promise<string | null> {
+async function callSeedream(
+    apiKey: string,
+    prompt: string,
+    referenceImageUrl: string | null,
+): Promise<string | null> {
     const log = (msg: string) => console.log(msg);
 
     const TIMEOUT_MS = 120_000;
@@ -128,19 +138,31 @@ async function callSeedream(apiKey: string, prompt: string): Promise<string | nu
     const timer = setTimeout(() => abortCtrl.abort(), TIMEOUT_MS);
 
     try {
-        const rawRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const body: Record<string, any> = {
+            model: SEEDREAM_MODEL,
+            prompt: prompt,
+            response_format: 'url',
+            size: '2K',
+            stream: false,
+            watermark: false,
+            sequential_image_generation: 'disabled',
+        };
+
+        // I2I mode: pass reference image URL
+        if (referenceImageUrl) {
+            body.image = [referenceImageUrl];
+            log(`[SEEDREAM] 🖼️ I2I mode — ref: ${referenceImageUrl.substring(0, 80)}...`);
+        } else {
+            log(`[SEEDREAM] ✏️ T2I mode — text only`);
+        }
+
+        const rawRes = await fetch(BYTEPLUS_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://ads.supbaongu.vn',
-                'X-Title': 'THO ADS AI - Creative Studio',
             },
-            body: JSON.stringify({
-                model: MODEL_SEEDREAM,
-                messages: [{ role: 'user', content: prompt }],
-                modalities: ['image'],
-            }),
+            body: JSON.stringify(body),
             signal: abortCtrl.signal,
         });
         clearTimeout(timer);
@@ -149,45 +171,27 @@ async function callSeedream(apiKey: string, prompt: string): Promise<string | nu
 
         if (!rawRes.ok) {
             const errText = await rawRes.text().catch(() => '');
-            log(`[SEEDREAM] ❌ HTTP ${rawRes.status}: ${errText.substring(0, 300)}`);
+            log(`[SEEDREAM] ❌ HTTP ${rawRes.status}: ${errText.substring(0, 500)}`);
             return null;
         }
 
         const data = await rawRes.json();
-        const message = data?.choices?.[0]?.message;
 
-        // Check for image in content array
-        if (Array.isArray(message?.content)) {
-            for (const part of message.content) {
-                if (part?.type === 'image_url' && part?.image_url?.url) {
-                    log(`[SEEDREAM] ✅ Image received (url_len=${part.image_url.url.length})`);
-                    return part.image_url.url;
-                }
-                if (part?.inline_data?.data) {
-                    const mime = part.inline_data.mime_type || 'image/png';
-                    log(`[SEEDREAM] ✅ Inline image received (${mime})`);
-                    return `data:${mime};base64,${part.inline_data.data}`;
-                }
-            }
+        // BytePlus response format: { data: [{ url: "..." }] }
+        const imageUrl = data?.data?.[0]?.url;
+        if (imageUrl) {
+            log(`[SEEDREAM] ✅ Image URL received (${imageUrl.substring(0, 80)}...)`);
+            return imageUrl;
         }
 
-        // Check for image_url directly on message
-        if (message?.image_url?.url) {
-            log(`[SEEDREAM] ✅ Image from message.image_url`);
-            return message.image_url.url;
+        // Fallback: check b64_json format
+        const b64 = data?.data?.[0]?.b64_json;
+        if (b64) {
+            log(`[SEEDREAM] ✅ Base64 image received (${Math.round(b64.length / 1024)}KB)`);
+            return `data:image/png;base64,${b64}`;
         }
 
-        // Check string content for data URL
-        if (typeof message?.content === 'string') {
-            const match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-            if (match) {
-                log(`[SEEDREAM] ✅ Image from text content`);
-                return match[0];
-            }
-            log(`[SEEDREAM] ⚠️ Text response, no image: ${message.content.substring(0, 200)}`);
-        }
-
-        log(`[SEEDREAM] ⚠️ No image found in response`);
+        log(`[SEEDREAM] ⚠️ No image in response: ${JSON.stringify(data).substring(0, 300)}`);
         return null;
     } catch (error: any) {
         clearTimeout(timer);
@@ -196,30 +200,31 @@ async function callSeedream(apiKey: string, prompt: string): Promise<string | nu
     }
 }
 
-// ─── Main generation: 3 attempts, all Seedream 4.5 ──────────────────
+// ─── Main generation: 3 attempts ─────────────────────────────────────
 
 async function generateImage(
     apiKey: string,
     prompt: string,
-    _referenceImageUrl: string | null, // kept for API compat, not used by Seedream
+    referenceImageUrl: string | null,
     imageCount: number,
 ): Promise<string | null> {
     const log = (msg: string) => console.log(msg);
     const aspectSpec = getAspectRatioSpec(imageCount);
+    const hasRef = !!referenceImageUrl;
 
     // ─── Attempt 1: Full Xiaohongshu prompt ───
-    log(`[IMG] 🎯 Attempt 1: Seedream 4.5 — full Xiaohongshu prompt`);
-    const result1 = await callSeedream(apiKey, buildXiaohongshuPrompt(prompt, aspectSpec));
+    log(`[IMG] 🎯 Attempt 1: Seedream 4.5 — full prompt (ref=${hasRef ? 'YES' : 'NO'})`);
+    const result1 = await callSeedream(apiKey, buildXiaohongshuPrompt(prompt, aspectSpec, hasRef), referenceImageUrl);
     if (result1) return result1;
 
     // ─── Attempt 2: Simplified prompt ───
     log(`[IMG] 🔄 Attempt 2: Seedream 4.5 — simplified prompt`);
-    const result2 = await callSeedream(apiKey, buildSimplifiedPrompt(prompt, aspectSpec));
+    const result2 = await callSeedream(apiKey, buildSimplifiedPrompt(prompt, aspectSpec), referenceImageUrl);
     if (result2) return result2;
 
-    // ─── Attempt 3: Minimal prompt ───
-    log(`[IMG] 🔄 Attempt 3: Seedream 4.5 — minimal prompt`);
-    const result3 = await callSeedream(apiKey, `Xiaohongshu food photo: ${prompt}. Aspect ratio: ${aspectSpec.ratio}.`);
+    // ─── Attempt 3: Minimal prompt, no ref ───
+    log(`[IMG] 🔄 Attempt 3: Seedream 4.5 — minimal prompt, no ref`);
+    const result3 = await callSeedream(apiKey, `Xiaohongshu food photo: ${prompt}. Aspect ratio: ${aspectSpec.ratio}.`, null);
     if (result3) return result3;
 
     log(`[IMG] ❌ All 3 attempts failed`);
@@ -249,19 +254,20 @@ export async function POST(
         return NextResponse.json({ success: false, error: 'prompt is required' }, { status: 400 });
     }
 
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openrouterKey) {
-        return NextResponse.json({ success: false, error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
+    const arkKey = process.env.BYTEPLUS_ARK_API_KEY;
+    if (!arkKey) {
+        return NextResponse.json({ success: false, error: 'BYTEPLUS_ARK_API_KEY not configured' }, { status: 500 });
     }
 
-    console.log(`[GENERATE_IMAGE] 🖼️ Campaign ${campaignId} — Seedream 4.5 only`);
+    console.log(`[GENERATE_IMAGE] 🖼️ Campaign ${campaignId} — Seedream 4.5 via BytePlus`);
     console.log(`[GENERATE_IMAGE] 📝 prompt: ${prompt.substring(0, 100)}...`);
+    console.log(`[GENERATE_IMAGE] 📎 ref: ${referenceImageUrl ? 'YES (I2I clone)' : 'NO (T2I new)'}`);
 
     try {
-        const image = await generateImage(openrouterKey, prompt, referenceImageUrl || null, imageCount || 1);
+        const image = await generateImage(arkKey, prompt, referenceImageUrl || null, imageCount || 1);
 
         if (image) {
-            console.log(`[GENERATE_IMAGE] ✅ Image generated (${image.substring(0, 50)}...)`);
+            console.log(`[GENERATE_IMAGE] ✅ Image generated (${image.substring(0, 60)}...)`);
             return NextResponse.json({ success: true, data: image });
         } else {
             console.warn(`[GENERATE_IMAGE] ⚠️ All attempts failed`);

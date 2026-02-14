@@ -130,7 +130,7 @@ async function callSeedream(
     apiKey: string,
     prompt: string,
     referenceImageUrl: string | null,
-): Promise<string | null> {
+): Promise<{ image: string } | { error: string }> {
     const log = (msg: string) => console.log(msg);
 
     const TIMEOUT_MS = 120_000;
@@ -172,31 +172,37 @@ async function callSeedream(
         if (!rawRes.ok) {
             const errText = await rawRes.text().catch(() => '');
             log(`[SEEDREAM] ❌ HTTP ${rawRes.status}: ${errText.substring(0, 500)}`);
-            return null;
+            return { error: `BytePlus HTTP ${rawRes.status}: ${errText.substring(0, 300)}` };
         }
 
         const data = await rawRes.json();
 
         // BytePlus response format: { data: [{ url: "..." }] }
+        // Check for API-level error
+        if (data?.error) {
+            log(`[SEEDREAM] ❌ API error: ${JSON.stringify(data.error)}`);
+            return { error: `BytePlus API: ${data.error.message || JSON.stringify(data.error)}` };
+        }
+
         const imageUrl = data?.data?.[0]?.url;
         if (imageUrl) {
             log(`[SEEDREAM] ✅ Image URL received (${imageUrl.substring(0, 80)}...)`);
-            return imageUrl;
+            return { image: imageUrl };
         }
 
         // Fallback: check b64_json format
         const b64 = data?.data?.[0]?.b64_json;
         if (b64) {
             log(`[SEEDREAM] ✅ Base64 image received (${Math.round(b64.length / 1024)}KB)`);
-            return `data:image/png;base64,${b64}`;
+            return { image: `data:image/png;base64,${b64}` };
         }
 
         log(`[SEEDREAM] ⚠️ No image in response: ${JSON.stringify(data).substring(0, 300)}`);
-        return null;
+        return { error: `No image in response: ${JSON.stringify(data).substring(0, 200)}` };
     } catch (error: any) {
         clearTimeout(timer);
         log(`[SEEDREAM] ❌ Error: ${error?.message || String(error)}`);
-        return null;
+        return { error: `Seedream error: ${error?.message || String(error)}` };
     }
 }
 
@@ -207,28 +213,34 @@ async function generateImage(
     prompt: string,
     referenceImageUrl: string | null,
     imageCount: number,
-): Promise<string | null> {
+): Promise<{ image: string } | { error: string }> {
     const log = (msg: string) => console.log(msg);
     const aspectSpec = getAspectRatioSpec(imageCount);
     const hasRef = !!referenceImageUrl;
+    let lastError = 'Unknown error';
 
     // ─── Attempt 1: Full Xiaohongshu prompt ───
     log(`[IMG] 🎯 Attempt 1: Seedream 4.5 — full prompt (ref=${hasRef ? 'YES' : 'NO'})`);
     const result1 = await callSeedream(apiKey, buildXiaohongshuPrompt(prompt, aspectSpec, hasRef), referenceImageUrl);
-    if (result1) return result1;
+    if ('image' in result1) return result1;
+    lastError = result1.error;
+    log(`[IMG] Attempt 1 failed: ${lastError}`);
 
     // ─── Attempt 2: Simplified prompt ───
     log(`[IMG] 🔄 Attempt 2: Seedream 4.5 — simplified prompt`);
     const result2 = await callSeedream(apiKey, buildSimplifiedPrompt(prompt, aspectSpec), referenceImageUrl);
-    if (result2) return result2;
+    if ('image' in result2) return result2;
+    lastError = result2.error;
+    log(`[IMG] Attempt 2 failed: ${lastError}`);
 
     // ─── Attempt 3: Minimal prompt, no ref ───
     log(`[IMG] 🔄 Attempt 3: Seedream 4.5 — minimal prompt, no ref`);
     const result3 = await callSeedream(apiKey, `Xiaohongshu food photo: ${prompt}. Aspect ratio: ${aspectSpec.ratio}.`, null);
-    if (result3) return result3;
+    if ('image' in result3) return result3;
+    lastError = result3.error;
 
-    log(`[IMG] ❌ All 3 attempts failed`);
-    return null;
+    log(`[IMG] ❌ All 3 attempts failed. Last error: ${lastError}`);
+    return { error: lastError };
 }
 
 // ===================================================================
@@ -264,15 +276,15 @@ export async function POST(
     console.log(`[GENERATE_IMAGE] 📎 ref: ${referenceImageUrl ? 'YES (I2I clone)' : 'NO (T2I new)'}`);
 
     try {
-        const image = await generateImage(arkKey, prompt, referenceImageUrl || null, imageCount || 1);
+        const result = await generateImage(arkKey, prompt, referenceImageUrl || null, imageCount || 1);
 
-        if (image) {
-            console.log(`[GENERATE_IMAGE] ✅ Image generated (${image.substring(0, 60)}...)`);
-            return NextResponse.json({ success: true, data: image });
+        if ('image' in result) {
+            console.log(`[GENERATE_IMAGE] ✅ Image generated (${result.image.substring(0, 60)}...)`);
+            return NextResponse.json({ success: true, data: result.image });
         } else {
-            console.warn(`[GENERATE_IMAGE] ⚠️ All attempts failed`);
+            console.warn(`[GENERATE_IMAGE] ⚠️ Failed: ${result.error}`);
             return NextResponse.json(
-                { success: false, error: 'Image generation failed after 3 attempts' },
+                { success: false, error: result.error },
                 { status: 500 }
             );
         }

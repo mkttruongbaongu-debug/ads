@@ -380,15 +380,31 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             const contentType = rawRes.headers.get('content-type') || '';
             log(`[IMG] Response content-type: ${contentType}`);
 
+            // ─── Always read raw text first (OpenRouter may send SSE body with application/json header) ───
+            const rawText = await rawRes.text();
+            log(`[IMG] Raw response length: ${rawText.length} chars, starts with: ${rawText.substring(0, 200).replace(/\n/g, '\\n')}`);
+
             let message: any = null;
 
-            // ─── Handle SSE Stream (OpenRouter may force streaming for image gen) ───
-            if (contentType.includes('text/event-stream') || contentType.includes('text/plain')) {
-                log(`[IMG] ⚡ Streaming response detected — parsing SSE...`);
-                const rawText = await rawRes.text();
+            // Try JSON parse first
+            if (rawText.trimStart().startsWith('{')) {
+                try {
+                    const rawJson = JSON.parse(rawText);
+                    const choice = rawJson?.choices?.[0];
+                    message = choice?.message;
+                    log(`[IMG] ✅ Parsed as JSON: finish=${choice?.finish_reason}, content_type=${typeof message?.content}, is_array=${Array.isArray(message?.content)}, has_images=${!!message?.images}`);
+                } catch (e: any) {
+                    log(`[IMG] ⚠️ JSON parse failed: ${e.message}`);
+                }
+            }
+
+            // Fallback: parse as SSE stream
+            if (!message && rawText.includes('data: ')) {
+                log(`[IMG] ⚡ Parsing as SSE stream...`);
                 const lines = rawText.split('\n');
                 let accumulatedContent = '';
                 const accumulatedImages: any[] = [];
+                let lastFinishReason = '';
 
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
@@ -397,6 +413,8 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                     try {
                         const chunk = JSON.parse(data);
                         const delta = chunk?.choices?.[0]?.delta;
+                        const finishReason = chunk?.choices?.[0]?.finish_reason;
+                        if (finishReason) lastFinishReason = finishReason;
                         if (!delta) continue;
 
                         // Accumulate text content
@@ -422,19 +440,12 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                     }
                 }
 
-                log(`[IMG] SSE parsed: text_len=${accumulatedContent.length}, images=${accumulatedImages.length}`);
+                log(`[IMG] SSE parsed: finish=${lastFinishReason}, text_len=${accumulatedContent.length}, images=${accumulatedImages.length}`);
 
-                // Build a pseudo-message object for unified extraction below
                 message = {
                     content: accumulatedContent || null,
                     images: accumulatedImages.length > 0 ? accumulatedImages : undefined,
                 };
-            } else {
-                // ─── Regular JSON response ───
-                const rawJson = await rawRes.json();
-                const choice = rawJson?.choices?.[0];
-                message = choice?.message;
-                log(`[IMG] JSON response: finish=${choice?.finish_reason}, content_type=${typeof message?.content}, is_array=${Array.isArray(message?.content)}, has_images=${!!message?.images}`);
             }
 
             // ─── DEBUG: Dump response structure ───

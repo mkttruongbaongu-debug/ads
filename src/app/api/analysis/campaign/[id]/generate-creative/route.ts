@@ -623,7 +623,7 @@ export async function POST(
                     },
                 });
 
-                // ─── STEP 2: Generate Images ONE BY ONE ────────────
+                // ─── STEP 2: Send image plan (client will fetch images separately) ────────────
                 let effectiveImageCount: number;
                 if (mode === 'clone' && referenceUrls.length > 0) {
                     effectiveImageCount = referenceUrls.length;
@@ -636,43 +636,28 @@ export async function POST(
                     effectivePrompts.push(captionResult.imagePrompts[captionResult.imagePrompts.length - 1] || captionResult.imagePrompts[0]);
                 }
 
-                send({ type: 'step', message: `Đang tạo ${effectiveImageCount} ảnh...` });
-                console.log(`[GENERATE_CREATIVE] 📋 Image plan: ${effectiveImageCount} images, ${effectivePrompts.length} prompts, ${referenceUrls.length} refs`);
-                effectivePrompts.forEach((p, i) => console.log(`[GENERATE_CREATIVE] 📋 prompt[${i}]: ${p.substring(0, 80)}...`));
-
+                // Build image plan: which prompt + which ref for each image
+                const imagePlan: { prompt: string; referenceImageUrl: string | null }[] = [];
                 for (let idx = 0; idx < effectiveImageCount; idx++) {
-                    const prompt = effectivePrompts[idx];
                     let refImage: string | null = null;
                     if (mode === 'clone') {
                         refImage = referenceUrls[idx] || null;
                     } else if (mode === 'inspired') {
                         refImage = referenceUrls[idx % referenceUrls.length] || null;
                     }
-
-                    send({
-                        type: 'step', message: `Đang vẽ ảnh ${idx + 1}/${effectiveImageCount}...`
-                    });
-                    // Stream debug info to client console
-                    send({ type: 'debug', message: `Image ${idx + 1}: prompt=${prompt.substring(0, 60)}... | ref=${refImage ? refImage.substring(0, 80) + '...' : 'NONE'}` });
-                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? refImage.substring(0, 100) : 'NONE'}`);
-                    console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1} prompt: ${prompt.substring(0, 100)}...`);
-
-                    const sendDebug = (msg: string) => send({ type: 'debug', message: msg });
-                    const image = await generateImage(openrouterKey, prompt, refImage, effectiveImageCount, sendDebug);
-
-                    send({
-                        type: 'image',
-                        index: idx,
-                        total: effectiveImageCount,
-                        data: image, // base64 or null
-                    });
-
-                    if (image) {
-                        console.log(`[GENERATE_CREATIVE] ✅ Image ${idx + 1} generated`);
-                    } else {
-                        console.warn(`[GENERATE_CREATIVE] ⚠️ Image ${idx + 1} failed`);
-                    }
+                    imagePlan.push({ prompt: effectivePrompts[idx], referenceImageUrl: refImage });
                 }
+
+                console.log(`[GENERATE_CREATIVE] 📋 Image plan: ${effectiveImageCount} images, ${effectivePrompts.length} prompts`);
+
+                // Send image plan to client — client will call /generate-image for each
+                send({
+                    type: 'image_plan',
+                    data: {
+                        imageCount: effectiveImageCount,
+                        images: imagePlan,
+                    },
+                });
 
                 // ─── DONE ────────────
                 send({ type: 'done' });

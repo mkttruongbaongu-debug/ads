@@ -344,8 +344,9 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
-            const collectedImages: string[] = [];
             let switchedToOutput = false;
+            let imagePlan: { prompt: string; referenceImageUrl: string | null }[] = [];
+            let totalImageCount = 0;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -379,11 +380,16 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                 setActiveTab('output');
                                 switchedToOutput = true;
                             }
+                        } else if (event.type === 'image_plan') {
+                            // New: receive image plan, will call generate-image separately
+                            totalImageCount = event.data.imageCount;
+                            imagePlan = event.data.images || [];
+                            console.log(`[CREATIVE_STUDIO] 📋 Image plan received: ${totalImageCount} images`);
                         } else if (event.type === 'image') {
+                            // Legacy: still handle inline images if server sends them
                             console.log(`[CREATIVE_STUDIO] Image ${event.index + 1}/${event.total}:`, event.data ? `OK (${event.data.substring(0, 50)}...)` : 'FAILED (null)');
                             if (event.data) {
-                                collectedImages.push(event.data);
-                                setGeneratedImages([...collectedImages]);
+                                setGeneratedImages(prev => [...prev, event.data]);
                             }
                         } else if (event.type === 'debug') {
                             console.log('[CREATIVE_STUDIO] 🔍 DEBUG:', event.message);
@@ -393,6 +399,60 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                         }
                     } catch {
                         // Skip malformed JSON lines
+                    }
+                }
+            }
+
+            // ─── STEP 2: Fetch images separately (parallel) ────
+            if (imagePlan.length > 0) {
+                setGenerateStep(`Đang tạo ${totalImageCount} ảnh...`);
+                console.log(`[CREATIVE_STUDIO] 🖼️ Fetching ${imagePlan.length} images in parallel...`);
+
+                const imagePromises = imagePlan.map(async (plan, idx) => {
+                    try {
+                        setGenerateStep(`Đang vẽ ảnh ${idx + 1}/${totalImageCount}...`);
+                        console.log(`[CREATIVE_STUDIO] 🖼️ Requesting image ${idx + 1}: prompt=${plan.prompt.substring(0, 60)}...`);
+
+                        const imgRes = await fetch(
+                            `/api/analysis/campaign/${campaignId}/generate-image`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    prompt: plan.prompt,
+                                    referenceImageUrl: plan.referenceImageUrl,
+                                    imageCount: totalImageCount,
+                                }),
+                            }
+                        );
+
+                        if (!imgRes.ok) {
+                            console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} HTTP ${imgRes.status}`);
+                            return null;
+                        }
+
+                        const imgData = await imgRes.json();
+                        if (imgData.success && imgData.data) {
+                            console.log(`[CREATIVE_STUDIO] ✅ Image ${idx + 1} OK`);
+                            return imgData.data as string;
+                        } else {
+                            console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} failed:`, imgData.error);
+                            return null;
+                        }
+                    } catch (imgErr) {
+                        console.error(`[CREATIVE_STUDIO] ❌ Image ${idx + 1} error:`, imgErr);
+                        return null;
+                    }
+                });
+
+                // As each image resolves, add it to state immediately
+                for (let i = 0; i < imagePromises.length; i++) {
+                    const image = await imagePromises[i];
+                    if (image) {
+                        setGeneratedImages(prev => [...prev, image]);
+                        setGenerateStep(`Ảnh ${i + 1}/${totalImageCount} xong ✅`);
+                    } else {
+                        setGenerateStep(`Ảnh ${i + 1}/${totalImageCount} thất bại ⚠️`);
                     }
                 }
             }

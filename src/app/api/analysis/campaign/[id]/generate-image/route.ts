@@ -52,71 +52,72 @@ ${refInstruction}
 🍯 WARM AMBER GLAZE — for braised meats, kho, sốt nâu, caramelized dishes:
    Color: 3000-3500K amber/caramel cast, rich brown tones, golden highlights
    Surface: glossy sauce/glaze, caramelized lacquer finish
-   Light: warm overhead kitchen light, specular highlights on wet surfaces
+   Light: warm golden glow from the side, specular highlights on wet surfaces, soft shadows
 
 🌿 FRESH & BRIGHT — for seafood, salads, sushi, raw dishes, light meals:
    Color: clean daylight 5500K, vibrant greens/whites, fresh & crisp
    Surface: dewy, moist, glistening water droplets
-   Light: natural window light, soft and bright, airy feel
+   Light: bright natural daylight, soft and even, airy feel
 
 🔥 SMOKY & DARK — for grilled, BBQ, charcoal, lẩu, roasted dishes:
    Color: deep moody tones, charred blacks, ember reds/oranges, smoky atmosphere
    Surface: charred crust with juicy interior, smoke wisps
-   Light: dramatic low light, fire glow, strong contrast
+   Light: dramatic low-key side light, fire glow from below, strong contrast
 
 🍜 STEAM & WARMTH — for phở, soup, noodles, dim sum, hot pot, steamed dishes:
    Color: gentle warm tones 4000-4500K, soft and inviting
    Surface: steam rising, condensation, broth shimmer
-   Light: soft diffused warm light, cozy atmosphere
+   Light: soft diffused warm ambient glow, cozy atmosphere
 
 🌶️ VIBRANT SPICY — for mala, chili dishes, Sichuan, spicy street food:
    Color: INTENSE saturated reds, oranges, chili oil sheen, peppercorn greens
    Surface: glistening chili oil layer, visible spice flakes, wet & fiery
-   Light: bright and punchy, high saturation, bold contrast
+   Light: bright and punchy ambient light, high saturation, bold contrast
 
 🍰 SOFT & ELEGANT — for desserts, pastries, tea, café items, bánh:
    Color: soft pastel tones, creamy whites, gentle warm accents
    Surface: smooth, powdered sugar, drizzle, delicate textures
-   Light: soft natural light, dreamy and airy
+   Light: soft diffused natural glow, dreamy and airy
 
 === UNIVERSAL RULES (apply to ALL styles) ===
 
 COMPOSITION:
 - Close-up filling 70-90% of frame — food is the HERO
-- Shallow depth of field — background blurred
-- Slightly imperfect framing — feels real, not studio-perfect
-- Show some environment context (table, plate edge, utensils)
+- Shallow depth of field f/1.8-f/2.8 — background creamy bokeh
+- Camera angle: 30-45° looking down at the food (NEVER straight up showing ceiling)
+- Show some environment context (table edge, plate edge, utensils) but NOT ceiling
 
 AUTHENTICITY:
-- Must look like a REAL person took this with a good phone camera
-- Human presence: hand holding food, chopsticks, spoon, or cooking action
-- Real environment: kitchen, restaurant table, street food stall
+- Must look like a REAL person took this with a high-end phone camera
+- Human presence: hand holding food, chopsticks lifting a piece, spoon scooping
+- Real environment: restaurant table, food stall counter, home dining table
 - NOT a sterile studio setup — life and context around the food
 
 PROPS & UTENSILS (vary based on context):
 - Plates/bowls: classic Vietnamese rooster plate (đĩa con gà), ceramic bowls, bamboo baskets (rổ tre), white plastic takeaway containers, steel bowls
 - Utensils: chopsticks, soup ladle, large kitchen knife (dao phay), wooden spatula, tongs
-- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopstips
+- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopsticks
 - Surfaces: stainless steel kitchen table, wooden cutting board (thớt gỗ), bamboo mat
 
-BACKGROUND & SPACE (critical for authenticity):
-- REAL working kitchen visible: gas stove, pots, other dishes being prepped
-- Other food items partially visible at edges — the scene is BUSY, not isolated
-- Condensation on containers, sauce splatters on table — signs of active cooking
+BACKGROUND & SPACE:
+- Blurred background with other dishes, condiments, or kitchen items partially visible
+- Signs of active cooking: sauce splatters, condensation, other food at edges
 - NOT a clean empty background — messy, lived-in, working environment
-- Blurred background elements add depth and context without distracting
+- Background must be BLURRED and never show ceiling, lamps, or overhead fixtures
 
-TEXTURE & DETAIL:
-- Ultra-sharp food texture — every fiber, grain, flake visible
-- Micro-details: oil droplets, sauce bubbles, steam particles, spice flakes
+IMAGE QUALITY (critical):
+- 8K ultra-high resolution, razor-sharp focus on the food
+- Every fiber, grain, and flake of the food must be TACK SHARP
+- Micro-details: individual oil droplets, sauce bubbles, steam particles, spice flakes
 - The surface quality must be TACTILE — viewer can almost feel the texture
+- Professional DSLR-level sharpness, NOT soft or blurry
 
-⛔ CRITICAL PROHIBITIONS (MUST follow):
-- absolutely NO text, words, letters, titles, captions, watermarks, or labels anywhere on the image
-- absolutely NO visible light fixtures, light bulbs, lamp shades, or ceiling lights in the frame
-- absolutely NO logos, brand names, or stamps
-- The lighting should be FELT (warm glow, soft shadows) but the light SOURCE must NOT be visible
-- Keep the food as the ONLY focal point — no distracting overhead objects
+⛔ ABSOLUTE PROHIBITIONS:
+- NO text, words, letters, titles, captions, watermarks on the image
+- NO visible light fixtures, light bulbs, lamps, ceiling lights, pendant lights
+- NO ceiling visible in the frame at all
+- NO logos, brand names, or stamps
+- Light is AMBIENT and DIRECTIONAL — the source is NEVER in frame
 
 === ASPECT RATIO ===
 ${aspectSpec.instruction} (${aspectSpec.resolution})
@@ -124,7 +125,7 @@ ${aspectSpec.instruction} (${aspectSpec.resolution})
 === FOOD SUBJECT ===
 ${basePrompt}
 
-OUTPUT: ONE photo that matches the ideal Xiaohongshu sub-style for this specific food. The viewer must feel HUNGRY immediately.`;
+OUTPUT: ONE hyper-sharp, 8K quality food photo. No lamps, no text. The viewer must feel HUNGRY immediately.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {

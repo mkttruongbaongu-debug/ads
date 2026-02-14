@@ -235,6 +235,27 @@ async function isUrlAccessible(url: string): Promise<boolean> {
     }
 }
 
+// Download image and convert to base64 for inline_data
+async function downloadImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const res = await fetch(url, {
+            signal: controller.signal,
+            redirect: 'follow',
+        });
+        clearTimeout(timeout);
+        if (!res.ok) return null;
+        const contentType = res.headers.get('content-type') || 'image/jpeg';
+        const mimeType = contentType.split(';')[0].trim();
+        const buffer = await res.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+        return { data: base64, mimeType };
+    } catch {
+        return null;
+    }
+}
+
 async function generateImage(
     apiKey: string,
     prompt: string,
@@ -247,22 +268,21 @@ async function generateImage(
         sendDebug?.(msg);
     };
 
-    // ─── Validate reference URL before using it ───
-    let validRefUrl = referenceImageUrl;
-    if (validRefUrl) {
-        log(`[IMG] Validating ref URL: ${validRefUrl.substring(0, 80)}...`);
-        const accessible = await isUrlAccessible(validRefUrl);
-        if (!accessible) {
-            log(`[IMG] ⚠️ Ref URL NOT accessible → generating WITHOUT reference`);
-            validRefUrl = null;
+    // ─── Download reference image as base64 (OpenRouter/Gemini can't fetch Facebook CDN directly) ───
+    let refBase64: { data: string; mimeType: string } | null = null;
+    if (referenceImageUrl) {
+        log(`[IMG] Downloading ref image: ${referenceImageUrl.substring(0, 80)}...`);
+        refBase64 = await downloadImageAsBase64(referenceImageUrl);
+        if (!refBase64) {
+            log(`[IMG] ⚠️ Failed to download ref → generating WITHOUT reference`);
         } else {
-            log(`[IMG] ✅ Ref URL accessible`);
+            log(`[IMG] ✅ Ref downloaded (${Math.round(refBase64.data.length / 1024)}KB, ${refBase64.mimeType})`);
         }
     }
 
     // ─── Attempt generation (with retry) ───
     for (let attempt = 1; attempt <= 2; attempt++) {
-        const useRef = attempt === 1 ? validRefUrl : null;
+        const useRef = attempt === 1 ? refBase64 : null;
         if (attempt === 2) {
             log(`[IMG] 🔄 RETRY attempt 2 — generating WITHOUT reference image`);
         }
@@ -322,7 +342,7 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             if (useRef) {
                 contentParts.push({
                     type: 'image_url',
-                    image_url: { url: useRef },
+                    image_url: { url: `data:${useRef.mimeType};base64,${useRef.data}` },
                 });
             }
 
@@ -421,7 +441,7 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 
             log(`[IMG] ⚠️ No image extracted. Raw dump: ${JSON.stringify(rawJson).substring(0, 2000)}`);
 
-            if (attempt === 1 && validRefUrl) {
+            if (attempt === 1 && refBase64) {
                 log(`[IMG] Will retry without ref...`);
                 continue;
             }
@@ -431,7 +451,7 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             const errMsg = error?.message || String(error);
             log(`[IMG] ❌ FAILED (attempt ${attempt}): ${errMsg}`);
 
-            if (attempt === 1 && validRefUrl) {
+            if (attempt === 1 && refBase64) {
                 log(`[IMG] Will retry without ref...`);
                 continue;
             }

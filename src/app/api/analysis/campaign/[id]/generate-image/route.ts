@@ -39,7 +39,7 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: st
 
 function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
     const refInstruction = hasRef
-        ? `\n=== REFERENCE IMAGE ===\nA reference image is attached. Create a NEW photo that:\n- Matches the SAME food type, composition, and angle\n- Preserves the SAME color temperature and lighting mood\n- Keeps similar props and environment\n- But with ENOUGH variation to look like a different photo\n`
+        ? `\n=== REFERENCE IMAGE ===\nA reference image is attached. Use it ONLY as inspiration for the food type and color mood.\nYou MUST create a COMPLETELY DIFFERENT photo with:\n- DIFFERENT camera angle (if ref is overhead, try 45°; if ref is close-up, try medium shot)\n- DIFFERENT composition and framing\n- DIFFERENT props, plates, or utensils\n- DIFFERENT background arrangement\n- SAME food type and SAME warm color temperature\nThe result must look like a DIFFERENT photographer took a DIFFERENT photo of the SAME dish.\n`
         : '';
 
     return `Create a STUNNING food photo in the Xiaohongshu (小红书) Chinese food photography style.

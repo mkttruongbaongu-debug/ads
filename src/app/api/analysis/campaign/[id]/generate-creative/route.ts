@@ -23,7 +23,7 @@ export const maxDuration = 300; // 5 minutes
 // STEP 1: GENERATE CAPTION + IMAGE PROMPT (Gemini 2.5 Flash)
 // ===================================================================
 
-function buildCaptionPrompt(briefData: any, referenceImageCount?: number): string {
+function buildCaptionPrompt(briefData: any, referenceImageCount?: number, referenceImageUrls?: string[]): string {
     const { creativeBrief, winningPatterns, topAds, campaignName, genMode, winnerCaption } = briefData;
     const mode = genMode || 'inspired';
 
@@ -31,49 +31,36 @@ function buildCaptionPrompt(briefData: any, referenceImageCount?: number): strin
     let missionBlock = '';
     if (mode === 'clone' && winnerCaption) {
         missionBlock = `## CHẾ ĐỘ: NHÂN BẢN (SPIN)
-⚠️ BẮT BUỘC: Bạn PHẢI SPIN caption gốc bên dưới. Giữ NGUYÊN:
-- Cấu trúc (số dòng, nhịp câu, flow logic)
-- Tone of voice (tự nhiên, review, hài hước... giống y caption gốc)
-- CTA kiểu (cùng kiểu kêu gọi hành động)
-- Độ dài (tương đương)
-
-ĐỔI:
-- Từ ngữ khác (paraphrase, đồng nghĩa)
-- Ví dụ/chi tiết cụ thể khác (nhưng cùng loại)
-- Emoji vị trí khác (nếu gốc có)
+⚠️ BẮT BUỘC: SPIN caption gốc bên dưới.
+GIỮ NGUYÊN: nhịp câu, tone, CTA, độ dài tương đương.
+ĐỔI: từ ngữ khác (paraphrase), chi tiết cụ thể khác.
 
 CAPTION GỐC CẦN SPIN:
 """
 ${winnerCaption}
 """
 
-Image prompts cũng phải MATCH nội dung caption mới — mô tả cùng loại sản phẩm/cảnh trong bài viết.`;
+Image prompts phải MATCH nội dung caption mới.`;
     } else if (mode === 'fresh') {
         missionBlock = `## CHẾ ĐỘ: SÁNG TẠO MỚI
-⚠️ BẮT BUỘC: Viết caption HOÀN TOÀN MỚI:
-- GÓC TIẾP CẬN KHÁC so với winning ads (nếu gốc là review → thử so sánh trước/sau, 
-nếu gốc là UGC → thử storytelling, nếu gốc là testimonial → thử tips/tricks)
-- KHÔNG copy cấu trúc caption mẫu
-- Chỉ dựa trên Creative Brief và thông tin sản phẩm
-- Vẫn giữ tone tự nhiên, viết như người thật
-- Image prompts phải TỰ SÁNG TẠO — không dựa vào winning ads`;
+Viết caption HOÀN TOÀN MỚI, góc tiếp cận KHÁC winning ads.
+Chỉ dựa trên Creative Brief + thông tin sản phẩm.`;
     } else {
         // inspired (default)
         missionBlock = `## CHẾ ĐỘ: LẤY CẢM HỨNG
-Học 99% phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc).
-Tạo bản MỚI nhưng GIỮ NGUYÊN phong cách đã chứng minh hiệu quả.
-KHÔNG copy nguyên văn — paraphrase thông minh.`;
+Học phong cách winning ads (cách dùng từ, nhịp câu, cảm xúc).
+Tạo bản MỚI nhưng GIỮ phong cách đã chứng minh hiệu quả.
+KHÔNG copy nguyên văn.`;
     }
 
     if (mode === 'clone') {
-        missionBlock += `\n\n⛔ QUY TẮC SẢN PHẨM (TUYỆT ĐỐI):
-- Sản phẩm trong caption spin PHẢI GIỐNG Y sản phẩm trong caption gốc
-- TUYỆT ĐỐI KHÔNG thay đổi sản phẩm, KHÔNG trộn lẫn sản phẩm khác
-- Nếu caption gốc nói về "thịt kho" → caption mới PHẢI nói về "thịt kho"
-- Image prompts cũng PHẢI mô tả ĐÚNG sản phẩm trong caption gốc`;
+        missionBlock += `\n\n⛔ QUY TẮC SẢN PHẨM:
+- Sản phẩm caption spin PHẢI GIỐNG Y caption gốc
+- KHÔNG thay đổi, KHÔNG trộn lẫn sản phẩm khác
+- Image prompts PHẢI mô tả ĐÚNG sản phẩm trong caption gốc`;
     }
 
-    const briefBlock = mode === 'clone' ? `## STYLE GUIDELINES (từ Creative Brief)
+    const briefBlock = mode === 'clone' ? `## STYLE GUIDELINES
 - Caption Guideline: ${creativeBrief?.captionGuideline || 'N/A'}
 - Visual Direction: ${creativeBrief?.visualDirection || 'N/A'}
 - CTA: ${creativeBrief?.ctaRecommendation || 'N/A'}` : `## CREATIVE BRIEF
@@ -86,21 +73,59 @@ KHÔNG copy nguyên văn — paraphrase thông minh.`;
 
     const captionExamplesBlock = mode === 'clone' ? '' :
         (mode !== 'fresh' && creativeBrief?.captionExamples?.length ? `## CAPTION MẪU TỪ ADS THẮNG
-${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. \"${ex}\"`).join('\n')}` : '## CAPTION MẪU: Không có (chế độ sáng tạo mới)');
+${creativeBrief.captionExamples.map((ex: string, i: number) => `${i + 1}. \"${ex}\"`).join('\n')}` : '');
 
     const winningPatternsBlock = mode === 'clone' ? '' :
         (mode !== 'fresh' ? `## WINNING PATTERNS
 ${winningPatterns?.map((p: any) => `- [${p.category}] ${p.pattern} (Evidence: ${p.evidence})`).join('\n') || 'N/A'}` : '');
 
     const topAdsBlock = mode === 'clone' ? '' :
-        (mode !== 'fresh' ? `## TOP ADS THẮNG (CẢM HỨNG CHÍNH)
+        (mode !== 'fresh' ? `## TOP ADS THẮNG
 ${topAds?.map((ad: any, i: number) => `- Ad #${i + 1} \"${ad.name}\" (ROAS ${ad.roas?.toFixed(1)}x, CPP ${ad.cpp?.toLocaleString()}): ${ad.whyItWorks}`).join('\n') || 'N/A'}` : '');
 
-    return `Bạn là CHUYÊN GIA CREATIVE quảng cáo Facebook Việt Nam — chuyên tạo nội dung UGC (User-Generated Content) chân thực, tự nhiên.
+    return `Bạn là copywriter Facebook Việt Nam — chuyên viết caption TỰ NHIÊN, NGẮN GỌN, đọc như NGƯỜI THẬT chia sẻ, KHÔNG PHẢI quảng cáo.
+
+## PHONG CÁCH CAPTION BẮT BUỘC
+
+### TRIẾT LÝ: "Viết như nhắn tin cho bạn bè, không viết như quảng cáo"
+
+CAPTION PHẢI:
+- NGẮN GỌN: Tối đa 5-7 dòng. Mỗi dòng ngắn, dễ đọc trên điện thoại
+- TỰ NHIÊN 100%: Viết đúng giọng nói đời thường của người Việt (có thể hơi xuề xoà, thân mật)
+- KHÔNG CÓ TIÊU ĐỀ: Không ✨ TIÊU ĐỀ IN HOA, không --- phân cách, không bullet points
+- HOOK MẠNH: 1 câu đầu phải khiến người ta dừng scroll — gây tò mò, shock nhẹ, hoặc đồng cảm
+- THẲNG VÀO VẤN ĐỀ: Không dẫn dắt vòng vo, không "Bạn có bao giờ...", không mở bài dài dòng
+- KẾT THÚC GỌN: CTA nhẹ nhàng, tự nhiên (inbox, comment, hoặc link) — không ép buộc
+
+CẤU TRÚC LÝ TƯỞNG (Alex Hormozi style thuần Việt):
+Dòng 1: Hook — 1 câu gây tò mò / shock nhẹ / nhận định thẳng
+Dòng 2-4: Value — chia sẻ trải nghiệm / review thật / mẹo hay (ngắn, cụ thể, có số liệu nếu được)
+Dòng 5-6: CTA tự nhiên — "inbox mình", "link ở comment", hoặc thông tin liên hệ
+
+❌ TUYỆT ĐỐI CẤM (nếu vi phạm = FAIL):
+- Caption dài hơn 10 dòng
+- Có tiêu đề / header / phân cách bằng emoji dàn hàng (🔥🔥🔥)
+- Giọng điệu "chuyên gia" hoặc "thương hiệu" — phải là giọng người thật
+- Mở bài kiểu "Bạn đã bao giờ...", "Xin chào...", "Giới thiệu đến bạn..."
+- Liệt kê nhiều bullet points — quá quảng cáo
+- Câu CTA ép buộc kiểu "MUA NGAY", "ĐẶT HÀNG NGAY HÔM NAY", "ĐỪNG BỎ LỠ"
+- Lặp lại ý — mỗi dòng phải có thông tin MỚI
+- Viết hoa toàn bộ để nhấn mạnh
+
+✅ VÍ DỤ CAPTION CHUẨN (tone tự nhiên Việt):
+---
+Thịt kho tàu mà kho kiểu này thì cơm 3 bát chứ không đùa 😂
+
+Mẹo là phi hành cho thơm trước, rim vỏ trứng trước khi thả vào, nước dừa tươi chứ đừng dùng nước dừa hộp.
+
+Ăn nóng với cơm trắng, kèm dưa leo + canh chua.
+
+Ship Huế, inbox mình nhé.
+---
 
 ## NHIỆM VỤ
-${mode === 'clone' ? 'SPIN caption gốc thành caption mới, giữ nguyên sản phẩm và phong cách.' : 'Dựa vào Creative Brief và Winning Patterns, tạo:'}
-1. **Caption** quảng cáo tự nhiên, đọc như người thật viết
+${mode === 'clone' ? 'SPIN caption gốc thành caption mới, giữ nguyên sản phẩm và phong cách.' : 'Tạo:'}
+1. **Caption** — tự nhiên, ngắn gọn, đọc như NGƯỜI THẬT chia sẻ
 2. **Image prompts CHI TIẾT** — mô tả ảnh kiểu NGƯỜI THẬT CHỤP BẰNG ĐIỆN THOẠI (UGC / POV style)
 
 ## CHIẾN DỊCH: ${campaignName}
@@ -156,6 +181,14 @@ Mỗi image prompt PHẢI mô tả ảnh trông như "NGƯỜI THẬT chụp b�
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}
+${referenceImageUrls && referenceImageUrls.length > 0 ? `
+## ẢNH THAM KHẢO ĐÃ ĐÍNH KÈM
+⚠️ QUAN TRỌNG: ${referenceImageUrls.length} ảnh tham khảo đã được đính kèm bên dưới (Ảnh tham khảo #1, #2, ...).
+Bạn PHẢI viết imagePrompts THEO THỨ TỰ TƯƠNG ỨNG:
+- imagePrompts[0] → mô tả ảnh MỚI lấy CẢM HỨNG từ Ảnh tham khảo #1 (cùng góc chụp, bố cục, sản phẩm, nhưng khác chi tiết)
+- imagePrompts[1] → mô tả ảnh MỚI lấy CẢM HỨNG từ Ảnh tham khảo #2
+- ... và tương tự cho các ảnh còn lại
+Mỗi prompt phải MATCH với ảnh tham khảo tương ứng — nhìn ảnh ref rồi mô tả ảnh mới giống kiểu đó.` : ''}
 DÙNG TIẾNG ANH cho image prompt
 
 Trả lời JSON (không markdown, không \`\`\`):
@@ -479,11 +512,26 @@ export async function POST(
                     campaignName,
                     genMode: mode,
                     winnerCaption: winnerCaption || '',
-                }, mode === 'clone' ? referenceUrls.length : undefined);
+                }, mode === 'clone' ? referenceUrls.length : undefined, referenceUrls);
+
+                // Build multimodal content: text prompt + reference images
+                const captionContentParts: any[] = [{ type: 'text', text: captionPrompt }];
+                if (referenceUrls.length > 0) {
+                    referenceUrls.forEach((url, i) => {
+                        captionContentParts.push({
+                            type: 'text',
+                            text: `\n[Ảnh tham khảo #${i + 1}]:`,
+                        });
+                        captionContentParts.push({
+                            type: 'image_url',
+                            image_url: { url },
+                        });
+                    });
+                }
 
                 const captionResponse = await client.chat.completions.create({
                     model: 'google/gemini-2.5-flash',
-                    messages: [{ role: 'user', content: captionPrompt }],
+                    messages: [{ role: 'user', content: captionContentParts }],
                     temperature: 0.8,
                 });
 

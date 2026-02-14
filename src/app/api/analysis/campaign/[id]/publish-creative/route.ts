@@ -164,15 +164,6 @@ export async function POST(
         // ─── Step 3: Create Ad Creative ──────────────────────────────
         console.log('[PUBLISH_CREATIVE] 🎨 Step 3: Creating ad creative...');
 
-        // Build degrees_of_freedom_spec (required for Advantage+ / flexible campaigns)
-        const degreesOfFreedomSpec = {
-            creative_features_spec: {
-                standard_enhancements: {
-                    enroll_status: 'OPT_OUT',
-                },
-            },
-        };
-
         const creativeForm = new URLSearchParams();
         creativeForm.append('name', adName || `Creative Studio - ${new Date().toLocaleDateString('vi-VN')}`);
         creativeForm.append('object_story_spec', JSON.stringify({
@@ -189,7 +180,6 @@ export async function POST(
                 },
             },
         }));
-        creativeForm.append('degrees_of_freedom_spec', JSON.stringify(degreesOfFreedomSpec));
         creativeForm.append('access_token', accessToken);
 
         const creativeRes = await fetch(
@@ -225,7 +215,6 @@ export async function POST(
         adForm.append('adset_id', adSetId);
         adForm.append('creative', JSON.stringify({ creative_id: creativeId }));
         adForm.append('status', 'PAUSED');
-        adForm.append('creative_features_spec', JSON.stringify(degreesOfFreedomSpec.creative_features_spec));
         adForm.append('access_token', accessToken);
 
         const adRes = await fetch(

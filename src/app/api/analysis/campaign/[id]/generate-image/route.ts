@@ -1,16 +1,14 @@
 /**
  * ===================================================================
- * API: GENERATE SINGLE IMAGE
+ * API: GENERATE SINGLE IMAGE — Seedream 4.5 Only
  * ===================================================================
  * Route: POST /api/analysis/campaign/[id]/generate-image
  *
  * Input: { prompt, referenceImageUrl, imageCount }
  * Output: { success, data: base64ImageUrl } or { success: false, error }
  *
- * Strategy:
- *   Attempt 1: Seedream 4.5 (ByteDance) — Xiaohongshu food style
- *   Attempt 2: Seedream 4.5 — simplified prompt
- *   Attempt 3: Gemini 3 Pro (fallback, supports image reference)
+ * Model: ByteDance Seedream 4.5 (text-to-image)
+ * Strategy: 3 retries with progressively simpler prompts
  * ===================================================================
  */
 
@@ -21,7 +19,6 @@ export const maxDuration = 120; // 2 minutes per image
 
 // ─── Constants ───────────────────────────────────────────────────────
 const MODEL_SEEDREAM = 'bytedance-seed/seedream-4.5';
-const MODEL_GEMINI = 'google/gemini-3-pro-image-preview';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -33,23 +30,6 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: st
             return { ratio: '1:1', resolution: '1080x1080', instruction: 'SQUARE 1:1 aspect ratio (1080x1080px).' };
         default:
             return { ratio: '4:5', resolution: '1080x1350', instruction: 'PORTRAIT 4:5 aspect ratio (1080x1350px).' };
-    }
-}
-
-async function downloadImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
-        clearTimeout(timeout);
-        if (!res.ok) return null;
-        const contentType = res.headers.get('content-type') || 'image/jpeg';
-        const mimeType = contentType.split(';')[0].trim();
-        const buffer = await res.arrayBuffer();
-        const base64 = Buffer.from(buffer).toString('base64');
-        return { data: base64, mimeType };
-    } catch {
-        return null;
     }
 }
 
@@ -138,23 +118,6 @@ function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof
     return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
 }
 
-function buildGeminiFallbackPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
-    return `Create a food photo in Xiaohongshu (小红书) Chinese social media style.
-
-STYLE: Choose the ideal lighting and color grading that MATCHES the food type — warm amber for braised dishes, bright and fresh for seafood/salads, dark and smoky for grilled/BBQ, vibrant for spicy dishes, soft for desserts. Let the FOOD dictate the visual style.
-
-QUALITY: Close-up, sharp texture detail, shallow depth of field, authentic environment, human element visible.
-
-⚠️ ASPECT RATIO: ${aspectSpec.instruction} (${aspectSpec.resolution}).
-
-${hasRef ? `REFERENCE IMAGE: Create a NEW photo matching the same food type, composition, and mood as the reference, with appropriate Xiaohongshu styling.` : ''}
-
-FOOD SUBJECT:
-${basePrompt}
-
-Make the viewer INSTANTLY hungry.`;
-}
-
 // ─── Call Seedream 4.5 (text-to-image, non-streaming) ────────────────
 
 async function callSeedream(apiKey: string, prompt: string): Promise<string | null> {
@@ -233,159 +196,30 @@ async function callSeedream(apiKey: string, prompt: string): Promise<string | nu
     }
 }
 
-// ─── Call Gemini 3 Pro (supports image reference, uses streaming) ─────
-
-async function callGemini(
-    apiKey: string,
-    prompt: string,
-    refBase64: { data: string; mimeType: string } | null,
-): Promise<string | null> {
-    const log = (msg: string) => console.log(msg);
-
-    const contentParts: any[] = [{ type: 'text', text: prompt }];
-    if (refBase64) {
-        contentParts.push({
-            type: 'image_url',
-            image_url: { url: `data:${refBase64.mimeType};base64,${refBase64.data}` },
-        });
-    }
-
-    const TIMEOUT_MS = 120_000;
-    const abortCtrl = new AbortController();
-    const timer = setTimeout(() => abortCtrl.abort(), TIMEOUT_MS);
-
-    try {
-        const rawRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://ads.supbaongu.vn',
-                'X-Title': 'THO ADS AI - Creative Studio',
-            },
-            body: JSON.stringify({
-                model: MODEL_GEMINI,
-                messages: [{ role: 'user', content: contentParts }],
-                modalities: ['image', 'text'],
-                stream: true,
-            }),
-            signal: abortCtrl.signal,
-        });
-        clearTimeout(timer);
-
-        log(`[GEMINI] Response: ${rawRes.status}`);
-        if (!rawRes.ok) {
-            const errText = await rawRes.text().catch(() => '');
-            log(`[GEMINI] ❌ HTTP ${rawRes.status}: ${errText.substring(0, 300)}`);
-            return null;
-        }
-
-        // Read SSE stream
-        const reader = rawRes.body?.getReader();
-        if (!reader) return null;
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let accumulatedContent = '';
-        const accumulatedImages: any[] = [];
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith('data: ')) continue;
-                const data = trimmed.substring(6);
-                if (data === '[DONE]') continue;
-
-                try {
-                    const chunk = JSON.parse(data);
-                    const delta = chunk?.choices?.[0]?.delta;
-                    if (!delta) continue;
-
-                    if (typeof delta.content === 'string') accumulatedContent += delta.content;
-
-                    if (Array.isArray(delta.images)) {
-                        for (const img of delta.images) accumulatedImages.push(img);
-                    }
-                    if (Array.isArray(delta.content)) {
-                        for (const part of delta.content) {
-                            if (part?.inline_data?.data || (part?.type === 'image_url' && part?.image_url?.url)) {
-                                accumulatedImages.push(part);
-                            }
-                        }
-                    }
-                } catch { /* skip */ }
-            }
-        }
-
-        // Extract image
-        if (accumulatedImages.length > 0) {
-            const img = accumulatedImages[0];
-            const url = img?.image_url?.url || img?.url || (typeof img === 'string' ? img : null);
-            if (url) { log(`[GEMINI] ✅ Image found`); return url; }
-            if (img?.inline_data?.data) {
-                const mime = img.inline_data.mime_type || 'image/png';
-                log(`[GEMINI] ✅ Inline image found`);
-                return `data:${mime};base64,${img.inline_data.data}`;
-            }
-        }
-
-        if (accumulatedContent) {
-            const match = accumulatedContent.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-            if (match) { log(`[GEMINI] ✅ Image in text`); return match[0]; }
-        }
-
-        log(`[GEMINI] ⚠️ No image in response`);
-        return null;
-    } catch (error: any) {
-        clearTimeout(timer);
-        log(`[GEMINI] ❌ Error: ${error?.message || String(error)}`);
-        return null;
-    }
-}
-
-// ─── Main generation with 3-attempt strategy ─────────────────────────
+// ─── Main generation: 3 attempts, all Seedream 4.5 ──────────────────
 
 async function generateImage(
     apiKey: string,
     prompt: string,
-    referenceImageUrl: string | null,
+    _referenceImageUrl: string | null, // kept for API compat, not used by Seedream
     imageCount: number,
 ): Promise<string | null> {
     const log = (msg: string) => console.log(msg);
     const aspectSpec = getAspectRatioSpec(imageCount);
 
-    // Download reference image for Gemini fallback
-    let refBase64: { data: string; mimeType: string } | null = null;
-    if (referenceImageUrl) {
-        log(`[IMG] Downloading ref image for Gemini fallback...`);
-        refBase64 = await downloadImageAsBase64(referenceImageUrl);
-        if (refBase64) log(`[IMG] ✅ Ref downloaded (${Math.round(refBase64.data.length / 1024)}KB)`);
-        else log(`[IMG] ⚠️ Ref download failed`);
-    }
-
-    // ─── Attempt 1: Seedream 4.5 — Full Xiaohongshu prompt ───
-    log(`[IMG] 🎯 Attempt 1: Seedream 4.5 — Xiaohongshu style`);
-    const prompt1 = buildXiaohongshuPrompt(prompt, aspectSpec);
-    const result1 = await callSeedream(apiKey, prompt1);
+    // ─── Attempt 1: Full Xiaohongshu prompt ───
+    log(`[IMG] 🎯 Attempt 1: Seedream 4.5 — full Xiaohongshu prompt`);
+    const result1 = await callSeedream(apiKey, buildXiaohongshuPrompt(prompt, aspectSpec));
     if (result1) return result1;
 
-    // ─── Attempt 2: Seedream 4.5 — Simplified prompt ───
+    // ─── Attempt 2: Simplified prompt ───
     log(`[IMG] 🔄 Attempt 2: Seedream 4.5 — simplified prompt`);
-    const prompt2 = buildSimplifiedPrompt(prompt, aspectSpec);
-    const result2 = await callSeedream(apiKey, prompt2);
+    const result2 = await callSeedream(apiKey, buildSimplifiedPrompt(prompt, aspectSpec));
     if (result2) return result2;
 
-    // ─── Attempt 3: Gemini 3 Pro fallback (with ref image if available) ───
-    log(`[IMG] 🔄 Attempt 3: Gemini 3 Pro fallback (ref=${refBase64 ? 'YES' : 'NO'})`);
-    const prompt3 = buildGeminiFallbackPrompt(prompt, aspectSpec, !!refBase64);
-    const result3 = await callGemini(apiKey, prompt3, refBase64);
+    // ─── Attempt 3: Minimal prompt ───
+    log(`[IMG] 🔄 Attempt 3: Seedream 4.5 — minimal prompt`);
+    const result3 = await callSeedream(apiKey, `Xiaohongshu food photo: ${prompt}. Aspect ratio: ${aspectSpec.ratio}.`);
     if (result3) return result3;
 
     log(`[IMG] ❌ All 3 attempts failed`);
@@ -420,7 +254,7 @@ export async function POST(
         return NextResponse.json({ success: false, error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
     }
 
-    console.log(`[GENERATE_IMAGE] 🖼️ Campaign ${campaignId} — Seedream 4.5 primary`);
+    console.log(`[GENERATE_IMAGE] 🖼️ Campaign ${campaignId} — Seedream 4.5 only`);
     console.log(`[GENERATE_IMAGE] 📝 prompt: ${prompt.substring(0, 100)}...`);
 
     try {

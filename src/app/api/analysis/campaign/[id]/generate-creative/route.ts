@@ -281,19 +281,21 @@ async function generateImage(
     }
 
     // ─── Attempt generation (with retry) ───
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
         const useRef = attempt === 1 ? refBase64 : null;
         if (attempt === 2) {
             log(`[IMG] 🔄 RETRY attempt 2 — generating WITHOUT reference image`);
+        } else if (attempt === 3) {
+            log(`[IMG] 🔄 RETRY attempt 3 — simplified prompt, no reference`);
         }
 
         try {
             const aspectSpec = getAspectRatioSpec(imageCount);
 
-            const contentParts: any[] = [
-                {
-                    type: 'text',
-                    text: `You are creating an AUTHENTIC smartphone photo that looks like a REAL PERSON took it and posted on social media. This is for a Vietnamese Facebook ad.
+            // For attempt 3, simplify the prompt
+            const effectivePrompt = attempt === 3
+                ? `Generate a high-quality food photography image. ${prompt.substring(0, 200)}. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`
+                : `You are creating an AUTHENTIC smartphone photo that looks like a REAL PERSON took it and posted on social media. This is for a Vietnamese Facebook ad.
 
 CRITICAL IDENTITY: You are NOT a professional photographer. You are a REGULAR PERSON casually taking a quick photo with your phone to share with friends on Facebook. The photo should feel SPONTANEOUS and LIVED-IN.
 
@@ -335,8 +337,10 @@ ABSOLUTELY FORBIDDEN — Dead giveaways of fake/staged photos:
 
 THE ULTIMATE TEST: If someone scrolling Facebook would pause and think "this looks like a real person posted this, not an ad" — you succeeded.
 
-OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspect ratio.`,
-                },
+OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspect ratio.`;
+
+            const contentParts: any[] = [
+                { type: 'text', text: effectivePrompt },
             ];
 
             if (useRef) {
@@ -396,7 +400,7 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
                     const trimmed = line.trim();
@@ -413,12 +417,10 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
 
                         if (!delta) continue;
 
-                        // Text content
                         if (typeof delta.content === 'string') {
                             accumulatedContent += delta.content;
                         }
 
-                        // Images in delta.images (OpenRouter standard)
                         if (Array.isArray(delta.images)) {
                             for (const img of delta.images) {
                                 accumulatedImages.push(img);
@@ -426,7 +428,6 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                             }
                         }
 
-                        // Content array parts (inline_data / image_url)
                         if (Array.isArray(delta.content)) {
                             for (const part of delta.content) {
                                 if (part?.inline_data?.data) {
@@ -447,17 +448,13 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             log(`[IMG] Stream complete: ${chunkCount} chunks, finish=${lastFinishReason}, text_len=${accumulatedContent.length}, images=${accumulatedImages.length}`);
 
             // ─── Extract image from accumulated data ───
-
-            // Priority 1: images from delta.images
             if (accumulatedImages.length > 0) {
                 const img = accumulatedImages[0];
-                // OpenRouter format: { type: 'image_url', image_url: { url: 'data:image/png;base64,...' } }
                 const url = img?.image_url?.url || img?.url || (typeof img === 'string' ? img : null);
                 if (url) {
                     log(`[IMG] ✅ Found image from stream (${url.substring(0, 60)}...)`);
                     return url;
                 }
-                // Gemini inline_data format
                 if (img?.inline_data?.data) {
                     const mime = img.inline_data.mime_type || 'image/png';
                     log(`[IMG] ✅ Found inline_data from stream (${mime})`);
@@ -465,7 +462,6 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 }
             }
 
-            // Priority 2: data URL in accumulated text
             if (accumulatedContent.length > 0) {
                 const base64Match = accumulatedContent.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
                 if (base64Match) {
@@ -474,25 +470,16 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 }
             }
 
-            log(`[IMG] ⚠️ No image in stream. text_preview: ${accumulatedContent.substring(0, 200)}`);
-
-            if (attempt === 1 && refBase64) {
-                log(`[IMG] Will retry without ref...`);
-                continue;
-            }
-            return null;
+            log(`[IMG] ⚠️ No image in stream (attempt ${attempt}). text_preview: ${accumulatedContent.substring(0, 200)}`);
+            continue;
 
         } catch (error: any) {
             const errMsg = error?.message || String(error);
             log(`[IMG] ❌ FAILED (attempt ${attempt}): ${errMsg}`);
-
-            if (attempt === 1 && refBase64) {
-                log(`[IMG] Will retry without ref...`);
-                continue;
-            }
-            return null;
+            continue;
         }
     }
+    log(`[IMG] ❌ All 3 attempts failed`);
     return null;
 }
 
@@ -544,8 +531,8 @@ export async function POST(
     const referenceUrls: string[] = topAdImageUrls || [];
     const mode = genMode || 'inspired';
 
-    console.log(`[GENERATE_CREATIVE] 🎨 Campaign ${campaignId} — STREAMING pipeline, mode=${mode}`);
-    console.log(`[GENERATE_CREATIVE] 📎 Reference URLs count: ${referenceUrls.length}`);
+    console.log(`[GENERATE_CREATIVE] 🎨 Campaign ${campaignId} — STREAMING pipeline, mode = ${mode} `);
+    console.log(`[GENERATE_CREATIVE] 📎 Reference URLs count: ${referenceUrls.length} `);
     referenceUrls.forEach((url, i) => console.log(`[GENERATE_CREATIVE] 📎 ref[${i}]: ${url.substring(0, 120)}...`));
 
     // Create streaming response
@@ -575,7 +562,7 @@ export async function POST(
                     referenceUrls.forEach((url, i) => {
                         captionContentParts.push({
                             type: 'text',
-                            text: `\n[Ảnh tham khảo #${i + 1}]:`,
+                            text: `\n[Ảnh tham khảo #${i + 1}]: `,
                         });
                         captionContentParts.push({
                             type: 'image_url',
@@ -602,7 +589,7 @@ export async function POST(
 
                 try {
                     let cleaned = captionText;
-                    const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+                    const fenceMatch = cleaned.match(/```(?: json) ?\s *\n ? ([\s\S] *?) \n ?\s * ```/);
                     if (fenceMatch) cleaned = fenceMatch[1];
                     const startIdx = cleaned.indexOf('{');
                     if (startIdx === -1) throw new Error('No JSON object found');
@@ -662,7 +649,9 @@ export async function POST(
                         refImage = referenceUrls[idx % referenceUrls.length] || null;
                     }
 
-                    send({ type: 'step', message: `Đang vẽ ảnh ${idx + 1}/${effectiveImageCount}...` });
+                    send({
+                        type: 'step', message: `Đang vẽ ảnh ${idx + 1}/${effectiveImageCount}...`
+                    });
                     // Stream debug info to client console
                     send({ type: 'debug', message: `Image ${idx + 1}: prompt=${prompt.substring(0, 60)}... | ref=${refImage ? refImage.substring(0, 80) + '...' : 'NONE'}` });
                     console.log(`[GENERATE_CREATIVE] 🖼️ Image ${idx + 1}/${effectiveImageCount} [${mode}] ref: ${refImage ? refImage.substring(0, 100) : 'NONE'}`);

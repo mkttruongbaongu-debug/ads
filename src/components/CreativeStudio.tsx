@@ -1279,28 +1279,7 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                                 background: colors.bg, border: `1px solid ${colors.border}`,
                                                 borderRadius: '6px', maxHeight: '500px', overflow: 'auto',
                                             }}>
-                                                {/* Reference Images Used */}
-                                                {referenceImageUrls.length > 0 && (
-                                                    <div style={{ marginBottom: '16px' }}>
-                                                        <span style={{ fontSize: '0.625rem', fontWeight: 700, color: colors.accent, letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>
-                                                            ẢNH THAM KHẢO ĐÃ DÙNG ({referenceImageUrls.length})
-                                                        </span>
-                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                                                            {referenceImageUrls.map((url, i) => (
-                                                                <img
-                                                                    key={i} src={url} alt={`Ref ${i + 1}`}
-                                                                    style={{
-                                                                        width: '60px', height: '60px', objectFit: 'cover' as const,
-                                                                        borderRadius: '4px', border: `1px solid ${colors.border}`,
-                                                                    }}
-                                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Image Prompts */}
+                                                {/* Image Prompts + inline ref image */}
                                                 {generatedImagePrompts.map((prompt, i) => (
                                                     <div key={i} style={{ marginBottom: '12px' }}>
                                                         <span style={{
@@ -1310,12 +1289,29 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                                             IMAGE PROMPT #{i + 1}
                                                         </span>
                                                         <div style={{
-                                                            padding: '10px 12px', borderRadius: '4px',
-                                                            background: colors.bgAlt, border: `1px solid ${colors.border}`,
-                                                            fontSize: '0.6875rem', color: colors.text,
-                                                            lineHeight: 1.5, whiteSpace: 'pre-wrap' as const,
+                                                            display: 'flex', gap: '10px', alignItems: 'flex-start',
                                                         }}>
-                                                            {prompt}
+                                                            {/* Ref image for this prompt */}
+                                                            {referenceImageUrls[i] && (
+                                                                <img
+                                                                    src={referenceImageUrls[i]} alt={`Ref ${i + 1}`}
+                                                                    style={{
+                                                                        width: '72px', height: '72px', objectFit: 'cover' as const,
+                                                                        borderRadius: '4px', border: `1px solid ${colors.accent}`,
+                                                                        flexShrink: 0,
+                                                                    }}
+                                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                />
+                                                            )}
+                                                            {/* Prompt text */}
+                                                            <div style={{
+                                                                flex: 1, padding: '10px 12px', borderRadius: '4px',
+                                                                background: colors.bgAlt, border: `1px solid ${colors.border}`,
+                                                                fontSize: '0.6875rem', color: colors.text,
+                                                                lineHeight: 1.5, whiteSpace: 'pre-wrap' as const,
+                                                            }}>
+                                                                {prompt}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}

@@ -96,7 +96,7 @@ AUTHENTICITY:
 PROPS & UTENSILS (vary based on context):
 - Plates/bowls: classic Vietnamese rooster plate (đĩa con gà), ceramic bowls, bamboo baskets (rổ tre), white plastic takeaway containers, steel bowls
 - Utensils: chopsticks, soup ladle, large kitchen knife (dao phay), wooden spatula, tongs
-- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopsticks
+- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopstips
 - Surfaces: stainless steel kitchen table, wooden cutting board (thớt gỗ), bamboo mat
 
 BACKGROUND & SPACE (critical for authenticity):
@@ -111,6 +111,13 @@ TEXTURE & DETAIL:
 - Micro-details: oil droplets, sauce bubbles, steam particles, spice flakes
 - The surface quality must be TACTILE — viewer can almost feel the texture
 
+⛔ CRITICAL PROHIBITIONS (MUST follow):
+- absolutely NO text, words, letters, titles, captions, watermarks, or labels anywhere on the image
+- absolutely NO visible light fixtures, light bulbs, lamp shades, or ceiling lights in the frame
+- absolutely NO logos, brand names, or stamps
+- The lighting should be FELT (warm glow, soft shadows) but the light SOURCE must NOT be visible
+- Keep the food as the ONLY focal point — no distracting overhead objects
+
 === ASPECT RATIO ===
 ${aspectSpec.instruction} (${aspectSpec.resolution})
 
@@ -121,7 +128,7 @@ OUTPUT: ONE photo that matches the ideal Xiaohongshu sub-style for this specific
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
+    return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. CRITICAL: No text, no watermarks, no visible light bulbs or lamps in frame. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────

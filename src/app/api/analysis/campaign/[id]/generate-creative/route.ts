@@ -349,7 +349,7 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
             log(`[IMG] Calling OpenRouter (attempt ${attempt}, ref=${useRef ? 'YES' : 'NO'})...`);
 
             // ─── Direct fetch() instead of OpenAI SDK to preserve raw multimodal response ───
-            const TIMEOUT_MS = 90_000;
+            const TIMEOUT_MS = 120_000; // 2 minute timeout for image gen
             const abortCtrl = new AbortController();
             const timer = setTimeout(() => abortCtrl.abort(), TIMEOUT_MS);
 
@@ -377,13 +377,67 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 throw new Error(`OpenRouter HTTP ${rawRes.status}`);
             }
 
-            const rawJson = await rawRes.json();
+            const contentType = rawRes.headers.get('content-type') || '';
+            log(`[IMG] Response content-type: ${contentType}`);
 
-            // ─── DEBUG: Dump raw response structure ───
-            const choice = rawJson?.choices?.[0];
-            const message = choice?.message;
-            log(`[IMG] Raw response: finish=${choice?.finish_reason}, content_type=${typeof message?.content}, is_array=${Array.isArray(message?.content)}`);
+            let message: any = null;
 
+            // ─── Handle SSE Stream (OpenRouter may force streaming for image gen) ───
+            if (contentType.includes('text/event-stream') || contentType.includes('text/plain')) {
+                log(`[IMG] ⚡ Streaming response detected — parsing SSE...`);
+                const rawText = await rawRes.text();
+                const lines = rawText.split('\n');
+                let accumulatedContent = '';
+                const accumulatedImages: any[] = [];
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.substring(6).trim();
+                    if (data === '[DONE]') break;
+                    try {
+                        const chunk = JSON.parse(data);
+                        const delta = chunk?.choices?.[0]?.delta;
+                        if (!delta) continue;
+
+                        // Accumulate text content
+                        if (typeof delta.content === 'string') {
+                            accumulatedContent += delta.content;
+                        }
+                        // Accumulate content array parts
+                        if (Array.isArray(delta.content)) {
+                            for (const part of delta.content) {
+                                if (part?.inline_data?.data) {
+                                    accumulatedImages.push(part);
+                                } else if (part?.type === 'image_url' && part?.image_url?.url) {
+                                    accumulatedImages.push(part);
+                                }
+                            }
+                        }
+                        // Accumulate images from delta.images
+                        if (Array.isArray(delta.images)) {
+                            accumulatedImages.push(...delta.images);
+                        }
+                    } catch {
+                        // skip invalid JSON lines
+                    }
+                }
+
+                log(`[IMG] SSE parsed: text_len=${accumulatedContent.length}, images=${accumulatedImages.length}`);
+
+                // Build a pseudo-message object for unified extraction below
+                message = {
+                    content: accumulatedContent || null,
+                    images: accumulatedImages.length > 0 ? accumulatedImages : undefined,
+                };
+            } else {
+                // ─── Regular JSON response ───
+                const rawJson = await rawRes.json();
+                const choice = rawJson?.choices?.[0];
+                message = choice?.message;
+                log(`[IMG] JSON response: finish=${choice?.finish_reason}, content_type=${typeof message?.content}, is_array=${Array.isArray(message?.content)}, has_images=${!!message?.images}`);
+            }
+
+            // ─── DEBUG: Dump response structure ───
             if (Array.isArray(message?.content)) {
                 log(`[IMG] Content parts: ${message.content.length}`);
                 message.content.forEach((part: any, i: number) => {
@@ -392,14 +446,27 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 });
             } else if (typeof message?.content === 'string') {
                 log(`[IMG] Content string len=${message.content.length}`);
-            } else {
-                // Dump the entire message keys for debugging
-                log(`[IMG] Message keys: ${JSON.stringify(Object.keys(message || {}))}`);
-                log(`[IMG] Full choice dump: ${JSON.stringify(choice, null, 2).substring(0, 1500)}`);
+            }
+            if (message?.images?.length > 0) {
+                log(`[IMG] Images array: ${message.images.length} items`);
+                message.images.forEach((img: any, i: number) => {
+                    log(`[IMG] images[${i}]: type=${img?.type}, has_url=${!!img?.image_url?.url}, url_len=${img?.image_url?.url?.length || 0}`);
+                });
             }
 
-            // ─── Extract image from raw response ───
-            // Format 1: content array with inline_data (Gemini native via OpenRouter)
+            // ─── Extract image — Priority: message.images > content array > content string ───
+
+            // Format 1: message.images array (OpenRouter standard for image gen)
+            if (message?.images?.length > 0) {
+                const img = message.images[0];
+                const url = img?.image_url?.url || img?.url || (typeof img === 'string' ? img : null);
+                if (url) {
+                    log(`[IMG] ✅ Found image in .images[] (${url.substring(0, 50)}...)`);
+                    return url;
+                }
+            }
+
+            // Format 2: content array with inline_data (Gemini native via OpenRouter)
             if (Array.isArray(message?.content)) {
                 for (const part of message.content) {
                     // Gemini inline_data format
@@ -426,20 +493,13 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 }
             }
 
-            // Format 2: content is string with embedded data URL
+            // Format 3: content is string with embedded data URL
             if (typeof message?.content === 'string' && message.content.length > 0) {
                 const base64Match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
                 if (base64Match) { log(`[IMG] ✅ Found data URL in content string`); return base64Match[0]; }
             }
 
-            // Format 3: message.images array
-            if (message?.images?.length > 0) {
-                const img = message.images[0];
-                const url = img?.image_url?.url || img?.url || (typeof img === 'string' ? img : null);
-                if (url) { log(`[IMG] ✅ Found in .images[]`); return url; }
-            }
-
-            log(`[IMG] ⚠️ No image extracted. Raw dump: ${JSON.stringify(rawJson).substring(0, 2000)}`);
+            log(`[IMG] ⚠️ No image extracted from response. Message keys: ${JSON.stringify(Object.keys(message || {}))}`);
 
             if (attempt === 1 && refBase64) {
                 log(`[IMG] Will retry without ref...`);

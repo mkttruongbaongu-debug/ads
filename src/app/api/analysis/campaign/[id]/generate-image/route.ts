@@ -53,48 +53,64 @@ async function downloadImageAsBase64(url: string): Promise<{ data: string; mimeT
     }
 }
 
-// ─── Xiaohongshu Food Photography Prompt ─────────────────────────────
+// ─── Xiaohongshu Food Photography Prompt (ADAPTIVE) ──────────────────
 
 function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Create a MOUTH-WATERING food photo in the Xiaohongshu (小红书) Chinese food photography style.
+    return `Create a STUNNING food photo in the Xiaohongshu (小红书) Chinese food photography style.
 
-=== XIAOHONGSHU VISUAL DNA (最重要) ===
+=== YOUR TASK ===
+Analyze the food subject below and AUTOMATICALLY choose the most appropriate visual style from the style palette. Each food type has its own ideal color grading, lighting, and mood — DO NOT use the same look for every dish.
 
-COLOR GRADING — MANDATORY:
-- Color temperature: WARM 3000-3500K amber/caramel cast over the ENTIRE image
-- Reds, oranges, browns: saturation boosted +25-30% — food must look RICH and INTENSE
-- Shadows: warm brown/amber tint (NEVER grey or blue)
-- Highlights: golden amber reflections on glossy surfaces
-- Overall mood: warm, inviting, appetite-inducing
+=== XIAOHONGSHU STYLE PALETTE (choose the BEST match) ===
 
-GLOSSY SURFACE — CRITICAL:
-- Food MUST have a visible oil/sauce/glaze layer creating GLOSSY REFLECTIONS
-- Specular highlights from overhead warm light bouncing off wet, oily surfaces
-- Sauce/gravy GLISTENING — visible wet sheen, droplets, shine on every piece of food
-- The food should look JUICY, WET, and SUCCULENT — never dry or matte
+🍯 WARM AMBER GLAZE — for braised meats, kho, sốt nâu, caramelized dishes:
+   Color: 3000-3500K amber/caramel cast, rich brown tones, golden highlights
+   Surface: glossy sauce/glaze, caramelized lacquer finish
+   Light: warm overhead kitchen light, specular highlights on wet surfaces
 
-LIGHTING — AUTHENTIC KITCHEN:
-- Warm overhead kitchen light (NOT studio softbox, NOT ring light)
-- Creates strong specular highlights on glossy food surfaces
-- Slight hard shadows from above — NOT diffused/flat
-- Light temperature around 3000K (warm tungsten/LED feel)
+🌿 FRESH & BRIGHT — for seafood, salads, sushi, raw dishes, light meals:
+   Color: clean daylight 5500K, vibrant greens/whites, fresh & crisp
+   Surface: dewy, moist, glistening water droplets
+   Light: natural window light, soft and bright, airy feel
 
-COMPOSITION — CLOSE & IMMERSIVE:
-- EXTREME close-up filling 85%+ of frame with food
-- Shallow depth of field — background heavily blurred
-- Food touching or extending beyond edges of frame — NO empty space
-- Slightly off-center, imperfect framing (real person, not studio)
+🔥 SMOKY & DARK — for grilled, BBQ, charcoal, lẩu, roasted dishes:
+   Color: deep moody tones, charred blacks, ember reds/oranges, smoky atmosphere
+   Surface: charred crust with juicy interior, smoke wisps
+   Light: dramatic low light, fire glow, strong contrast
 
-HUMAN ELEMENT — AUTHENTIC TOUCHES:
-- Hands wearing disposable PE gloves holding food
-- OR: chopsticks/spoon lifting food, sauce dripping
-- OR: ladle pouring sauce over dish — action shot
-- Kitchen/cooking environment visible in blurred background
+🍜 STEAM & WARMTH — for phở, soup, noodles, dim sum, hot pot, steamed dishes:
+   Color: gentle warm tones 4000-4500K, soft and inviting
+   Surface: steam rising, condensation, broth shimmer
+   Light: soft diffused warm light, cozy atmosphere
 
-TEXTURE DETAIL:
-- Every fiber of meat, every grain of spice must be SHARP and visible
-- Oil droplets, sauce bubbles, steam — micro-details that make food feel REAL
-- Surface texture of braised/glazed food: caramelized, lacquered appearance
+🌶️ VIBRANT SPICY — for mala, chili dishes, Sichuan, spicy street food:
+   Color: INTENSE saturated reds, oranges, chili oil sheen, peppercorn greens
+   Surface: glistening chili oil layer, visible spice flakes, wet & fiery
+   Light: bright and punchy, high saturation, bold contrast
+
+🍰 SOFT & ELEGANT — for desserts, pastries, tea, café items, bánh:
+   Color: soft pastel tones, creamy whites, gentle warm accents
+   Surface: smooth, powdered sugar, drizzle, delicate textures
+   Light: soft natural light, dreamy and airy
+
+=== UNIVERSAL RULES (apply to ALL styles) ===
+
+COMPOSITION:
+- Close-up filling 70-90% of frame — food is the HERO
+- Shallow depth of field — background blurred
+- Slightly imperfect framing — feels real, not studio-perfect
+- Show some environment context (table, plate edge, utensils)
+
+AUTHENTICITY:
+- Must look like a REAL person took this with a good phone camera
+- Human presence: hand holding food, chopsticks, spoon, or cooking action
+- Real environment: kitchen, restaurant table, street food stall
+- NOT a sterile studio setup — life and context around the food
+
+TEXTURE & DETAIL:
+- Ultra-sharp food texture — every fiber, grain, flake visible
+- Micro-details: oil droplets, sauce bubbles, steam particles, spice flakes
+- The surface quality must be TACTILE — viewer can almost feel the texture
 
 === ASPECT RATIO ===
 ${aspectSpec.instruction} (${aspectSpec.resolution})
@@ -102,26 +118,28 @@ ${aspectSpec.instruction} (${aspectSpec.resolution})
 === FOOD SUBJECT ===
 ${basePrompt}
 
-OUTPUT: A single stunning food photo that would get 10,000+ likes on Xiaohongshu. The image must make the viewer INSTANTLY hungry.`;
+OUTPUT: ONE photo that matches the ideal Xiaohongshu sub-style for this specific food. The viewer must feel HUNGRY immediately.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Professional food photography, Xiaohongshu style (小红书美食). Warm amber lighting (3000K), glossy/oily food surface with specular highlights, extreme close-up, shallow depth of field. ${basePrompt}. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
+    return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
 }
 
 function buildGeminiFallbackPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
-    return `You are creating a FOOD PHOTO in the Xiaohongshu/小红书 Chinese social media style.
+    return `Create a food photo in Xiaohongshu (小红书) Chinese social media style.
 
-KEY STYLE: Warm amber color temperature (3000K), glossy oily food surfaces, rich saturated warm colors, extreme close-up, shallow depth of field, authentic kitchen setting.
+STYLE: Choose the ideal lighting and color grading that MATCHES the food type — warm amber for braised dishes, bright and fresh for seafood/salads, dark and smoky for grilled/BBQ, vibrant for spicy dishes, soft for desserts. Let the FOOD dictate the visual style.
 
-⚠️ ASPECT RATIO: ${aspectSpec.instruction} (${aspectSpec.resolution}). NON-NEGOTIABLE.
+QUALITY: Close-up, sharp texture detail, shallow depth of field, authentic environment, human element visible.
 
-${hasRef ? `REFERENCE IMAGE: Create a NEW photo matching the same food type, composition, and mood as the reference, but with the Xiaohongshu warm glossy style.` : ''}
+⚠️ ASPECT RATIO: ${aspectSpec.instruction} (${aspectSpec.resolution}).
+
+${hasRef ? `REFERENCE IMAGE: Create a NEW photo matching the same food type, composition, and mood as the reference, with appropriate Xiaohongshu styling.` : ''}
 
 FOOD SUBJECT:
 ${basePrompt}
 
-The food MUST look glossy and wet with sauce/oil, warm amber tones throughout. Make the viewer HUNGRY.`;
+Make the viewer INSTANTLY hungry.`;
 }
 
 // ─── Call Seedream 4.5 (text-to-image, non-streaming) ────────────────

@@ -24,112 +24,53 @@ const SEEDREAM_MODEL = 'seedream-4-5-251128';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-function getAspectRatioSpec(imageCount: number): { ratio: string; resolution: string; instruction: string } {
+function getAspectRatioSpec(imageCount: number): { ratio: string; byteplusRatio: string } {
     switch (imageCount) {
-        case 2:
-            return { ratio: '4:5', resolution: '1080x1350', instruction: 'PORTRAIT 4:5 aspect ratio (1080x1350px).' };
         case 4:
-            return { ratio: '1:1', resolution: '1080x1080', instruction: 'SQUARE 1:1 aspect ratio (1080x1080px).' };
+            return { ratio: '1:1', byteplusRatio: '1:1' };
         default:
-            return { ratio: '4:5', resolution: '1080x1350', instruction: 'PORTRAIT 4:5 aspect ratio (1080x1350px).' };
+            // 3:4 is the closest BytePlus ratio to 4:5 (portrait)
+            return { ratio: '3:4', byteplusRatio: '3:4' };
     }
 }
 
-// ─── Xiaohongshu Food Photography Prompt (ADAPTIVE) ──────────────────
+// ─── Food Photography Prompt (Casual & Real) ──────────────────────────
 
 function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
     const refInstruction = hasRef
-        ? `\n=== REFERENCE IMAGE ===\nA reference image is attached. Use it ONLY as inspiration for the food type and color mood.\nYou MUST create a COMPLETELY DIFFERENT photo with:\n- DIFFERENT camera angle (if ref is overhead, try 45°; if ref is close-up, try medium shot)\n- DIFFERENT composition and framing\n- DIFFERENT props, plates, or utensils\n- DIFFERENT background arrangement\n- SAME food type and SAME warm color temperature\nThe result must look like a DIFFERENT photographer took a DIFFERENT photo of the SAME dish.\n`
+        ? `\nA reference image is attached. Use it ONLY to understand the food type and color mood. Create a COMPLETELY DIFFERENT photo — different angle, different plate, different background. Same dish, different shot.\n`
         : '';
 
-    return `Create a STUNNING food photo in the Xiaohongshu (小红书) Chinese food photography style.
-
-=== YOUR TASK ===
-Analyze the food subject below and AUTOMATICALLY choose the most appropriate visual style from the style palette. Each food type has its own ideal color grading, lighting, and mood — DO NOT use the same look for every dish.
+    return `Vietnamese food photo, casual smartphone style.
 ${refInstruction}
-=== XIAOHONGSHU STYLE PALETTE (choose the BEST match) ===
+SUBJECT: ${basePrompt}
 
-🍯 WARM AMBER GLAZE — for braised meats, kho, sốt nâu, caramelized dishes:
-   Color: 3000-3500K amber/caramel cast, rich brown tones, golden highlights
-   Surface: glossy sauce/glaze, caramelized lacquer finish
-   Light: warm golden glow from the side, specular highlights on wet surfaces, soft shadows
+STYLE:
+- Shot on iPhone in a real Vietnamese kitchen or restaurant
+- Warm, appetizing color tones that match the food naturally
+- Close-up, food fills most of the frame
+- Slightly messy environment — real table, real dishes around
+- A hand holding chopsticks, lifting food, or scooping with a spoon
+- Shallow depth of field, background softly blurred
 
-🌿 FRESH & BRIGHT — for seafood, salads, sushi, raw dishes, light meals:
-   Color: clean daylight 5500K, vibrant greens/whites, fresh & crisp
-   Surface: dewy, moist, glistening water droplets
-   Light: bright natural daylight, soft and even, airy feel
+FEEL:
+- Like a real person snapped this to share on social media
+- Candid, spontaneous, NOT posed or styled
+- Imperfect but appetizing — sauce drips, steam, oil sheen
+- The food must look REAL and DELICIOUS, not like a 3D render
 
-🔥 SMOKY & DARK — for grilled, BBQ, charcoal, lẩu, roasted dishes:
-   Color: deep moody tones, charred blacks, ember reds/oranges, smoky atmosphere
-   Surface: charred crust with juicy interior, smoke wisps
-   Light: dramatic low-key side light, fire glow from below, strong contrast
+DO NOT:
+- No text, watermarks, or labels on the image
+- No visible lamps, light bulbs, or ceiling in frame
+- No overly perfect studio lighting
+- No bamboo mat styling or decorative props arranged around the food
+- No stock photo look
 
-🍜 STEAM & WARMTH — for phở, soup, noodles, dim sum, hot pot, steamed dishes:
-   Color: gentle warm tones 4000-4500K, soft and inviting
-   Surface: steam rising, condensation, broth shimmer
-   Light: soft diffused warm ambient glow, cozy atmosphere
-
-🌶️ VIBRANT SPICY — for mala, chili dishes, Sichuan, spicy street food:
-   Color: INTENSE saturated reds, oranges, chili oil sheen, peppercorn greens
-   Surface: glistening chili oil layer, visible spice flakes, wet & fiery
-   Light: bright and punchy ambient light, high saturation, bold contrast
-
-🍰 SOFT & ELEGANT — for desserts, pastries, tea, café items, bánh:
-   Color: soft pastel tones, creamy whites, gentle warm accents
-   Surface: smooth, powdered sugar, drizzle, delicate textures
-   Light: soft diffused natural glow, dreamy and airy
-
-=== UNIVERSAL RULES (apply to ALL styles) ===
-
-COMPOSITION:
-- Close-up filling 70-90% of frame — food is the HERO
-- Shallow depth of field f/1.8-f/2.8 — background creamy bokeh
-- Camera angle: 30-45° looking down at the food (NEVER straight up showing ceiling)
-- Show some environment context (table edge, plate edge, utensils) but NOT ceiling
-
-AUTHENTICITY:
-- Must look like a REAL person took this with a high-end phone camera
-- Human presence: hand holding food, chopsticks lifting a piece, spoon scooping
-- Real environment: restaurant table, food stall counter, home dining table
-- NOT a sterile studio setup — life and context around the food
-
-PROPS & UTENSILS (vary based on context):
-- Plates/bowls: classic Vietnamese rooster plate (đĩa con gà), ceramic bowls, bamboo baskets (rổ tre), white plastic takeaway containers, steel bowls
-- Utensils: chopsticks, soup ladle, large kitchen knife (dao phay), wooden spatula, tongs
-- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopsticks
-- Surfaces: stainless steel kitchen table, wooden cutting board (thớt gỗ), bamboo mat
-
-BACKGROUND & SPACE:
-- Blurred background with other dishes, condiments, or kitchen items partially visible
-- Signs of active cooking: sauce splatters, condensation, other food at edges
-- NOT a clean empty background — messy, lived-in, working environment
-- Background must be BLURRED and never show ceiling, lamps, or overhead fixtures
-
-IMAGE QUALITY (critical):
-- 8K ultra-high resolution, razor-sharp focus on the food
-- Every fiber, grain, and flake of the food must be TACK SHARP
-- Micro-details: individual oil droplets, sauce bubbles, steam particles, spice flakes
-- The surface quality must be TACTILE — viewer can almost feel the texture
-- Professional DSLR-level sharpness, NOT soft or blurry
-
-⛔ ABSOLUTE PROHIBITIONS:
-- NO text, words, letters, titles, captions, watermarks on the image
-- NO visible light fixtures, light bulbs, lamps, ceiling lights, pendant lights
-- NO ceiling visible in the frame at all
-- NO logos, brand names, or stamps
-- Light is AMBIENT and DIRECTIONAL — the source is NEVER in frame
-
-=== ASPECT RATIO ===
-${aspectSpec.instruction} (${aspectSpec.resolution})
-
-=== FOOD SUBJECT ===
-${basePrompt}
-
-OUTPUT: ONE hyper-sharp, 8K quality food photo. No lamps, no text. The viewer must feel HUNGRY immediately.`;
+Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Xiaohongshu (小红书) food photography. Choose the ideal color grading and lighting to match this food: ${basePrompt}. Close-up, shallow depth of field, ultra-sharp food texture, authentic feel, human element (hands/utensils). Make it look delicious and real. CRITICAL: No text, no watermarks, no visible light bulbs or lamps in frame. Aspect ratio: ${aspectSpec.ratio} (${aspectSpec.resolution}).`;
+    return `Casual Vietnamese food photo, shot on iPhone. ${basePrompt}. Close-up, warm tones, real messy kitchen background, hand with chopsticks. Candid and appetizing, not studio-perfect. No text, no lamps in frame. Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────
@@ -150,7 +91,7 @@ async function callSeedream(
             model: SEEDREAM_MODEL,
             prompt: prompt,
             response_format: 'url',
-            size: '2K',
+            size: '4K',
             stream: false,
             watermark: false,
             sequential_image_generation: 'disabled',

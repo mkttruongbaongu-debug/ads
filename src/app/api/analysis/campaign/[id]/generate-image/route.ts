@@ -107,6 +107,19 @@ AUTHENTICITY:
 - Real environment: kitchen, restaurant table, street food stall
 - NOT a sterile studio setup — life and context around the food
 
+PROPS & UTENSILS (vary based on context):
+- Plates/bowls: classic Vietnamese rooster plate (đĩa con gà), ceramic bowls, bamboo baskets (rổ tre), white plastic takeaway containers, steel bowls
+- Utensils: chopsticks, soup ladle, large kitchen knife (dao phay), wooden spatula, tongs
+- Hands: disposable PE gloves (găng PE trong suốt), bare hands, or hands with tongs/chopsticks
+- Surfaces: stainless steel kitchen table, wooden cutting board (thớt gỗ), bamboo mat
+
+BACKGROUND & SPACE (critical for authenticity):
+- REAL working kitchen visible: gas stove, pots, other dishes being prepped
+- Other food items partially visible at edges — the scene is BUSY, not isolated
+- Condensation on containers, sauce splatters on table — signs of active cooking
+- NOT a clean empty background — messy, lived-in, working environment
+- Blurred background elements add depth and context without distracting
+
 TEXTURE & DETAIL:
 - Ultra-sharp food texture — every fiber, grain, flake visible
 - Micro-details: oil droplets, sauce bubbles, steam particles, spice flakes

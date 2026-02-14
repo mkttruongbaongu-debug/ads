@@ -1664,20 +1664,6 @@ export default function DashboardPage() {
                                                             >
                                                                 <td style={{ padding: '12px 16px', maxWidth: '280px' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                        <div style={{
-                                                                            width: '32px',
-                                                                            height: '32px',
-                                                                            borderRadius: '50%',
-                                                                            background: actionColor,
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center',
-                                                                            fontSize: '0.85rem',
-                                                                            fontWeight: 700,
-                                                                            color: colors.bg,
-                                                                        }}>
-                                                                            {statusIcon}
-                                                                        </div>
                                                                         <div>
                                                                             <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px', display: 'inline-block' }} title={campaign.name}>{campaign.name}</span>

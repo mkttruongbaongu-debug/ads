@@ -710,98 +710,8 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                         </p>
                                     )}
 
-                                    {/* Debug button */}
-                                    <button
-                                        onClick={() => setShowDebug(!showDebug)}
-                                        style={{
-                                            width: '100%', padding: '8px', marginTop: '10px',
-                                            background: 'transparent',
-                                            border: `1px dashed ${colors.border}`,
-                                            borderRadius: '4px',
-                                            color: colors.textSubtle, fontSize: '0.625rem',
-                                            fontWeight: 600, cursor: 'pointer',
-                                            letterSpacing: '0.05em',
-                                        }}
-                                    >
-                                        {showDebug ? '▲ ẨN DEBUG' : '▼ DEBUG: XEM RAW DATA'}
-                                    </button>
 
-                                    {showDebug && (
-                                        <div style={{
-                                            marginTop: '10px', padding: '12px',
-                                            background: '#0a0c0f',
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '6px',
-                                            fontSize: '0.625rem', fontFamily: '"JetBrains Mono", monospace',
-                                            color: colors.textMuted, lineHeight: 1.5,
-                                            maxHeight: '400px', overflowY: 'auto' as const,
-                                        }}>
-                                            <div style={{ marginBottom: '10px' }}>
-                                                <span style={{ color: colors.accent, fontWeight: 700 }}>LOGIC PHÂN LOẠI:</span>
-                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: colors.text }}>
-                                                    {`Sắp xếp: ROAS giảm dần
-TOP PERFORMER: purchases > 0, lấy 5 đầu
-UNDER PERFORMER: spend > 50.000đ, lấy 3 cuối, đảo ngược
-Tổng ads: ${ads.length}`}
-                                                </pre>
-                                            </div>
 
-                                            <div style={{ marginBottom: '10px' }}>
-                                                <span style={{ color: colors.accent, fontWeight: 700 }}>▲ TOP PERFORMER ({ads.filter(a => a.metrics.purchases > 0).slice(0, 5).length}):</span>
-                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#4ade80' }}>
-                                                    {JSON.stringify(
-                                                        ads.filter(a => a.metrics.purchases > 0).slice(0, 5).map((a, i) => ({
-                                                            [`#${i + 1}`]: a.ad_name,
-                                                            roas: `${a.metrics.roas.toFixed(1)}x`,
-                                                            cpp: `${formatMoney(a.metrics.cpp)}`,
-                                                            ctr: `${a.metrics.ctr.toFixed(1)}%`,
-                                                            purchases: a.metrics.purchases,
-                                                            spend: formatMoney(a.metrics.spend),
-                                                            caption: a.caption?.substring(0, 60) + '...',
-                                                            image: a.image_url ? 'YES' : 'NO',
-                                                        })),
-                                                        null, 2
-                                                    )}
-                                                </pre>
-                                            </div>
-
-                                            <div style={{ marginBottom: '10px' }}>
-                                                <span style={{ color: colors.error, fontWeight: 700 }}>▼ UNDER PERFORMER ({ads.filter(a => a.metrics.spend > 50000).slice(-3).length}):</span>
-                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: '#f87171' }}>
-                                                    {JSON.stringify(
-                                                        ads.filter(a => a.metrics.spend > 50000).slice(-3).reverse().map((a, i) => ({
-                                                            [`#${i + 1}`]: a.ad_name,
-                                                            roas: `${a.metrics.roas.toFixed(1)}x`,
-                                                            cpp: `${formatMoney(a.metrics.cpp)}`,
-                                                            ctr: `${a.metrics.ctr.toFixed(1)}%`,
-                                                            purchases: a.metrics.purchases,
-                                                            spend: formatMoney(a.metrics.spend),
-                                                            caption: a.caption?.substring(0, 60) + '...',
-                                                        })),
-                                                        null, 2
-                                                    )}
-                                                </pre>
-                                            </div>
-
-                                            <div>
-                                                <span style={{ color: colors.warning, fontWeight: 700 }}>ALL ADS (sorted by ROAS):</span>
-                                                <pre style={{ margin: '4px 0', whiteSpace: 'pre-wrap' as const, color: colors.text }}>
-                                                    {JSON.stringify(
-                                                        ads.map((a, i) => ({
-                                                            i: i + 1,
-                                                            name: a.ad_name,
-                                                            roas: a.metrics.roas.toFixed(1),
-                                                            cpp: Math.round(a.metrics.cpp),
-                                                            ctr: a.metrics.ctr.toFixed(1),
-                                                            purchases: a.metrics.purchases,
-                                                            spend: Math.round(a.metrics.spend),
-                                                        })),
-                                                        null, 2
-                                                    )}
-                                                </pre>
-                                            </div>
-                                        </div>
-                                    )}
                                 </>
                             )}
 
@@ -1183,7 +1093,8 @@ Tổng ads: ${ads.length}`}
                                     textAlign: 'center' as const, padding: '40px 20px',
                                     color: colors.textMuted,
                                 }}>
-                                    <p style={{ fontSize: '2rem', margin: '0 0 8px' }}>🎨</p>
+
+
                                     <p style={{ fontSize: '0.8125rem', margin: '0 0 16px' }}>
                                         Chưa có creative nào được tạo
                                     </p>

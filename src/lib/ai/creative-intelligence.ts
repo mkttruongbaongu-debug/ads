@@ -186,7 +186,7 @@ export async function analyzeCreativeIntelligence(
             apiKey: openrouterKey,
             baseURL: 'https://openrouter.ai/api/v1',
             defaultHeaders: {
-                'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+                'HTTP-Referer': 'https://ads.supbaongu.vn',
                 'X-Title': 'THO ADS AI - Creative Intelligence',
             },
         })

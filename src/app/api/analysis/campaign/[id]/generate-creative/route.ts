@@ -305,13 +305,14 @@ OUTPUT: A single authentic-looking smartphone photo in ${aspectSpec.ratio} aspec
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+                    'HTTP-Referer': 'https://ads.supbaongu.vn',
                     'X-Title': 'THO ADS AI - Creative Studio',
                 },
                 body: JSON.stringify({
                     model: 'google/gemini-3-pro-image-preview',
                     messages: [{ role: 'user', content: contentParts }],
                     modalities: ['image', 'text'],
+                    stream: false,
                 }),
                 signal: abortCtrl.signal,
             });
@@ -447,7 +448,7 @@ export async function POST(
         apiKey: openrouterKey,
         baseURL: 'https://openrouter.ai/api/v1',
         defaultHeaders: {
-            'HTTP-Referer': 'https://tho-ads-ai.netlify.app',
+            'HTTP-Referer': 'https://ads.supbaongu.vn',
             'X-Title': 'THO ADS AI - Creative Studio',
         },
     });

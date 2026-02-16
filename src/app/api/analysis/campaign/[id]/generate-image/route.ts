@@ -89,7 +89,7 @@ async function callSeedream(
             model: SEEDREAM_MODEL,
             prompt: prompt,
             response_format: 'url',
-            size: '4K',
+            size: '2K',
             stream: false,
             watermark: false,
             sequential_image_generation: 'disabled',

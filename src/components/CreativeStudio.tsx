@@ -751,18 +751,18 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                                     {/* Analyze button */}
                                     <button
                                         onClick={fetchIntel}
-                                        disabled={loadingIntel || selectedAdIds.size < 2}
+                                        disabled={loadingIntel || selectedAdIds.size < 1}
                                         style={{
                                             width: '100%', padding: '12px', marginTop: '8px',
-                                            background: loadingIntel ? colors.bgAlt : selectedAdIds.size < 2 ? colors.bgAlt : colors.primary,
+                                            background: loadingIntel ? colors.bgAlt : selectedAdIds.size < 1 ? colors.bgAlt : colors.primary,
                                             border: 'none', borderRadius: '6px',
-                                            color: loadingIntel || selectedAdIds.size < 2 ? colors.textMuted : '#000',
+                                            color: loadingIntel || selectedAdIds.size < 1 ? colors.textMuted : '#000',
                                             fontSize: '0.8125rem', fontWeight: 700,
-                                            cursor: loadingIntel || selectedAdIds.size < 2 ? 'not-allowed' : 'pointer',
+                                            cursor: loadingIntel || selectedAdIds.size < 1 ? 'not-allowed' : 'pointer',
                                             letterSpacing: '0.05em',
                                         }}
                                     >
-                                        {loadingIntel ? 'ĐANG PHÂN TÍCH...' : selectedAdIds.size < 2 ? 'CHỌN ÍT NHẤT 2 CONTENT' : `PHÂN TÍCH SÂU ${selectedAdIds.size} CONTENT → TẠO BRIEF`}
+                                        {loadingIntel ? 'ĐANG PHÂN TÍCH...' : selectedAdIds.size < 1 ? 'CHỌN ÍT NHẤT 1 CONTENT' : `PHÂN TÍCH SÂU ${selectedAdIds.size} CONTENT → TẠO BRIEF`}
                                     </button>
                                     {intelError && (
                                         <p style={{ color: colors.error, fontSize: '0.75rem', marginTop: '8px' }}>

@@ -410,41 +410,62 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
 
                 for (let idx = 0; idx < imagePlan.length; idx++) {
                     const plan = imagePlan[idx];
-                    try {
-                        setGenerateStep(`Đang vẽ ảnh ${idx + 1}/${totalImageCount}...`);
-                        console.log(`[CREATIVE_STUDIO] 🖼️ Requesting image ${idx + 1}: prompt=${plan.prompt.substring(0, 60)}...`);
+                    const MAX_RETRIES = 2;
+                    let imageSuccess = false;
 
-                        const imgRes = await fetch(
-                            `/api/analysis/campaign/${campaignId}/generate-image`,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    prompt: plan.prompt,
-                                    referenceImageUrl: plan.referenceImageUrl,
-                                    imageCount: totalImageCount,
-                                }),
+                    for (let attempt = 1; attempt <= MAX_RETRIES && !imageSuccess; attempt++) {
+                        try {
+                            setGenerateStep(attempt > 1
+                                ? `Đang thử lại ảnh ${idx + 1}/${totalImageCount} (lần ${attempt})...`
+                                : `Đang vẽ ảnh ${idx + 1}/${totalImageCount}...`);
+                            console.log(`[CREATIVE_STUDIO] 🖼️ Requesting image ${idx + 1} (attempt ${attempt}): prompt=${plan.prompt.substring(0, 60)}...`);
+
+                            const imgRes = await fetch(
+                                `/api/analysis/campaign/${campaignId}/generate-image`,
+                                {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        prompt: plan.prompt,
+                                        referenceImageUrl: plan.referenceImageUrl,
+                                        imageCount: totalImageCount,
+                                    }),
+                                }
+                            );
+
+                            if (!imgRes.ok) {
+                                console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} attempt ${attempt} HTTP ${imgRes.status}`);
+                                if (attempt < MAX_RETRIES) {
+                                    setGenerateStep(`Ảnh ${idx + 1} timeout, đang thử lại...`);
+                                    await new Promise(r => setTimeout(r, 2000));
+                                    continue;
+                                }
+                                setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
+                                break;
                             }
-                        );
 
-                        if (!imgRes.ok) {
-                            console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} HTTP ${imgRes.status}`);
-                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
-                            continue;
+                            const imgData = await imgRes.json();
+                            if (imgData.success && imgData.data) {
+                                console.log(`[CREATIVE_STUDIO] ✅ Image ${idx + 1} OK (attempt ${attempt})`);
+                                setGeneratedImages(prev => [...prev, imgData.data as string]);
+                                setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} xong ✅`);
+                                imageSuccess = true;
+                            } else {
+                                console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} attempt ${attempt} failed:`, imgData.error);
+                                if (attempt < MAX_RETRIES) {
+                                    await new Promise(r => setTimeout(r, 2000));
+                                    continue;
+                                }
+                                setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
+                            }
+                        } catch (imgErr) {
+                            console.error(`[CREATIVE_STUDIO] ❌ Image ${idx + 1} attempt ${attempt} error:`, imgErr);
+                            if (attempt < MAX_RETRIES) {
+                                await new Promise(r => setTimeout(r, 2000));
+                                continue;
+                            }
+                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} lỗi ❌`);
                         }
-
-                        const imgData = await imgRes.json();
-                        if (imgData.success && imgData.data) {
-                            console.log(`[CREATIVE_STUDIO] ✅ Image ${idx + 1} OK`);
-                            setGeneratedImages(prev => [...prev, imgData.data as string]);
-                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} xong ✅`);
-                        } else {
-                            console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} failed:`, imgData.error);
-                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
-                        }
-                    } catch (imgErr) {
-                        console.error(`[CREATIVE_STUDIO] ❌ Image ${idx + 1} error:`, imgErr);
-                        setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} lỗi ❌`);
                     }
                 }
             }

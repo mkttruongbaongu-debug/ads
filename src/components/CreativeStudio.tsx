@@ -403,12 +403,13 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
                 }
             }
 
-            // ─── STEP 2: Fetch images separately (parallel) ────
+            // ─── STEP 2: Fetch images SEQUENTIALLY (avoid Netlify timeout + BytePlus rate limits) ────
             if (imagePlan.length > 0) {
                 setGenerateStep(`Đang tạo ${totalImageCount} ảnh...`);
-                console.log(`[CREATIVE_STUDIO] 🖼️ Fetching ${imagePlan.length} images in parallel...`);
+                console.log(`[CREATIVE_STUDIO] 🖼️ Fetching ${imagePlan.length} images sequentially...`);
 
-                const imagePromises = imagePlan.map(async (plan, idx) => {
+                for (let idx = 0; idx < imagePlan.length; idx++) {
+                    const plan = imagePlan[idx];
                     try {
                         setGenerateStep(`Đang vẽ ảnh ${idx + 1}/${totalImageCount}...`);
                         console.log(`[CREATIVE_STUDIO] 🖼️ Requesting image ${idx + 1}: prompt=${plan.prompt.substring(0, 60)}...`);
@@ -428,31 +429,22 @@ export default function CreativeStudio({ campaignId, campaignName, startDate, en
 
                         if (!imgRes.ok) {
                             console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} HTTP ${imgRes.status}`);
-                            return null;
+                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
+                            continue;
                         }
 
                         const imgData = await imgRes.json();
                         if (imgData.success && imgData.data) {
                             console.log(`[CREATIVE_STUDIO] ✅ Image ${idx + 1} OK`);
-                            return imgData.data as string;
+                            setGeneratedImages(prev => [...prev, imgData.data as string]);
+                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} xong ✅`);
                         } else {
                             console.warn(`[CREATIVE_STUDIO] ⚠️ Image ${idx + 1} failed:`, imgData.error);
-                            return null;
+                            setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} thất bại ⚠️`);
                         }
                     } catch (imgErr) {
                         console.error(`[CREATIVE_STUDIO] ❌ Image ${idx + 1} error:`, imgErr);
-                        return null;
-                    }
-                });
-
-                // As each image resolves, add it to state immediately
-                for (let i = 0; i < imagePromises.length; i++) {
-                    const image = await imagePromises[i];
-                    if (image) {
-                        setGeneratedImages(prev => [...prev, image]);
-                        setGenerateStep(`Ảnh ${i + 1}/${totalImageCount} xong ✅`);
-                    } else {
-                        setGenerateStep(`Ảnh ${i + 1}/${totalImageCount} thất bại ⚠️`);
+                        setGenerateStep(`Ảnh ${idx + 1}/${totalImageCount} lỗi ❌`);
                     }
                 }
             }

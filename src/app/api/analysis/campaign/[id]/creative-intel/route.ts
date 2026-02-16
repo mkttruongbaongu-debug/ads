@@ -194,10 +194,10 @@ export async function GET(
             console.log(`[CREATIVE_INTEL_API] 🎯 Filtered to ${adsToAnalyze.length}/${ads.length} selected ads`);
         }
 
-        if (adsToAnalyze.length < 2) {
+        if (adsToAnalyze.length < 1) {
             return NextResponse.json({
                 success: false,
-                error: 'Cần chọn ít nhất 2 ads để phân tích creative intelligence',
+                error: 'Cần chọn ít nhất 1 ad để phân tích creative intelligence',
             }, { status: 400 });
         }
 

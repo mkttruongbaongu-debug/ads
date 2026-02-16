@@ -173,9 +173,9 @@ export async function analyzeCreativeIntelligence(
         throw new Error('Missing OPENROUTER_API_KEY or OPENAI_API_KEY');
     }
 
-    // User đã chọn ads thủ công qua checkbox → không filter thêm, chỉ cần >= 2
-    if (ads.length < 2) {
-        throw new Error('Cần chọn ít nhất 2 ads để phân tích creative intelligence');
+    // User đã chọn ads thủ công qua checkbox → không filter thêm, chỉ cần >= 1
+    if (ads.length < 1) {
+        throw new Error('Cần chọn ít nhất 1 ad để phân tích creative intelligence');
     }
 
     console.log(`[CREATIVE_INTEL] 🎨 Phân tích ${ads.length} ads...`);

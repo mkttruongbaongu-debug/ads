@@ -66,32 +66,36 @@ export async function POST(
         const adAccountId = `act_${campaignData.account_id}`;
         console.log(`[PUBLISH_CREATIVE] 📋 Ad Account: ${adAccountId}`);
 
-        // Get page_id from the ad account's promoted pages
-        const pagesRes = await fetch(
-            `${FB_API_BASE}/${adAccountId}/promote_pages?access_token=${accessToken}`
+        // Get page_id — PRIORITY: from existing ads in this campaign (guaranteed correct Page)
+        let resolvedPageId = '';
+
+        // Try 1: Get page from existing ads in this campaign (most reliable)
+        const existingAdsRes = await fetch(
+            `${FB_API_BASE}/${campaignId}/ads?fields=creative{object_story_spec}&limit=1&access_token=${accessToken}`
         );
-        const pagesData = await pagesRes.json();
-        const pageId = pagesData.data?.[0]?.id;
+        const existingAdsData = await existingAdsRes.json();
+        const campaignPageId = existingAdsData.data?.[0]?.creative?.object_story_spec?.page_id;
 
-        if (!pageId) {
-            // Fallback: try to get page from existing ads in this campaign
-            const existingAdsRes = await fetch(
-                `${FB_API_BASE}/${campaignId}/ads?fields=creative{object_story_spec}&limit=1&access_token=${accessToken}`
+        if (campaignPageId) {
+            resolvedPageId = campaignPageId;
+            console.log(`[PUBLISH_CREATIVE] 📋 Page ID (from campaign ads): ${resolvedPageId}`);
+        } else {
+            // Try 2: Fallback to promote_pages
+            const pagesRes = await fetch(
+                `${FB_API_BASE}/${adAccountId}/promote_pages?access_token=${accessToken}`
             );
-            const existingAdsData = await existingAdsRes.json();
-            const fallbackPageId = existingAdsData.data?.[0]?.creative?.object_story_spec?.page_id;
+            const pagesData = await pagesRes.json();
+            const fallbackPageId = pagesData.data?.[0]?.id;
 
-            if (!fallbackPageId) {
+            if (fallbackPageId) {
+                resolvedPageId = fallbackPageId;
+                console.log(`[PUBLISH_CREATIVE] 📋 Page ID (from promote_pages): ${resolvedPageId}`);
+            } else {
                 return NextResponse.json(
                     { success: false, error: 'Không tìm được Page ID. Kiểm tra quyền truy cập.' },
                     { status: 400 }
                 );
             }
-            console.log(`[PUBLISH_CREATIVE] 📋 Page ID (fallback): ${fallbackPageId}`);
-            var resolvedPageId = fallbackPageId;
-        } else {
-            console.log(`[PUBLISH_CREATIVE] 📋 Page ID: ${pageId}`);
-            var resolvedPageId = pageId;
         }
 
         // ─── Step 2: Upload image ────────────────────────────────────

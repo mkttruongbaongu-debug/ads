@@ -68,7 +68,7 @@ CAMERA FEEL:
 IMPORTANT:
 - The food and styling should feel REAL and AUTHENTIC, not like a 3D render or stock photo
 - Vary the plates and props naturally — do not always use the same plate style
-- Background should be a real messy table or kitchen counter, NOT staged with decorative props
+- Background should be a casually busy table — other dishes, condiments, drinks visible — but surfaces must be CLEAN (no stains, no spills, no food debris)
 - No text, watermarks, or labels on the image
 - No visible lamps, light bulbs, or ceiling in frame
 
@@ -76,7 +76,7 @@ Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Xiaohongshu style food photo. ${basePrompt}. Warm appetizing tones, close-up, shallow depth of field, hand with chopsticks. Shot on iPhone, casual angle, real kitchen background. Beautiful but authentic, not a 3D render. No text, no lamps. Aspect ratio: ${aspectSpec.ratio}.`;
+    return `Xiaohongshu style food photo. ${basePrompt}. Warm appetizing tones, close-up, shallow depth of field, hand with chopsticks. Shot on iPhone, casual angle, clean table with other dishes around. Beautiful but authentic, not a 3D render. No text, no lamps. Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────

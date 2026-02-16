@@ -166,6 +166,7 @@ Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung và
 - KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo" — chỉ mô tả cái BẠN MUỐN, không nói cái không muốn
 - KHÔNG nói "phone camera noise" hoặc "slight blur" — Seedream sẽ làm ảnh xấu
 - Tập trung mô tả: subject + action + lighting mood + background ngắn
+- Background: "casually busy" — có các đĩa khác, gia vị, ly nước xung quanh — nhưng bàn/bề mặt PHẢI SẠCH SẼ, KHÔNG có vết bẩn, nước đổ, hay đồ bẩn
 
 ❌ CẤM trong image prompt:
 - Prompt dài hơn 100 từ
@@ -173,9 +174,11 @@ Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung và
 - Mô tả camera specs (iPhone 14, Samsung S23...)
 - Nói "NOT studio", "NOT professional" — chỉ nói cái muốn thôi
 - Thêm steam/khói cho món lạnh
+- Dùng từ "messy", "cluttered", "dirty" — thay bằng "casually busy", "lived-in"
+- Background bẩn, có vết ố, nước sốt vương vãi
 
 ✅ VÍ DỤ PROMPT CHUẨN:
-"Xiaohongshu food photo. Hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi from a dark ceramic bowl. The raw fish glistens with soy sauce and sesame seeds. Warm ambient lighting, shallow depth of field, blurred kitchen background. Close-up, appetizing. Aspect ratio: 3:4."
+"Xiaohongshu food photo. Hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi from a dark ceramic bowl. The raw fish glistens with soy sauce and sesame seeds. Warm ambient lighting, shallow depth of field. Clean table with other dishes and condiment bottles in blurred background. Close-up, appetizing. Aspect ratio: 3:4."
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}

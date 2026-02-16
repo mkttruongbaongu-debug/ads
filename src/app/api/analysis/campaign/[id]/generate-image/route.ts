@@ -34,43 +34,41 @@ function getAspectRatioSpec(imageCount: number): { ratio: string; byteplusRatio:
     }
 }
 
-// ─── Food Photography Prompt (Casual & Real) ──────────────────────────
+// ─── Xiaohongshu Food Photography Prompt (Beautiful + Real) ─────────
 
 function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>, hasRef: boolean): string {
     const refInstruction = hasRef
-        ? `\nA reference image is attached. Use it ONLY to understand the food type and color mood. Create a COMPLETELY DIFFERENT photo — different angle, different plate, different background. Same dish, different shot.\n`
+        ? `\nA reference image is attached. Use it to understand the food type and color mood. Create a DIFFERENT photo — different angle, different plate, different background. Same dish, different shot.\n`
         : '';
 
-    return `Vietnamese food photo, casual smartphone style.
+    return `Xiaohongshu (小红书) style food photography — beautiful, warm, and appetizing.
 ${refInstruction}
-SUBJECT: ${basePrompt}
+FOOD: ${basePrompt}
 
-STYLE:
-- Shot on iPhone in a real Vietnamese kitchen or restaurant
-- Warm, appetizing color tones that match the food naturally
-- Close-up, food fills most of the frame
-- Slightly messy environment — real table, real dishes around
-- A hand holding chopsticks, lifting food, or scooping with a spoon
-- Shallow depth of field, background softly blurred
+VISUAL STYLE:
+- Xiaohongshu aesthetic: warm inviting tones, beautiful color grading, the food looks irresistible
+- Choose lighting and color temperature that best suits this specific dish naturally
+- Close-up, food fills 70-80% of the frame, shallow depth of field
+- Glossy sauce, visible steam, oil sheen, juice dripping — make it look DELICIOUS
 
-FEEL:
-- Like a real person snapped this to share on social media
-- Candid, spontaneous, NOT posed or styled
-- Imperfect but appetizing — sauce drips, steam, oil sheen
-- The food must look REAL and DELICIOUS, not like a 3D render
+CAMERA FEEL:
+- Shot on a high-end phone camera (iPhone Pro), NOT a professional DSLR in a studio
+- Slightly casual framing — like a foodie took this at a restaurant or home kitchen
+- Human element: a hand with chopsticks lifting food, or fingers holding the dish
+- Real environment visible in blurred background: other dishes, condiments, kitchen items
 
-DO NOT:
+IMPORTANT:
+- The food and styling should feel REAL and AUTHENTIC, not like a 3D render or stock photo
+- Vary the plates and props naturally — do not always use the same plate style
+- Background should be a real messy table or kitchen counter, NOT staged with decorative props
 - No text, watermarks, or labels on the image
 - No visible lamps, light bulbs, or ceiling in frame
-- No overly perfect studio lighting
-- No bamboo mat styling or decorative props arranged around the food
-- No stock photo look
 
 Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Casual Vietnamese food photo, shot on iPhone. ${basePrompt}. Close-up, warm tones, real messy kitchen background, hand with chopsticks. Candid and appetizing, not studio-perfect. No text, no lamps in frame. Aspect ratio: ${aspectSpec.ratio}.`;
+    return `Xiaohongshu style food photo. ${basePrompt}. Warm appetizing tones, close-up, shallow depth of field, hand with chopsticks. Shot on iPhone, casual angle, real kitchen background. Beautiful but authentic, not a 3D render. No text, no lamps. Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────

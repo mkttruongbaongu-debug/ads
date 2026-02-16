@@ -146,9 +146,10 @@ ${topAdsBlock}
 
 Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung vào:
 1. **Subject**: Mô tả món ăn chính xác — loại, hình dáng, màu sắc, texture thực tế
-2. **Action**: Hành động đang diễn ra (tay cầm đũa gắp, muỗng múc, rót nước sốt...)
-3. **Mood**: Tông màu, ánh sáng, cảm giác chung
-4. **Context**: Bối cảnh ngắn gọn (bàn ăn, quán, bếp nhà)
+2. **Action**: Tay cầm đũa gắp/nâng miếng thức ăn lên từ đĩa/bát
+3. **Mood**: Tông màu warm, ánh sáng tự nhiên
+
+KHÔNG MÔ TẢ BACKGROUND — chỉ nói "heavy bokeh background" hoặc "blurred warm background".
 
 ### ĐỘ CHÍNH XÁC VẬT LÝ (CỰC KỲ QUAN TRỌNG):
 - Mô tả texture thức ăn ĐÚNG thực tế:
@@ -161,24 +162,23 @@ Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung và
 - Mô tả MÀU SẮC thực tế — cá hồi = cam hồng, thịt kho = nâu caramel, rau = xanh tươi
 
 ### QUY TẮC VIẾT PROMPT CHO SEEDREAM:
-- NGẮN GỌN: 50-80 từ. Seedream hiểu prompt ngắn tốt hơn prompt dài
-- KHÔNG liệt kê chi tiết background quá cụ thể (loại đèn, loại bàn, loại sàn)
-- KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo" — chỉ mô tả cái BẠN MUỐN, không nói cái không muốn
-- KHÔNG nói "phone camera noise" hoặc "slight blur" — Seedream sẽ làm ảnh xấu
-- Tập trung mô tả: subject + action + lighting mood + background ngắn
-- Background: "casually busy" — có các đĩa khác, gia vị, ly nước xung quanh — nhưng bàn/bề mặt PHẢI SẠCH SẼ, KHÔNG có vết bẩn, nước đổ, hay đồ bẩn
+- NGẮN GỌN: 50-80 từ
+- EXTREME close-up: món ăn chiếm 90% khung hình
+- Chỉ 3 yếu tố: MÓN ĂN + TAY + ĐŨA — không gì khác
+- Background: chỉ nói "heavy bokeh" hoặc "blurred warm tones" — KHÔNG liệt kê đồ vật nào
+- KHÔNG mô tả bàn ăn, đĩa phụ, gia vị, ly nước xung quanh
+- KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo"
+- Góc chụp off-center, hơi nghiêng — không overhead hoàn hảo
 
 ❌ CẤM trong image prompt:
+- Mô tả background items (side dishes, condiment bowls, table spread)
 - Prompt dài hơn 100 từ
-- Liệt kê 5+ chi tiết background
-- Mô tả camera specs (iPhone 14, Samsung S23...)
-- Nói "NOT studio", "NOT professional" — chỉ nói cái muốn thôi
-- Thêm steam/khói cho món lạnh
-- Dùng từ "messy", "cluttered", "dirty" — thay bằng "casually busy", "lived-in"
-- Background bẩn, có vết ố, nước sốt vương vãi
+- Từ "messy", "cluttered", "clean table", "other dishes around"
+- Dàn bày kiểu bàn ăn nhiều đĩa (table spread / flat lay)
+- Steam/khói cho món lạnh
 
 ✅ VÍ DỤ PROMPT CHUẨN:
-"Xiaohongshu food photo. Hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi from a dark ceramic bowl. The raw fish glistens with soy sauce and sesame seeds. Warm ambient lighting, shallow depth of field. Clean table with other dishes and condiment bottles in blurred background. Close-up, appetizing. Aspect ratio: 3:4."
+"Xiaohongshu food photo. Extreme close-up of a hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi. The raw fish glistens with soy sauce and sesame seeds. Food fills 90% of the frame. Warm lighting, very shallow depth of field, heavy bokeh background. Appetizing. Aspect ratio: 3:4."
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}

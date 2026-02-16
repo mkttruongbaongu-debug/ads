@@ -142,42 +142,40 @@ ${topAdsBlock}
 
 ## IMAGE PROMPT REQUIREMENTS
 
-### Phong cách TUYỆT ĐỐI: UGC / POV (User-Generated Content / Point-of-View)
+### Phong cách: Xiaohongshu food photography — đẹp mà tự nhiên
 
-Mỗi image prompt PHẢI mô tả ảnh trông như "NGƯỜI THẬT chụp bằng ĐIỆN THOẠI ở đời thường":
+Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung vào:
+1. **Subject**: Mô tả món ăn chính xác — loại, hình dáng, màu sắc, texture thực tế
+2. **Action**: Hành động đang diễn ra (tay cầm đũa gắp, muỗng múc, rót nước sốt...)
+3. **Mood**: Tông màu, ánh sáng, cảm giác chung
+4. **Context**: Bối cảnh ngắn gọn (bàn ăn, quán, bếp nhà)
 
-1. **Camera**: LUÔN LÀ smartphone camera (iPhone 13/14/15, Samsung Galaxy S23/S24). KHÔNG BAO GIỜ dùng DSLR, mirrorless, hay bất kỳ camera chuyên nghiệp nào.
-2. **Góc chụp**: Slightly tilted (2-5 degrees), first-person POV, selfie-with-product, or casual overhead. KHÔNG BAO GIỜ centered/symmetrical.
-3. **Ánh sáng**: Chỉ dùng ánh sáng thực tế tại chỗ:
-   - Trong nhà: đèn huỳnh quang trần (ánh vàng), đèn LED (ánh trắng lạnh), ánh sáng cửa sổ
-   - Quán ăn: đèn neon, đèn treo warm, ánh sáng lẫn từ nhiều nguồn
-   - Ngoài trời: nắng tự nhiên, bóng râm, golden hour
-   → KHÔNG BAO GIỜ studio lighting, softbox, ring light
-4. **Background**: LUÔN messy/cluttered — nền thực tế không dọn dẹp:
-   - Đồ ăn: bàn ăn có ly nước dùng dở, khăn giấy, chai nước mắm, bát đũa lung tung
-   - Mỹ phẩm/skincare: bàn trang điểm có gương, bông tẩy trang, vài lọ khác bày bừa, điện thoại
-   - Thời trang: phòng thử đồ có gương, tủ quần áo, sàn có giày dép, túi shopping
-   - Nội thất/gia dụng: phòng khách/bếp thật có remote TV, ly cà phê, sách báo, dép đi trong nhà
-   - Đồ công nghệ: bàn làm việc có dây sạc, ly cà phê, sticky note, chuột bàn phím
-   - Ngoài trời: quán cà phê vỉa hè, công viên, xe máy đậu gần, ghế nhựa
-   → Luôn có 2-3 vật dụng "thừa" không liên quan sản phẩm để tạo cảm giác đời thường
-6. **Sản phẩm**: Sản phẩm trong bối cảnh sử dụng thực tế, KHÔNG phải trưng bày. Đang dùng, đang mở, đang cầm trên tay.
-7. **Con người (nếu có)**: Chỉ thấy tay/cánh tay đang tương tác với sản phẩm (POV style). Da tay tự nhiên, có thể thấy móng tay, đồng hồ, vòng tay.
-8. **Texture & Grain**: Slight phone camera noise, not tack-sharp everywhere, natural depth of field from phone lens
-9. **Mood**: Casual, everyday, authentic, lived-in — như scroll Facebook thấy bạn bè đăng
-10. **Chất lượng**: "Authentic smartphone photo, UGC style, NOT studio, NOT AI-generated, NOT stock photo"
+### ĐỘ CHÍNH XÁC VẬT LÝ (CỰC KỲ QUAN TRỌNG):
+- Mô tả texture thức ăn ĐÚNG thực tế:
+  + Cá sống/sashimi → "semi-translucent, glistening raw flesh, visible grain"
+  + Thịt nấu chín → "opaque, caramelized, firm"
+  + Đồ chiên → "crispy golden crust"
+  + Nước sốt → "glossy, viscous"
+- KHÔNG thêm steam/khói cho MÓN LẠNH (sashimi, gỏi, salad, đồ ngâm lạnh, sushi)
+- CHỈ mô tả steam cho MÓN NÓNG (phở, cơm nóng, đồ nướng, lẩu)
+- Mô tả MÀU SẮC thực tế — cá hồi = cam hồng, thịt kho = nâu caramel, rau = xanh tươi
 
-❌ TUYỆT ĐỐI KHÔNG ĐƯỢC (CẤM HOÀN TOÀN):
-- Bố cục đối xứng hoàn hảo — kiểu studio
-- Ánh sáng hoàn hảo từ mọi góc — kiểu dàn dựng
-- Background sạch sẽ, trống trơn — kiểu chụp sản phẩm
-- Sản phẩm đặt chính giữa trên nền trắng/đơn sắc — kiểu e-commerce
-- Bất kỳ yếu tố nào trông "quá hoàn hảo" hoặc "quá đẹp" — đó là dấu hiệu ảnh giả
-- Camera specs chuyên nghiệp (Nikon, Canon, Sony, DSLR, mirrorless)
-- Props styling quá cầu kỳ, quá đẹp, quá nghệ thuật
+### QUY TẮC VIẾT PROMPT CHO SEEDREAM:
+- NGẮN GỌN: 50-80 từ. Seedream hiểu prompt ngắn tốt hơn prompt dài
+- KHÔNG liệt kê chi tiết background quá cụ thể (loại đèn, loại bàn, loại sàn)
+- KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo" — chỉ mô tả cái BẠN MUỐN, không nói cái không muốn
+- KHÔNG nói "phone camera noise" hoặc "slight blur" — Seedream sẽ làm ảnh xấu
+- Tập trung mô tả: subject + action + lighting mood + background ngắn
 
-✅ VÍ DỤ PROMPT CHUẨN UGC (1 ảnh = 4:5):
-"Inspired by Ad #1 (ROAS 16x). Casual smartphone photo, slightly tilted angle, taken from first-person POV at a typical Vietnamese family dinner table. The main dish is in the foreground, slightly off-center to the left. Background shows other dishes, a rice cooker, condiment bottles, and someone's elbow across the table. Warm yellowish indoor lighting from overhead fluorescent tube, creating slight color cast. Table surface is a common formica/plastic top with some water drops and used napkins nearby. A pair of chopsticks resting on the bowl edge. The photo has natural smartphone depth of field — foreground sharp, background slightly soft. Slight motion blur on the steam. The whole scene feels like someone just sat down to eat and quickly snapped a photo to share on Facebook. NOT a professional photo, NOT studio lighting, NOT perfectly composed. Authentic, messy, real. Aspect ratio: 4:5 portrait (1080x1350px)."
+❌ CẤM trong image prompt:
+- Prompt dài hơn 100 từ
+- Liệt kê 5+ chi tiết background
+- Mô tả camera specs (iPhone 14, Samsung S23...)
+- Nói "NOT studio", "NOT professional" — chỉ nói cái muốn thôi
+- Thêm steam/khói cho món lạnh
+
+✅ VÍ DỤ PROMPT CHUẨN:
+"Xiaohongshu food photo. Hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi from a dark ceramic bowl. The raw fish glistens with soy sauce and sesame seeds. Warm ambient lighting, shallow depth of field, blurred kitchen background. Close-up, appetizing. Aspect ratio: 3:4."
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}

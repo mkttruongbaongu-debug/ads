@@ -49,7 +49,15 @@ VISUAL STYLE:
 - Xiaohongshu aesthetic: warm inviting tones, beautiful color grading, the food looks irresistible
 - Choose lighting and color temperature that best suits this specific dish naturally
 - Close-up, food fills 70-80% of the frame, shallow depth of field
-- Glossy sauce, visible steam, oil sheen, juice dripping — make it look DELICIOUS
+- Glossy sauce, oil sheen, juice dripping — make it look DELICIOUS
+
+PHYSICAL ACCURACY (critical):
+- Render the food EXACTLY as it looks in real life
+- Raw/sashimi fish = semi-translucent flesh, visible grain, moist surface, NOT opaque or cooked-looking
+- Cooked meat = opaque, caramelized, firm texture
+- Cold dishes (sashimi, salad, cold noodles) = NO steam, NO smoke, NO heat haze
+- Hot dishes (soup, stir-fry, grilled) = steam rising naturally
+- If the food is cold, there must be ZERO steam or smoke in the entire image
 
 CAMERA FEEL:
 - Shot on a high-end phone camera (iPhone Pro), NOT a professional DSLR in a studio

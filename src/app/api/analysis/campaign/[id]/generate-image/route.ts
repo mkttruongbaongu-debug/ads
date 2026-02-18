@@ -48,8 +48,8 @@ FOOD: ${basePrompt}
 VISUAL STYLE:
 - Xiaohongshu aesthetic: warm inviting tones, beautiful color grading, the food looks irresistible
 - Choose lighting and color temperature that best suits this specific dish naturally
-- EXTREME close-up: food fills 90% of the frame
-- Very shallow depth of field — heavy bokeh, background is just soft blurry colors
+- Food should fill about 50-70% of the frame — NOT extreme close-up, NOT wide shot
+- Natural depth of field — background is slightly soft but items are still recognizable (NOT heavy bokeh with colorful light balls)
 - Glossy sauce, oil sheen, juice dripping — make it look DELICIOUS
 
 PHYSICAL ACCURACY (critical):
@@ -61,10 +61,10 @@ PHYSICAL ACCURACY (critical):
 - If the food is cold, there must be ZERO steam or smoke in the entire image
 
 COMPOSITION:
-- Only 3 elements in the shot: the FOOD dish + a HAND + CHOPSTICKS interacting with the food
-- Do NOT show the full table spread — no side dishes, no condiment bowls arranged around
-- Do NOT describe or render any background items — let it be naturally blurred out
-- Slightly off-center, casual angle — not perfectly overhead or perfectly symmetric
+- Hand interacting with food (holding bowl, chopsticks lifting food, etc.)
+- Natural casual angle — slightly off-center, NOT perfectly overhead or symmetric
+- Background: natural environment slightly out of focus — you can still tell what's there but it's not distracting
+- Do NOT arrange side dishes symmetrically around the main dish (studio flat-lay)
 
 IMPORTANT:
 - The food and styling should feel REAL and AUTHENTIC, not like a 3D render or stock photo
@@ -75,7 +75,7 @@ Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Xiaohongshu style food photo. Extreme close-up of ${basePrompt}. Food fills 90% of frame, heavy bokeh background. Hand with chopsticks lifting food. Warm appetizing tones, shallow depth of field. No side dishes or table spread visible. Aspect ratio: ${aspectSpec.ratio}.`;
+    return `Xiaohongshu style food photo. ${basePrompt}. Hand with chopsticks, warm appetizing tones. Natural depth of field, background slightly soft but recognizable. Casual angle. Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────

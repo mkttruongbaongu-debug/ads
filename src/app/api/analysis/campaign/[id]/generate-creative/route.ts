@@ -146,10 +146,16 @@ ${topAdsBlock}
 
 Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung vào:
 1. **Subject**: Mô tả món ăn chính xác — loại, hình dáng, màu sắc, texture thực tế
-2. **Action**: Tay cầm đũa gắp/nâng miếng thức ăn lên từ đĩa/bát
+2. **Action**: Tay cầm đũa gắp/nâng miếng thức ăn, hoặc tay cầm chén/đĩa
 3. **Mood**: Tông màu warm, ánh sáng tự nhiên
+4. **Composition**: Mô tả bố cục tương tự ảnh tham khảo (nếu có) — cận hay trung cảnh, góc chụp, tay cầm gì
 
-KHÔNG MÔ TẢ BACKGROUND — chỉ nói "heavy bokeh background" hoặc "blurred warm background".
+### BỐ CỤC — PHẢI TỰ NHIÊN NHƯ NGƯỜI THẬT CHỤP:
+- Món ăn chiếm khoảng 50-70% khung hình — KHÔNG cực cận (90%), KHÔNG toàn cảnh
+- Background: natural depth of field — mờ nhẹ vừa đủ, VẪN NHẬN RA được đồ vật phía sau (hộp đồ ăn, ly, bàn)
+- KHÔNG dùng "heavy bokeh" hoặc bokeh balls kiểu DSLR — đây là ảnh phone, bokeh nhẹ tự nhiên thôi
+- Góc chụp casual, hơi nghiêng — không overhead hoàn hảo
+- ${referenceImageUrls && referenceImageUrls.length > 0 ? 'CHẾ ĐỘ CLONE: bố cục, góc chụp, và framing PHẢI GIỐNG ảnh tham khảo. Nếu ảnh gốc là trung cảnh thì prompt cũng trung cảnh, nếu gốc cận thì cận.' : 'Chọn bố cục phù hợp với món ăn — cận cho chi tiết đẹp, trung cảnh cho tổng thể hấp dẫn.'}
 
 ### ĐỘ CHÍNH XÁC VẬT LÝ (CỰC KỲ QUAN TRỌNG):
 - Mô tả texture thức ăn ĐÚNG thực tế:
@@ -163,22 +169,19 @@ KHÔNG MÔ TẢ BACKGROUND — chỉ nói "heavy bokeh background" hoặc "blurr
 
 ### QUY TẮC VIẾT PROMPT CHO SEEDREAM:
 - NGẮN GỌN: 50-80 từ
-- EXTREME close-up: món ăn chiếm 90% khung hình
-- Chỉ 3 yếu tố: MÓN ĂN + TAY + ĐŨA — không gì khác
-- Background: chỉ nói "heavy bokeh" hoặc "blurred warm tones" — KHÔNG liệt kê đồ vật nào
-- KHÔNG mô tả bàn ăn, đĩa phụ, gia vị, ly nước xung quanh
+- Background: "natural depth of field, background slightly soft but recognizable" — KHÔNG "heavy bokeh"
+- KHÔNG dàn bày đĩa phụ đối xứng kiểu studio flat-lay
 - KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo"
-- Góc chụp off-center, hơi nghiêng — không overhead hoàn hảo
 
 ❌ CẤM trong image prompt:
-- Mô tả background items (side dishes, condiment bowls, table spread)
+- "heavy bokeh", "bokeh balls", "extremely blurred background"
+- "extreme close-up", "fills 90% of frame"
+- Dàn bày symmetrical (đĩa phụ xếp đều quanh đĩa chính)
 - Prompt dài hơn 100 từ
-- Từ "messy", "cluttered", "clean table", "other dishes around"
-- Dàn bày kiểu bàn ăn nhiều đĩa (table spread / flat lay)
 - Steam/khói cho món lạnh
 
 ✅ VÍ DỤ PROMPT CHUẨN:
-"Xiaohongshu food photo. Extreme close-up of a hand with chopsticks lifting a piece of semi-translucent soy-marinated salmon sashimi. The raw fish glistens with soy sauce and sesame seeds. Food fills 90% of the frame. Warm lighting, very shallow depth of field, heavy bokeh background. Appetizing. Aspect ratio: 3:4."
+"Xiaohongshu food photo. A hand holding a white bowl of rice, chopsticks lifting a slice of semi-translucent marinated salmon with green chili and sesame seeds. Warm natural lighting, casual angle. Background: other food containers on a wooden table, natural depth of field, slightly soft but recognizable. Appetizing. Aspect ratio: 3:4."
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}

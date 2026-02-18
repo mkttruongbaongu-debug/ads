@@ -142,46 +142,61 @@ ${topAdsBlock}
 
 ## IMAGE PROMPT REQUIREMENTS
 
-### Phong cách: Xiaohongshu food photography — đẹp mà tự nhiên
+### Phong cách: Xiaohongshu food photography — đẹp mà chân thật như người thật chụp
 
 Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung vào:
 1. **Subject**: Mô tả món ăn chính xác — loại, hình dáng, màu sắc, texture thực tế
-2. **Action**: Tay cầm đũa gắp/nâng miếng thức ăn, hoặc tay cầm chén/đĩa
-3. **Mood**: Tông màu warm, ánh sáng tự nhiên
-4. **Composition**: Mô tả bố cục tương tự ảnh tham khảo (nếu có) — cận hay trung cảnh, góc chụp, tay cầm gì
+2. **Action**: Chọn hành động PHÙ HỢP và ĐA DẠNG (xem danh sách bên dưới)
+3. **Color mood**: Chọn tông màu PHÙ HỢP với từng món (KHÔNG mặc định warm cho mọi thứ)
+4. **Composition**: Bố cục tự nhiên, lấy cảm hứng từ ảnh ref (nếu có)
 
-### BỐ CỤC — PHẢI TỰ NHIÊN NHƯ NGƯỜI THẬT CHỤP:
-- Món ăn chiếm khoảng 50-70% khung hình — KHÔNG cực cận (90%), KHÔNG toàn cảnh
-- Background: natural depth of field — mờ nhẹ vừa đủ, VẪN NHẬN RA được đồ vật phía sau (hộp đồ ăn, ly, bàn)
-- KHÔNG dùng "heavy bokeh" hoặc bokeh balls kiểu DSLR — đây là ảnh phone, bokeh nhẹ tự nhiên thôi
-- Góc chụp casual, hơi nghiêng — không overhead hoàn hảo
-- ${referenceImageUrls && referenceImageUrls.length > 0 ? 'CHẾ ĐỘ CLONE: lấy cảm hứng từ bố cục ảnh tham khảo nhưng ĐƯỢC PHÉP khác ~50% về góc chụp và framing. Giữ cùng phong cách và mood, nhưng thay đổi góc nhìn để tạo sự đa dạng.' : 'Chọn bố cục phù hợp với món ăn — cận cho chi tiết đẹp, trung cảnh cho tổng thể hấp dẫn.'}
+### HÀNH ĐỘNG — PHẢI ĐA DẠNG (chọn 1 cho mỗi prompt):
+- Tay cầm đũa gắp/nâng thức ăn lên
+- Tay cầm chén/bát, nghiêng nhẹ
+- Rót nước sốt/mật ong lên đĩa
+- Múc soup/canh bằng muỗng
+- Cắt thịt bằng dao + dĩa
+- Tay đeo găng nhựa bóc/cầm hải sản
+- Chỉ đĩa thức ăn đặt trên bàn, KHÔNG có tay (flat-lay tự nhiên)
+- Cầm đồ ăn giơ lên gần camera
+⚠️ KHÔNG lặp lại cùng 1 hành động cho nhiều prompt trong cùng 1 bộ ảnh
 
-### ĐỘ CHÍNH XÁC VẬT LÝ (CỰC KỲ QUAN TRỌNG):
-- Mô tả texture thức ăn ĐÚNG thực tế:
-  + Cá sống/sashimi → "semi-translucent, glistening raw flesh, visible grain"
-  + Thịt nấu chín → "opaque, caramelized, firm"
-  + Đồ chiên → "crispy golden crust"
-  + Nước sốt → "glossy, viscous"
-- KHÔNG thêm steam/khói cho MÓN LẠNH (sashimi, gỏi, salad, đồ ngâm lạnh, sushi)
-- CHỈ mô tả steam cho MÓN NÓNG (phở, cơm nóng, đồ nướng, lẩu)
-- Mô tả MÀU SẮC thực tế — cá hồi = cam hồng, thịt kho = nâu caramel, rau = xanh tươi
+### TÔNG MÀU — TỰ CHỌN PHÙ HỢP (KHÔNG mặc định warm):
+- Hải sản tươi/sashimi → tông mát, highlight sáng trắng, tươi sáng
+- Thịt nướng/BBQ/kho → warm amber, shadows sâu, ánh vàng
+- Salad/rau/đồ lạnh → tươi sáng, xanh lá chủ đạo, ánh sáng tự nhiên ban ngày
+- Lẩu/soup nóng → warm foggy, ánh đèn vàng mềm
+- Chọn tông nào thì MÔ TẢ TRONG PROMPT (ví dụ: "cool bright tones" hoặc "warm amber lighting")
 
-### QUY TẮC VIẾT PROMPT CHO SEEDREAM:
+### BỐ CỤC:
+- Background: mờ nhẹ tự nhiên (natural depth of field), VẪN NHẬN RA được đồ vật phía sau
+- KHÔNG dùng "heavy bokeh", "bokeh balls" — chỉ "natural depth of field, slightly soft"
+- KHÔNG dàn bày đĩa phụ đối xứng kiểu studio
+- ${referenceImageUrls && referenceImageUrls.length > 0 ? 'CHẾ ĐỘ CLONE: lấy cảm hứng từ ảnh tham khảo nhưng ĐƯỢC PHÉP khác ~50% về góc chụp/framing để tạo sự đa dạng.' : 'Tự do chọn bố cục phù hợp.'}
+- Thêm chi tiết "sống" tự nhiên: giọt sốt vương trên thành đĩa, ly nước uống dở, khăn giấy nhàu nhẹ
+
+### ĐỘ CHÍNH XÁC VẬT LÝ:
+- Cá sống/sashimi → "semi-translucent, glistening raw flesh, visible grain"
+- Thịt nấu chín → "opaque, caramelized, firm"
+- KHÔNG thêm steam/khói cho MÓN LẠNH
+- CHỈ mô tả steam cho MÓN NÓNG
+- Mô tả MÀU SẮC thực tế
+
+### ĐA DẠNG CAROUSEL (nếu nhiều ảnh):
+⚠️ Mỗi prompt trong bộ PHẢI có:
+- GÓC CHỤP KHÁC NHAU (cận, trung, nghiêng, overhead...)
+- HÀNH ĐỘNG KHÁC NHAU (gắp đũa, rót sốt, flat-lay, cầm chén...)
+- TÔNG MÀU có thể giữ nhất quán nhưng COMPOSITION phải khác biệt rõ ràng
+
+### QUY TẮC SEEDREAM:
 - NGẮN GỌN: 50-80 từ
-- Background: "natural depth of field, background slightly soft but recognizable" — KHÔNG "heavy bokeh"
-- KHÔNG dàn bày đĩa phụ đối xứng kiểu studio flat-lay
-- KHÔNG nói "NOT AI-generated" hoặc "NOT stock photo"
+- KHÔNG nói "NOT AI-generated", "NOT stock photo"
+- KHÔNG liệt kê 5+ chi tiết background
 
-❌ CẤM trong image prompt:
-- "heavy bokeh", "bokeh balls", "extremely blurred background"
-- "extreme close-up", "fills 90% of frame"
-- Dàn bày symmetrical (đĩa phụ xếp đều quanh đĩa chính)
-- Prompt dài hơn 100 từ
-- Steam/khói cho món lạnh
+❌ CẤM: "heavy bokeh", "extreme close-up 90%", "warm tones" mặc định, prompt > 100 từ, steam cho món lạnh
 
 ✅ VÍ DỤ PROMPT CHUẨN:
-"Xiaohongshu food photo. A hand holding a white bowl of rice, chopsticks lifting a slice of semi-translucent marinated salmon with green chili and sesame seeds. Warm natural lighting, casual angle. Background: other food containers on a wooden table, natural depth of field, slightly soft but recognizable. Appetizing. Aspect ratio: 3:4."
+"Xiaohongshu food photo. A gloved hand lifting half of a marinated blue crab, revealing vibrant orange roe inside. Dark soy sauce and sesame seeds pooling on the white plate below. Cool bright lighting, natural depth of field, background shows wooden table and other seafood containers slightly soft. Casual angle. Aspect ratio: 3:4."
 
 Số lượng ảnh: ${mode === 'clone' && referenceImageCount ? referenceImageCount : '1, 2, hoặc 4 (tuỳ content format)'}
 ${mode === 'clone' && referenceImageCount ? `⚠️ BẮT BUỘC: imageCount PHẢI = ${referenceImageCount} và imagePrompts PHẢI có ĐÚNG ${referenceImageCount} prompt riêng biệt (mỗi prompt mô tả 1 ảnh khác nhau).` : ''}

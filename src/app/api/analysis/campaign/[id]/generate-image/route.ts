@@ -41,41 +41,30 @@ function buildXiaohongshuPrompt(basePrompt: string, aspectSpec: ReturnType<typeo
         ? `\nA reference image is attached. Use it to understand the food type and color mood. Create a DIFFERENT photo — different angle, different plate, different background. Same dish, different shot.\n`
         : '';
 
-    return `Xiaohongshu (小红书) style food photography — beautiful, warm, and appetizing.
+    return `Xiaohongshu style food photography — beautiful and appetizing.
 ${refInstruction}
-FOOD: ${basePrompt}
+${basePrompt}
 
-VISUAL STYLE:
-- Xiaohongshu aesthetic: warm inviting tones, beautiful color grading, the food looks irresistible
-- Choose lighting and color temperature that best suits this specific dish naturally
-- Food should fill about 50-70% of the frame — NOT extreme close-up, NOT wide shot
-- Natural depth of field — background is slightly soft but items are still recognizable (NOT heavy bokeh with colorful light balls)
+STYLE RULES:
+- Beautiful color grading that suits this specific dish naturally
 - Glossy sauce, oil sheen, juice dripping — make it look DELICIOUS
+- Natural depth of field — background slightly soft but recognizable, NOT heavy DSLR bokeh
+- Real and authentic feel, not a 3D render or stock photo
 
-PHYSICAL ACCURACY (critical):
-- Render the food EXACTLY as it looks in real life
-- Raw/sashimi fish = semi-translucent flesh, visible grain, moist surface, NOT opaque or cooked-looking
-- Cooked meat = opaque, caramelized, firm texture
-- Cold dishes (sashimi, salad, cold noodles) = NO steam, NO smoke, NO heat haze
-- Hot dishes (soup, stir-fry, grilled) = steam rising naturally
-- If the food is cold, there must be ZERO steam or smoke in the entire image
+PHYSICAL ACCURACY:
+- Raw/sashimi fish = semi-translucent, glistening, NOT opaque or cooked-looking
+- Cold dishes (sashimi, salad) = NO steam, NO smoke at all
+- Hot dishes (soup, stir-fry, grilled) = natural steam rising
 
-COMPOSITION:
-- Hand interacting with food (holding bowl, chopsticks lifting food, etc.)
-- Natural casual angle — slightly off-center, NOT perfectly overhead or symmetric
-- Background: natural environment slightly out of focus — you can still tell what's there but it's not distracting
-- Do NOT arrange side dishes symmetrically around the main dish (studio flat-lay)
-
-IMPORTANT:
-- The food and styling should feel REAL and AUTHENTIC, not like a 3D render or stock photo
-- No text, watermarks, or labels on the image
-- No visible lamps, light bulbs, or ceiling in frame
+RULES:
+- No text, watermarks, or labels
+- No visible lamps, light bulbs, or ceiling
 
 Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 function buildSimplifiedPrompt(basePrompt: string, aspectSpec: ReturnType<typeof getAspectRatioSpec>): string {
-    return `Xiaohongshu style food photo. ${basePrompt}. Hand with chopsticks, warm appetizing tones. Natural depth of field, background slightly soft but recognizable. Casual angle. Aspect ratio: ${aspectSpec.ratio}.`;
+    return `Xiaohongshu style food photo. ${basePrompt}. Beautiful color grading, appetizing. Natural depth of field. No text. Aspect ratio: ${aspectSpec.ratio}.`;
 }
 
 // ─── Call BytePlus Seedream 4.5 API ──────────────────────────────────

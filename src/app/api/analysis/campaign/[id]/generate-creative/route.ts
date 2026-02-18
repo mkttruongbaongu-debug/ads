@@ -155,7 +155,7 @@ Mỗi image prompt PHẢI ngắn gọn (50-80 từ tiếng Anh), tập trung và
 - Background: natural depth of field — mờ nhẹ vừa đủ, VẪN NHẬN RA được đồ vật phía sau (hộp đồ ăn, ly, bàn)
 - KHÔNG dùng "heavy bokeh" hoặc bokeh balls kiểu DSLR — đây là ảnh phone, bokeh nhẹ tự nhiên thôi
 - Góc chụp casual, hơi nghiêng — không overhead hoàn hảo
-- ${referenceImageUrls && referenceImageUrls.length > 0 ? 'CHẾ ĐỘ CLONE: bố cục, góc chụp, và framing PHẢI GIỐNG ảnh tham khảo. Nếu ảnh gốc là trung cảnh thì prompt cũng trung cảnh, nếu gốc cận thì cận.' : 'Chọn bố cục phù hợp với món ăn — cận cho chi tiết đẹp, trung cảnh cho tổng thể hấp dẫn.'}
+- ${referenceImageUrls && referenceImageUrls.length > 0 ? 'CHẾ ĐỘ CLONE: lấy cảm hứng từ bố cục ảnh tham khảo nhưng ĐƯỢC PHÉP khác ~50% về góc chụp và framing. Giữ cùng phong cách và mood, nhưng thay đổi góc nhìn để tạo sự đa dạng.' : 'Chọn bố cục phù hợp với món ăn — cận cho chi tiết đẹp, trung cảnh cho tổng thể hấp dẫn.'}
 
 ### ĐỘ CHÍNH XÁC VẬT LÝ (CỰC KỲ QUAN TRỌNG):
 - Mô tả texture thức ăn ĐÚNG thực tế:
